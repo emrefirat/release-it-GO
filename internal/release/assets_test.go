@@ -63,6 +63,40 @@ func TestResolveAssets(t *testing.T) {
 			t.Error("expected error for invalid glob pattern")
 		}
 	})
+
+	t.Run("wildcard all files", func(t *testing.T) {
+		files, err := ResolveAssets([]string{filepath.Join(tmpDir, "*")})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(files) != 3 {
+			t.Errorf("expected 3 files, got %d", len(files))
+		}
+	})
+
+	t.Run("exact file path", func(t *testing.T) {
+		files, err := ResolveAssets([]string{filepath.Join(tmpDir, "app.zip")})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(files) != 1 {
+			t.Errorf("expected 1 file, got %d", len(files))
+		}
+	})
+
+	t.Run("duplicate patterns", func(t *testing.T) {
+		files, err := ResolveAssets([]string{
+			filepath.Join(tmpDir, "*.zip"),
+			filepath.Join(tmpDir, "*.zip"),
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		// Duplicate patterns produce duplicate results
+		if len(files) != 2 {
+			t.Errorf("expected 2 files (duplicated), got %d", len(files))
+		}
+	})
 }
 
 func TestDetectContentType(t *testing.T) {
@@ -83,6 +117,13 @@ func TestDetectContentType(t *testing.T) {
 		{"asc file", "app.asc", "application/pgp-signature"},
 		{"unknown file", "app.unknown123", "application/octet-stream"},
 		{"uppercase", "APP.ZIP", "application/zip"},
+		{"gz file", "data.gz", "application/gzip"},
+		{"bz2 file", "archive.bz2", "application/x-bzip2"},
+		{"xz file", "archive.xz", "application/x-xz"},
+		{"msi file", "installer.msi", "application/x-msi"},
+		{"apk file", "app.apk", "application/vnd.android.package-archive"},
+		{"path with directory", "/dist/linux/app.tar.gz", "application/gzip"},
+		{"mixed case tar.gz", "APP.TAR.GZ", "application/gzip"},
 	}
 
 	for _, tt := range tests {
