@@ -142,6 +142,54 @@ func TestCheckUpstream(t *testing.T) {
 	}
 }
 
+func TestCheckGitIdentity(t *testing.T) {
+	tests := []struct {
+		name    string
+		commit  bool
+		gitName string
+		gitEmail string
+		wantErr bool
+	}{
+		{"commit disabled, no identity", false, "", "", false},
+		{"commit enabled, both set", true, "Test User", "test@example.com", false},
+		{"commit enabled, name missing", true, "", "test@example.com", true},
+		{"commit enabled, email missing", true, "Test User", "", true},
+		{"commit enabled, both missing", true, "", "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			original := commandExecutor
+			defer func() { commandExecutor = original }()
+
+			commandExecutor = func(name string, args ...string) (string, error) {
+				cmd := strings.Join(args, " ")
+				if strings.Contains(cmd, "config user.name") {
+					return tt.gitName, nil
+				}
+				if strings.Contains(cmd, "config user.email") {
+					return tt.gitEmail, nil
+				}
+				return "", nil
+			}
+
+			cfg := &config.GitConfig{Commit: tt.commit}
+			g := newTestGitWithConfig(cfg, false)
+			err := g.checkGitIdentity()
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("checkGitIdentity() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if tt.wantErr && err != nil {
+				if !strings.Contains(err.Error(), "git user identity") {
+					t.Errorf("expected 'git user identity' in error, got: %v", err)
+				}
+			}
+		})
+	}
+}
+
 func TestCheckCommits(t *testing.T) {
 	tests := []struct {
 		name      string

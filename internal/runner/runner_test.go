@@ -2390,6 +2390,8 @@ func TestRunner_Run_FullPipeline_DryRun(t *testing.T) {
 		"git rev-parse --abbrev-ref HEAD":         {output: "main", err: nil},
 		"git rev-parse --is-inside-work-tree":     {output: "true", err: nil},
 		"git status --porcelain":                  {output: "", err: nil},
+		"git config user.name":                    {output: "Test User", err: nil},
+		"git config user.email":                   {output: "test@example.com", err: nil},
 		"git describe --tags --abbrev=0":          {output: "v1.0.0", err: nil},
 		"git log v1.0.0..HEAD --pretty=format:%s": {output: "fix: a fix", err: nil},
 		"git tag -l v1.0.1":                       {output: "", err: nil},
@@ -2702,6 +2704,192 @@ func TestRunner_GitRelease_CI_AddUntrackedFiles(t *testing.T) {
 	err := runner.gitRelease()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// --- checkTokens tests ---
+
+func TestRunner_CheckTokens_NoRelease(t *testing.T) {
+	cfg := &config.Config{
+		CI: true,
+		GitHub: config.GitHubConfig{Release: false},
+		GitLab: config.GitLabConfig{Release: false},
+	}
+	runner := NewRunner(cfg)
+
+	err := runner.checkTokens()
+	if err != nil {
+		t.Errorf("expected no error when releases are disabled, got: %v", err)
+	}
+}
+
+func TestRunner_CheckTokens_GitHubMissingToken(t *testing.T) {
+	// Ensure GITHUB_TOKEN is unset for this test
+	t.Setenv("GITHUB_TOKEN", "")
+
+	cfg := &config.Config{
+		CI: true,
+		GitHub: config.GitHubConfig{
+			Release: true,
+		},
+	}
+	runner := NewRunner(cfg)
+
+	err := runner.checkTokens()
+	if err == nil {
+		t.Error("expected error when GITHUB_TOKEN is missing")
+	}
+	if !strings.Contains(err.Error(), "GITHUB_TOKEN") {
+		t.Errorf("expected error about GITHUB_TOKEN, got: %v", err)
+	}
+}
+
+func TestRunner_CheckTokens_GitHubTokenSet(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "ghp_test123")
+
+	cfg := &config.Config{
+		CI: true,
+		GitHub: config.GitHubConfig{
+			Release: true,
+		},
+	}
+	runner := NewRunner(cfg)
+
+	err := runner.checkTokens()
+	if err != nil {
+		t.Errorf("expected no error when GITHUB_TOKEN is set, got: %v", err)
+	}
+}
+
+func TestRunner_CheckTokens_GitHubCustomTokenRef(t *testing.T) {
+	t.Setenv("MY_GH_TOKEN", "")
+
+	cfg := &config.Config{
+		CI: true,
+		GitHub: config.GitHubConfig{
+			Release:  true,
+			TokenRef: "MY_GH_TOKEN",
+		},
+	}
+	runner := NewRunner(cfg)
+
+	err := runner.checkTokens()
+	if err == nil {
+		t.Error("expected error when custom token ref is missing")
+	}
+	if !strings.Contains(err.Error(), "MY_GH_TOKEN") {
+		t.Errorf("expected error about MY_GH_TOKEN, got: %v", err)
+	}
+}
+
+func TestRunner_CheckTokens_GitHubSkipChecks(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "")
+
+	cfg := &config.Config{
+		CI: true,
+		GitHub: config.GitHubConfig{
+			Release:    true,
+			SkipChecks: true,
+		},
+	}
+	runner := NewRunner(cfg)
+
+	err := runner.checkTokens()
+	if err != nil {
+		t.Errorf("expected no error when skipChecks is true, got: %v", err)
+	}
+}
+
+func TestRunner_CheckTokens_GitLabMissingToken(t *testing.T) {
+	t.Setenv("GITLAB_TOKEN", "")
+
+	cfg := &config.Config{
+		CI: true,
+		GitLab: config.GitLabConfig{
+			Release: true,
+		},
+	}
+	runner := NewRunner(cfg)
+
+	err := runner.checkTokens()
+	if err == nil {
+		t.Error("expected error when GITLAB_TOKEN is missing")
+	}
+	if !strings.Contains(err.Error(), "GITLAB_TOKEN") {
+		t.Errorf("expected error about GITLAB_TOKEN, got: %v", err)
+	}
+}
+
+func TestRunner_CheckTokens_GitLabTokenSet(t *testing.T) {
+	t.Setenv("GITLAB_TOKEN", "glpat-test123")
+
+	cfg := &config.Config{
+		CI: true,
+		GitLab: config.GitLabConfig{
+			Release: true,
+		},
+	}
+	runner := NewRunner(cfg)
+
+	err := runner.checkTokens()
+	if err != nil {
+		t.Errorf("expected no error when GITLAB_TOKEN is set, got: %v", err)
+	}
+}
+
+func TestRunner_CheckTokens_GitLabCustomTokenRef(t *testing.T) {
+	t.Setenv("MY_GL_TOKEN", "")
+
+	cfg := &config.Config{
+		CI: true,
+		GitLab: config.GitLabConfig{
+			Release:  true,
+			TokenRef: "MY_GL_TOKEN",
+		},
+	}
+	runner := NewRunner(cfg)
+
+	err := runner.checkTokens()
+	if err == nil {
+		t.Error("expected error when custom GitLab token ref is missing")
+	}
+	if !strings.Contains(err.Error(), "MY_GL_TOKEN") {
+		t.Errorf("expected error about MY_GL_TOKEN, got: %v", err)
+	}
+}
+
+func TestRunner_CheckTokens_GitLabSkipChecks(t *testing.T) {
+	t.Setenv("GITLAB_TOKEN", "")
+
+	cfg := &config.Config{
+		CI: true,
+		GitLab: config.GitLabConfig{
+			Release:    true,
+			SkipChecks: true,
+		},
+	}
+	runner := NewRunner(cfg)
+
+	err := runner.checkTokens()
+	if err != nil {
+		t.Errorf("expected no error when skipChecks is true, got: %v", err)
+	}
+}
+
+func TestRunner_CheckTokens_BothEnabled_BothSet(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "ghp_test")
+	t.Setenv("GITLAB_TOKEN", "glpat-test")
+
+	cfg := &config.Config{
+		CI: true,
+		GitHub: config.GitHubConfig{Release: true},
+		GitLab: config.GitLabConfig{Release: true},
+	}
+	runner := NewRunner(cfg)
+
+	err := runner.checkTokens()
+	if err != nil {
+		t.Errorf("expected no error when both tokens are set, got: %v", err)
 	}
 }
 

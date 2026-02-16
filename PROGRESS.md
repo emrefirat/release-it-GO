@@ -20,6 +20,7 @@
 | 9 | Conventional Commit Linting | Tamamlandi | 100% |
 | 10 | UI/Output Iyilestirmesi | Tamamlandi | 100% |
 | 11 | Docker Container Destegi | Tamamlandi | 100% |
+| 12 | Docker Pre-flight Kontrolleri | Tamamlandi | 100% |
 
 **Son Guncelleme:** 2026-02-16
 **Aktif Gelistirici:** Claude
@@ -387,6 +388,31 @@
 
 ---
 
+## Faz 12: Docker Ortami Pre-flight Kontrolleri
+
+**Durum:** Tamamlandi
+
+### Yapilacaklar
+
+- [x] `git/prerequisites.go` - checkGitIdentity() fonksiyonu (user.name/user.email kontrolu)
+- [x] `git/prerequisites.go` - CheckPrerequisites() icine identity check eklenmesi
+- [x] `git/prerequisites_test.go` - Identity testleri (5 test: commit kapali, ikisi tam, name eksik, email eksik, ikisi eksik)
+- [x] `runner/runner.go` - checkTokens() fonksiyonu (GitHub/GitLab token kontrolu)
+- [x] `runner/runner.go` - checkPrerequisites() icine token check eklenmesi
+- [x] `runner/runner_test.go` - Token testleri (11 test: release kapali, token eksik/set, custom tokenRef, skipChecks, her iki platform)
+- [x] Tum testler gecti (`go test ./... -race`)
+- [x] `go vet` ve `go build` temiz
+
+### Notlar
+
+- Git identity kontrolu sadece `git.commit: true` ise yapilir (tag-only veya push-only senaryolarda gereksiz)
+- Token kontrolu `runner` seviyesinde cunku config bilgisine (GitHub/GitLab ayarlari) erisim gerekiyor
+- `skipChecks: true` ile token kontrolu atlanabilir (CI ortaminda farkli auth mekanizmasi kullanildiginda)
+- Custom `tokenRef` destegi: kullanici farkli env variable adi kullanabilir
+- Hatalar erken (prerequisites asamasinda) verilir, pipeline gec asamada basarisiz olmaz
+
+---
+
 ## Bugs
 
 - [x] BUG: Ilk release'de changelog "exit status 128" hatasi (2026-02-16) → `LatestVersion=0.0.0` iken `v0.0.0` tag'i araniyordu ama repo'da boyle bir tag yok. `latestVersionToTag()` helper fonksiyonu eklendi: `0.0.0` veya bos string icin bos doner, bu sayede `GetCommitsSinceTag("")` tum commitleri alir. 3 yer etkilendi: `RunChangelogOnly`, `generateChangelog`, `autoDetectIncrement`.
@@ -426,6 +452,7 @@
 | 2026-02-16 | Claude | fix: pre-release ayni ID ile versiyon artmama hatasi (prepatch → prerelease increment) |
 | 2026-02-16 | Claude | fix: commit lint type validation - allowedTypes map ile gecersiz type'lar reddediliyor, --verbose ile commit listesi gosteriliyor |
 | 2026-02-16 | Claude | Phase 11 tamamlandi: Docker container destegi - multi-stage Dockerfile, .dockerignore, Makefile docker target'lari |
+| 2026-02-16 | Claude | Phase 12 tamamlandi: Docker pre-flight kontrolleri - git identity check, token pre-flight check (GitHub/GitLab) |
 
 ---
 
