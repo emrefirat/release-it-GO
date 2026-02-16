@@ -270,6 +270,112 @@ func TestGitLabClient_PostComment_DryRun(t *testing.T) {
 	}
 }
 
+func TestGitLabClient_UploadAssets_Success(t *testing.T) {
+	uploadCalled := false
+	linkCalled := false
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "PUT" && strings.Contains(r.URL.Path, "/packages/generic/") {
+			uploadCalled = true
+			// Verify content type is set
+			if r.Header.Get("Content-Type") == "" {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			w.WriteHeader(http.StatusCreated)
+			w.Write([]byte(`{"message":"201 Created"}`))
+			return
+		}
+		if r.Method == "POST" && strings.Contains(r.URL.Path, "/assets/links") {
+			linkCalled = true
+			var req gitlabReleaseLinkRequest
+			json.NewDecoder(r.Body).Decode(&req)
+			if req.Name == "" || req.URL == "" {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			w.WriteHeader(http.StatusCreated)
+			w.Write([]byte(`{"id":1}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	// Create a temp file to upload
+	tmpDir := t.TempDir()
+	testFile := tmpDir + "/app.zip"
+	os.WriteFile(testFile, []byte("fake zip content"), 0644)
+
+	c := &GitLabClient{
+		config:    &config.GitLabConfig{},
+		repoInfo:  testGitLabRepoInfo(),
+		logger:    applog.NewLogger(0, false),
+		client:    server.Client(),
+		baseURL:   server.URL,
+		token:     "test-token",
+		projectID: "testgroup%2Ftestproject",
+	}
+
+	err := c.UploadAssets("v1.0.0", []string{testFile})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !uploadCalled {
+		t.Error("expected upload endpoint to be called")
+	}
+	if !linkCalled {
+		t.Error("expected release link endpoint to be called")
+	}
+}
+
+func TestGitLabClient_UploadAssets_FileNotFound(t *testing.T) {
+	c := &GitLabClient{
+		config:    &config.GitLabConfig{},
+		repoInfo:  testGitLabRepoInfo(),
+		logger:    applog.NewLogger(0, false),
+		client:    http.DefaultClient,
+		baseURL:   "https://gitlab.com/api/v4",
+		token:     "test-token",
+		projectID: "testgroup%2Ftestproject",
+	}
+
+	err := c.UploadAssets("v1.0.0", []string{"/nonexistent/file.zip"})
+	if err == nil {
+		t.Error("expected error for missing file")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("expected 'not found' in error, got: %v", err)
+	}
+}
+
+func TestGitLabClient_UploadAssets_UploadFailure(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"error":"internal error"}`))
+	}))
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+	testFile := tmpDir + "/app.zip"
+	os.WriteFile(testFile, []byte("content"), 0644)
+
+	c := &GitLabClient{
+		config:    &config.GitLabConfig{},
+		repoInfo:  testGitLabRepoInfo(),
+		logger:    applog.NewLogger(0, false),
+		client:    server.Client(),
+		baseURL:   server.URL,
+		token:     "test-token",
+		projectID: "testgroup%2Ftestproject",
+	}
+
+	err := c.UploadAssets("v1.0.0", []string{testFile})
+	if err == nil {
+		t.Error("expected error for upload failure")
+	}
+}
+
 func TestGitLabClient_UploadAssets_DryRun(t *testing.T) {
 	c := &GitLabClient{
 		config:    &config.GitLabConfig{},
@@ -376,6 +482,65 @@ func TestGitLabClient_HandleErrorResponse(t *testing.T) {
 				t.Errorf("expected %q in error, got: %v", tt.wantMsg, err)
 			}
 		})
+	}
+}
+
+func TestGitLabClient_CreateRelease_Error(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		w.Write([]byte(`{"message":"422 Unprocessable"}`))
+	}))
+	defer server.Close()
+
+	c := &GitLabClient{
+		config:    &config.GitLabConfig{},
+		repoInfo:  testGitLabRepoInfo(),
+		logger:    applog.NewLogger(0, false),
+		client:    server.Client(),
+		baseURL:   server.URL,
+		token:     "test-token",
+		projectID: "testgroup%2Ftestproject",
+	}
+
+	_, err := c.CreateRelease(ReleaseOptions{TagName: "v1.0.0"})
+	if err == nil {
+		t.Error("expected error")
+	}
+}
+
+func TestGitLabClient_PostComment_Error(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte(`{"message":"forbidden"}`))
+	}))
+	defer server.Close()
+
+	c := &GitLabClient{
+		config:    &config.GitLabConfig{},
+		repoInfo:  testGitLabRepoInfo(),
+		logger:    applog.NewLogger(0, false),
+		client:    server.Client(),
+		baseURL:   server.URL,
+		token:     "test-token",
+		projectID: "testgroup%2Ftestproject",
+	}
+
+	err := c.PostComment(CommentTarget{Type: "issue", Number: 1}, "test")
+	if err == nil {
+		t.Error("expected error")
+	}
+}
+
+func TestNewGitLabClient_MissingToken(t *testing.T) {
+	os.Unsetenv("MISSING_GL_TOKEN")
+
+	cfg := &config.GitLabConfig{
+		TokenRef: "MISSING_GL_TOKEN",
+	}
+
+	_, err := NewGitLabClient(cfg, testGitLabRepoInfo(), applog.NewLogger(0, false), false)
+	if err == nil {
+		t.Error("expected error for missing token")
 	}
 }
 
