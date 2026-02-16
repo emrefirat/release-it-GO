@@ -54,8 +54,11 @@ WORKDIR /workspace
 
 USER releaser
 
-# Allow mounted repositories to be used safely (must be after USER releaser)
-RUN git config --global --add safe.directory '*'
+# Configure git defaults for container environment (can be overridden with
+# -e GIT_AUTHOR_NAME / GIT_AUTHOR_EMAIL or by mounting a .gitconfig)
+RUN git config --global --add safe.directory '*' && \
+    git config --global user.name "release-it-go" && \
+    git config --global user.email "noreply@release-it-go"
 
 ENTRYPOINT ["/usr/local/bin/release-it-go"]
 CMD ["--help"]

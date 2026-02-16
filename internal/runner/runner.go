@@ -258,7 +258,41 @@ func (r *Runner) checkPrerequisites() error {
 		return err
 	}
 
+	if err := r.checkTokens(); err != nil {
+		r.ctx.Spinner.Stop(false)
+		return err
+	}
+
 	r.ctx.Spinner.Stop(true)
+	return nil
+}
+
+// checkTokens verifies that required API tokens are set when GitHub/GitLab
+// releases are enabled. This catches missing tokens early in the pipeline
+// instead of failing late during the release step.
+func (r *Runner) checkTokens() error {
+	cfg := r.ctx.Config
+
+	if cfg.GitHub.Release && !cfg.GitHub.SkipChecks {
+		tokenRef := cfg.GitHub.TokenRef
+		if tokenRef == "" {
+			tokenRef = "GITHUB_TOKEN"
+		}
+		if os.Getenv(tokenRef) == "" {
+			return fmt.Errorf("GitHub release is enabled but %s is not set", tokenRef)
+		}
+	}
+
+	if cfg.GitLab.Release && !cfg.GitLab.SkipChecks {
+		tokenRef := cfg.GitLab.TokenRef
+		if tokenRef == "" {
+			tokenRef = "GITLAB_TOKEN"
+		}
+		if os.Getenv(tokenRef) == "" {
+			return fmt.Errorf("GitLab release is enabled but %s is not set", tokenRef)
+		}
+	}
+
 	return nil
 }
 

@@ -26,6 +26,9 @@ func (g *Git) CheckPrerequisites() error {
 	if err := g.checkUpstream(); err != nil {
 		return err
 	}
+	if err := g.checkGitIdentity(); err != nil {
+		return err
+	}
 	if err := g.checkCommits(); err != nil {
 		return err
 	}
@@ -85,6 +88,29 @@ func (g *Git) checkUpstream() error {
 	_, err := g.runSilent("rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
 	if err != nil {
 		return fmt.Errorf("no upstream configured for current branch")
+	}
+
+	return nil
+}
+
+// checkGitIdentity verifies that git user.name and user.email are configured.
+// This is only checked when commit is enabled, to prevent failures in Docker
+// containers or fresh environments where git identity is not set.
+func (g *Git) checkGitIdentity() error {
+	if !g.config.Commit {
+		return nil
+	}
+
+	name, _ := commandExecutor("git", "config", "user.name")
+	email, _ := commandExecutor("git", "config", "user.email")
+
+	name = strings.TrimSpace(name)
+	email = strings.TrimSpace(email)
+
+	if name == "" || email == "" {
+		return fmt.Errorf("git user identity is not configured (user.name or user.email is missing);\n" +
+			"  run: git config --global user.name \"Your Name\"\n" +
+			"       git config --global user.email \"you@example.com\"")
 	}
 
 	return nil
