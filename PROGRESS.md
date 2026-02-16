@@ -9,7 +9,7 @@
 
 | Faz | Baslik | Durum | Ilerleme |
 |-----|--------|-------|----------|
-| 1 | Core Foundation | Baslanmadi | 0% |
+| 1 | Core Foundation | Tamamlandi | 100% |
 | 2 | Git Operations | Baslanmadi | 0% |
 | 3 | Conventional Commits + Changelog | Baslanmadi | 0% |
 | 4 | GitHub + GitLab Releases | Baslanmadi | 0% |
@@ -18,35 +18,39 @@
 | 7 | Testing, CI/CD, Documentation | Baslanmadi | 0% |
 
 **Son Guncelleme:** 2026-02-16
-**Aktif Gelistirici:** -
-**Mevcut Versiyon:** Henuz baslanmadi
+**Aktif Gelistirici:** Claude
+**Mevcut Versiyon:** dev (Phase 1 tamamlandi)
 
 ---
 
 ## Faz 1: Core Foundation
 
-**Durum:** Baslanmadi
+**Durum:** Tamamlandi
 **PRD:** `docs/phase_1.md`
 
 ### Yapilacaklar
 
-- [ ] Go module init (`go mod init`)
-- [ ] Cobra CLI iskeleti
-- [ ] Config struct tanimlari
-- [ ] Config loader (JSON/YAML/TOML)
-- [ ] Default degerler
-- [ ] CLI flags -> config merge
-- [ ] Git tag'den versiyon okuma
-- [ ] VERSION dosyasindan versiyon okuma
-- [ ] Semver parse/increment/compare
-- [ ] Template variable rendering
-- [ ] Logger (verbose seviyeleri)
-- [ ] Makefile
-- [ ] Unit testler
+- [x] Go module init (`go mod init`)
+- [x] Cobra CLI iskeleti
+- [x] Config struct tanimlari
+- [x] Config loader (JSON/YAML/TOML)
+- [x] Default degerler
+- [x] CLI flags -> config merge
+- [x] Git tag'den versiyon okuma
+- [x] VERSION dosyasindan versiyon okuma
+- [x] Semver parse/increment/compare
+- [x] Template variable rendering
+- [x] Logger (verbose seviyeleri)
+- [x] Makefile
+- [x] Unit testler
+- [x] CalVer struct ve temel implementasyon
 
 ### Notlar
 
--
+- Test coverage: cli=%82.9, config=%87.9, log=%100, version=%86.5
+- semver.IncPatch() pre-release'de pre-release'i kaldirir (1.2.3-beta.0 -> 1.2.3), bu dogru semver davranisi
+- Viper ile config unmarshaling icin mapstructure tag'leri eklendi
+- runGit fonksiyonu test icin mocklanabilir (var olarak tanimli)
 
 ---
 
@@ -189,6 +193,7 @@
 | Tarih | Gelistirici | Degisiklik |
 |-------|------------|------------|
 | 2026-02-16 | - | Proje baslatildi, PRD dosyalari olusturuldu |
+| 2026-02-16 | Claude | Phase 1 tamamlandi: CLI, config, version, logger, template, tests |
 
 ---
 
