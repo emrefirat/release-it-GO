@@ -173,13 +173,6 @@ func runInitWithPrompter(prompter ui.Prompter) error {
 	}
 	cfg.Git.RequireConventionalCommits = requireConventional
 
-	// requireBranch
-	requireBranch, err := prompter.Input("Required branch (empty to skip)", "main")
-	if err != nil {
-		return err
-	}
-	cfg.Git.RequireBranch = requireBranch
-
 	// Write config
 	if err := config.WriteConfigJSON(cfg, config.NativeConfigFile); err != nil {
 		return fmt.Errorf("writing config: %w", err)
