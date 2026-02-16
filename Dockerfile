@@ -45,8 +45,9 @@ RUN apk add --no-cache git openssh-client ca-certificates
 RUN addgroup -g ${USER_GID} releaser && \
     adduser -D -u ${USER_UID} -G releaser releaser
 
-# Copy binary from builder
+# Copy binary and entrypoint script
 COPY --from=builder /build/release-it-go /usr/local/bin/release-it-go
+COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # Setup workspace
 RUN mkdir -p /workspace && chown releaser:releaser /workspace
@@ -54,11 +55,8 @@ WORKDIR /workspace
 
 USER releaser
 
-# Configure git defaults for container environment (can be overridden with
-# -e GIT_AUTHOR_NAME / GIT_AUTHOR_EMAIL or by mounting a .gitconfig)
-RUN git config --global --add safe.directory '*' && \
-    git config --global user.name "release-it-go" && \
-    git config --global user.email "noreply@release-it-go"
+# Allow mounted repositories to be used safely
+RUN git config --global --add safe.directory '*'
 
-ENTRYPOINT ["/usr/local/bin/release-it-go"]
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["--help"]
