@@ -485,6 +485,7 @@
 | 2026-02-16 | Claude | Phase 11 tamamlandi: Docker container destegi - multi-stage Dockerfile, .dockerignore, Makefile docker target'lari |
 | 2026-02-16 | Claude | Phase 12 tamamlandi: Docker pre-flight kontrolleri - git identity check, token pre-flight check (GitHub/GitLab) |
 | 2026-02-17 | Claude | Phase 13 tamamlandi: Webhook notification destegi - Slack + Teams, non-fatal pipeline adimi, urlRef guvenlik pattern'i, %98+ coverage |
+| 2026-02-17 | Claude | feat: init wizard'a "Write CHANGELOG.md file?" sorusu eklendi - changelog etkinken dosya yazmayi kapama imkani |
 
 ---
 
