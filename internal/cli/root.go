@@ -20,20 +20,22 @@ var (
 
 // CLI flag variables
 var (
-	cfgFile        string
-	dryRun         bool
-	ciMode         bool
-	verboseCount   int
-	increment      string
-	preReleaseID   string
-	preRelease     string
-	showChangelog  bool
-	releaseVersion bool
-	onlyVersion    bool
-	noIncrement    bool
-	noCommit       bool
-	noTag          bool
-	noPush         bool
+	cfgFile          string
+	dryRun           bool
+	ciMode           bool
+	verboseCount     int
+	increment        string
+	preReleaseID     string
+	preRelease       string
+	showChangelog    bool
+	releaseVersion   bool
+	onlyVersion      bool
+	noIncrement      bool
+	noCommit         bool
+	noTag            bool
+	noPush           bool
+	checkCommits     bool
+	ignoreCommitLint bool
 )
 
 // NewRootCommand creates the root cobra command for release-it-go.
@@ -68,6 +70,10 @@ It is a Go reimplementation of release-it without Node.js dependencies.`,
 	rootCmd.Flags().BoolVar(&noCommit, "no-git.commit", false, "skip git commit")
 	rootCmd.Flags().BoolVar(&noTag, "no-git.tag", false, "skip git tag")
 	rootCmd.Flags().BoolVar(&noPush, "no-git.push", false, "skip git push")
+
+	// Commit lint flags
+	rootCmd.Flags().BoolVar(&checkCommits, "check-commits", false, "check commit conventions only (no release)")
+	rootCmd.Flags().BoolVar(&ignoreCommitLint, "ignore-commit-lint", false, "skip conventional commit validation")
 
 	// Subcommands
 	rootCmd.AddCommand(newVersionCommand())
@@ -185,8 +191,17 @@ func runRelease(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("CalVer and pre-release cannot be used together")
 	}
 
+	// Handle commit lint override
+	if ignoreCommitLint {
+		cfg.Git.RequireConventionalCommits = false
+	}
+
 	// Create runner and handle special modes
 	r := runner.NewRunner(cfg)
+
+	if checkCommits {
+		return r.RunCheckCommits()
+	}
 
 	if showChangelog {
 		return r.RunChangelogOnly()

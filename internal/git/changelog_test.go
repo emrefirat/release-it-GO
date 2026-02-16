@@ -100,6 +100,85 @@ func TestGenerateChangelog_DefaultToRef(t *testing.T) {
 	}
 }
 
+func TestGetCommitsWithHashSinceTag(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	commandExecutor = func(name string, args ...string) (string, error) {
+		return "abc1234||feat: add feature\ndef5678||fix: bug fix\nghi9012||chore: update deps", nil
+	}
+
+	cfg := &config.GitConfig{}
+	g := newTestGitWithConfig(cfg, false)
+
+	commits, err := g.GetCommitsWithHashSinceTag("v1.0.0")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(commits) != 3 {
+		t.Fatalf("expected 3 commits, got %d", len(commits))
+	}
+	if commits[0].Hash != "abc1234" {
+		t.Errorf("expected hash 'abc1234', got %q", commits[0].Hash)
+	}
+	if commits[0].Subject != "feat: add feature" {
+		t.Errorf("expected subject 'feat: add feature', got %q", commits[0].Subject)
+	}
+	if commits[2].Hash != "ghi9012" {
+		t.Errorf("expected hash 'ghi9012', got %q", commits[2].Hash)
+	}
+}
+
+func TestGetCommitsWithHashSinceTag_NoTag(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	var capturedArgs []string
+	commandExecutor = func(name string, args ...string) (string, error) {
+		capturedArgs = args
+		return "abc1234||initial commit", nil
+	}
+
+	cfg := &config.GitConfig{}
+	g := newTestGitWithConfig(cfg, false)
+
+	commits, err := g.GetCommitsWithHashSinceTag("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	cmd := strings.Join(capturedArgs, " ")
+	if strings.Contains(cmd, "..HEAD") {
+		t.Error("should not contain range when tag is empty")
+	}
+	if len(commits) != 1 {
+		t.Fatalf("expected 1 commit, got %d", len(commits))
+	}
+	if commits[0].Hash != "abc1234" {
+		t.Errorf("expected hash 'abc1234', got %q", commits[0].Hash)
+	}
+}
+
+func TestGetCommitsWithHashSinceTag_Empty(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	commandExecutor = func(name string, args ...string) (string, error) {
+		return "", nil
+	}
+
+	cfg := &config.GitConfig{}
+	g := newTestGitWithConfig(cfg, false)
+
+	commits, err := g.GetCommitsWithHashSinceTag("v1.0.0")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if commits != nil {
+		t.Errorf("expected nil for no commits, got %v", commits)
+	}
+}
+
 func TestGetCommitsSinceTag(t *testing.T) {
 	original := commandExecutor
 	defer func() { commandExecutor = original }()
