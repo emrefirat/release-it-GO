@@ -10,7 +10,7 @@
 | Faz | Baslik | Durum | Ilerleme |
 |-----|--------|-------|----------|
 | 1 | Core Foundation | Tamamlandi | 100% |
-| 2 | Git Operations | Baslanmadi | 0% |
+| 2 | Git Operations | Tamamlandi | 100% |
 | 3 | Conventional Commits + Changelog | Baslanmadi | 0% |
 | 4 | GitHub + GitLab Releases | Baslanmadi | 0% |
 | 5 | Interactive UI + Hooks + Pipeline | Baslanmadi | 0% |
@@ -19,7 +19,7 @@
 
 **Son Guncelleme:** 2026-02-16
 **Aktif Gelistirici:** Claude
-**Mevcut Versiyon:** dev (Phase 1 tamamlandi)
+**Mevcut Versiyon:** dev (Phase 2 tamamlandi)
 
 ---
 
@@ -56,24 +56,28 @@
 
 ## Faz 2: Git Operations
 
-**Durum:** Baslanmadi
+**Durum:** Tamamlandi
 **PRD:** `docs/phase_2.md`
 
 ### Yapilacaklar
 
-- [ ] Git runner (komut calistirma)
-- [ ] Prerequisite checks (branch, clean, upstream, commits)
-- [ ] Stage + Commit
-- [ ] Tag olusturma
-- [ ] Push
-- [ ] Repo info parse (HTTPS + SSH)
-- [ ] Basit git log changelog
-- [ ] Dry-run destegi
-- [ ] Unit testler
+- [x] Git runner (komut calistirma)
+- [x] Prerequisite checks (branch, clean, upstream, commits)
+- [x] Stage + Commit
+- [x] Tag olusturma
+- [x] Push
+- [x] Repo info parse (HTTPS + SSH)
+- [x] Basit git log changelog
+- [x] Dry-run destegi
+- [x] Unit testler
 
 ### Notlar
 
--
+- Test coverage: git=%88.7
+- commandExecutor fonksiyon degiskeni ile git komutlari test icin mocklanabilir
+- isWriteOperation ile dry-run modunda okuma islemleri calismaya devam eder
+- TagExists her zaman gercek git komutu calistirir (dry-run dahil)
+- HTTPS ve SSH remote URL formatlari regex ile parse ediliyor
 
 ---
 
@@ -194,6 +198,7 @@
 |-------|------------|------------|
 | 2026-02-16 | - | Proje baslatildi, PRD dosyalari olusturuldu |
 | 2026-02-16 | Claude | Phase 1 tamamlandi: CLI, config, version, logger, template, tests |
+| 2026-02-16 | Claude | Phase 2 tamamlandi: git runner, prerequisites, commit, tag, push, repo info, changelog, tests |
 
 ---
 
