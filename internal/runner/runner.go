@@ -443,7 +443,14 @@ func (r *Runner) determineSemVer(latestVersion string) error {
 	preReleaseID := r.ctx.Config.PreReleaseID
 	incrementType := increment
 	if preReleaseID != "" {
-		incrementType = "pre" + increment
+		// If current version is already a pre-release with the same ID,
+		// use "prerelease" to increment the number (e.g. beta.0 → beta.1).
+		// Otherwise use "pre+increment" to start a new pre-release series.
+		if parsedCurrent.Prerelease() != "" && strings.HasPrefix(parsedCurrent.Prerelease(), preReleaseID+".") {
+			incrementType = "prerelease"
+		} else {
+			incrementType = "pre" + increment
+		}
 	}
 
 	newSemver, err := version.IncrementVersion(parsedCurrent, incrementType, preReleaseID)

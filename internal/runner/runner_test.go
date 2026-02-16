@@ -2093,6 +2093,72 @@ func TestRunner_DetermineSemVer_PreReleaseMinor(t *testing.T) {
 	}
 }
 
+func TestRunner_DetermineSemVer_PreReleaseIncrement(t *testing.T) {
+	cfg := &config.Config{
+		CI:           true,
+		Increment:    "patch",
+		PreReleaseID: "deneme2",
+		Git: config.GitConfig{
+			TagName: "v${version}",
+		},
+	}
+	runner := NewRunner(cfg)
+
+	// Current version is already pre-release with same ID → should increment number
+	err := runner.determineSemVer("1.6.0-deneme2.0")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if runner.ctx.Version != "1.6.0-deneme2.1" {
+		t.Errorf("expected 1.6.0-deneme2.1, got %s", runner.ctx.Version)
+	}
+}
+
+func TestRunner_DetermineSemVer_PreReleaseDifferentID(t *testing.T) {
+	cfg := &config.Config{
+		CI:           true,
+		Increment:    "patch",
+		PreReleaseID: "rc",
+		Git: config.GitConfig{
+			TagName: "v${version}",
+		},
+	}
+	runner := NewRunner(cfg)
+
+	// Current version has different pre-release ID → should start new series
+	err := runner.determineSemVer("1.6.0-beta.3")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if runner.ctx.Version != "1.6.0-rc.0" {
+		t.Errorf("expected 1.6.0-rc.0, got %s", runner.ctx.Version)
+	}
+}
+
+func TestRunner_DetermineSemVer_PreReleaseSecondIncrement(t *testing.T) {
+	cfg := &config.Config{
+		CI:           true,
+		Increment:    "minor",
+		PreReleaseID: "beta",
+		Git: config.GitConfig{
+			TagName: "v${version}",
+		},
+	}
+	runner := NewRunner(cfg)
+
+	// Already beta.5 → should become beta.6
+	err := runner.determineSemVer("2.0.0-beta.5")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if runner.ctx.Version != "2.0.0-beta.6" {
+		t.Errorf("expected 2.0.0-beta.6, got %s", runner.ctx.Version)
+	}
+}
+
 // --- gitRelease with actual (mocked) git operations ---
 
 func TestRunner_GitRelease_CI_StageError(t *testing.T) {
