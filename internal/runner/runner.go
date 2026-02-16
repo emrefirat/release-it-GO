@@ -267,9 +267,9 @@ func (r *Runner) checkPrerequisites() error {
 	return nil
 }
 
-// checkTokens verifies that required API tokens are set when GitHub/GitLab
-// releases are enabled. This catches missing tokens early in the pipeline
-// instead of failing late during the release step.
+// checkTokens verifies that required API tokens are set and valid when
+// GitHub/GitLab releases are enabled. This catches missing or invalid tokens
+// early in the pipeline instead of failing late during the release step.
 func (r *Runner) checkTokens() error {
 	cfg := r.ctx.Config
 
@@ -281,6 +281,15 @@ func (r *Runner) checkTokens() error {
 		if os.Getenv(tokenRef) == "" {
 			return fmt.Errorf("GitHub release is enabled but %s is not set", tokenRef)
 		}
+		if r.ctx.RepoInfo != nil {
+			client, err := release.NewGitHubClient(&cfg.GitHub, r.ctx.RepoInfo, r.ctx.Logger, r.ctx.IsDryRun)
+			if err != nil {
+				return fmt.Errorf("GitHub client: %w", err)
+			}
+			if err := client.ValidateToken(); err != nil {
+				return err
+			}
+		}
 	}
 
 	if cfg.GitLab.Release && !cfg.GitLab.SkipChecks {
@@ -290,6 +299,15 @@ func (r *Runner) checkTokens() error {
 		}
 		if os.Getenv(tokenRef) == "" {
 			return fmt.Errorf("GitLab release is enabled but %s is not set", tokenRef)
+		}
+		if r.ctx.RepoInfo != nil {
+			client, err := release.NewGitLabClient(&cfg.GitLab, r.ctx.RepoInfo, r.ctx.Logger, r.ctx.IsDryRun)
+			if err != nil {
+				return fmt.Errorf("GitLab client: %w", err)
+			}
+			if err := client.ValidateToken(); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -748,11 +766,6 @@ func (r *Runner) githubRelease() error {
 		return fmt.Errorf("GitHub client: %w", err)
 	}
 
-	if err := client.ValidateToken(); err != nil {
-		r.ctx.Spinner.Stop(false)
-		return err
-	}
-
 	releaseName := renderTagName(r.ctx.Config.GitHub.ReleaseName, r.ctx.Version)
 	releaseNotes := r.ctx.Changelog
 
@@ -817,11 +830,6 @@ func (r *Runner) gitlabRelease() error {
 	if err != nil {
 		r.ctx.Spinner.Stop(false)
 		return fmt.Errorf("GitLab client: %w", err)
-	}
-
-	if err := client.ValidateToken(); err != nil {
-		r.ctx.Spinner.Stop(false)
-		return err
 	}
 
 	releaseName := renderTagName(r.ctx.Config.GitLab.ReleaseName, r.ctx.Version)
