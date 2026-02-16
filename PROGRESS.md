@@ -12,14 +12,14 @@
 | 1 | Core Foundation | Tamamlandi | 100% |
 | 2 | Git Operations | Tamamlandi | 100% |
 | 3 | Conventional Commits + Changelog | Tamamlandi | 100% |
-| 4 | GitHub + GitLab Releases | Baslanmadi | 0% |
+| 4 | GitHub + GitLab Releases | Tamamlandi | 100% |
 | 5 | Interactive UI + Hooks + Pipeline | Baslanmadi | 0% |
 | 6 | Advanced Features | Baslanmadi | 0% |
 | 7 | Testing, CI/CD, Documentation | Baslanmadi | 0% |
 
 **Son Guncelleme:** 2026-02-16
 **Aktif Gelistirici:** Claude
-**Mevcut Versiyon:** dev (Phase 3 tamamlandi)
+**Mevcut Versiyon:** dev (Phase 4 tamamlandi)
 
 ---
 
@@ -108,24 +108,29 @@
 
 ## Faz 4: GitHub + GitLab Releases
 
-**Durum:** Baslanmadi
+**Durum:** Tamamlandi
 **PRD:** `docs/phase_4.md`
 
 ### Yapilacaklar
 
-- [ ] Release provider interface
-- [ ] GitHub client (create, upload, comment)
-- [ ] GitLab client (create, upload, comment)
-- [ ] Token yonetimi
-- [ ] Asset upload (glob)
-- [ ] GitHub Enterprise destegi
-- [ ] GitLab CA certificate destegi
-- [ ] Dry-run destegi
-- [ ] API mock testleri
+- [x] Release provider interface
+- [x] GitHub client (create, upload, comment)
+- [x] GitLab client (create, upload, comment)
+- [x] Token yonetimi
+- [x] Asset upload (glob)
+- [x] GitHub Enterprise destegi
+- [x] GitLab CA certificate destegi
+- [x] Dry-run destegi
+- [x] API mock testleri
 
 ### Notlar
 
--
+- Test coverage: release=%73.7
+- Harici SDK kullanilmadi, net/http ile dogrudan REST API cagrisi
+- GitHub: CreateRelease, UploadAssets, PostComment, ValidateToken, GHE URL, proxy, makeLatest, autoGenerate, discussionCategory
+- GitLab: CreateRelease, UploadAssets (Generic Package + Release Link), PostComment (MR/issue), ValidateToken, CA cert, custom token header
+- httptest.NewServer ile mock API testleri
+- Asset content type detection: 12+ format (zip, tar.gz, dmg, deb, rpm, exe, sig, vb.)
 
 ---
 
@@ -205,6 +210,7 @@
 | 2026-02-16 | Claude | Phase 1 tamamlandi: CLI, config, version, logger, template, tests |
 | 2026-02-16 | Claude | Phase 2 tamamlandi: git runner, prerequisites, commit, tag, push, repo info, changelog, tests |
 | 2026-02-16 | Claude | Phase 3 tamamlandi: conventional commit parser, bump analyzer, changelog renderers (conventional + keep-a-changelog), file update |
+| 2026-02-16 | Claude | Phase 4 tamamlandi: GitHub + GitLab API client, release create, asset upload, comment, token management, GHE/CA cert support |
 
 ---
 
