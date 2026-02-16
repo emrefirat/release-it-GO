@@ -57,7 +57,7 @@ func TestRunInit_WizardCreatesConfig(t *testing.T) {
 
 	p := &mockPrompter{
 		selectAnswers:  []int{0, 0},                                                            // GitHub, Conventional Changelog
-		confirmAnswers: []bool{true, true, true, true},                                          // writeChangelog, commit/tag, push, requireConventional
+		confirmAnswers: []bool{true, true, true},                                                 // writeChangelog, commit/tag, push
 		inputAnswers:   []string{"chore(release): release v${version}", "v${version}"}, // commit msg, tag format
 	}
 
@@ -91,7 +91,7 @@ func TestRunInit_GitLabPlatform(t *testing.T) {
 
 	p := &mockPrompter{
 		selectAnswers:  []int{1, 1},                    // GitLab, Keep a Changelog
-		confirmAnswers: []bool{true, true, true, true}, // writeChangelog, commit/tag, push, requireConventional
+		confirmAnswers: []bool{true, true, true}, // writeChangelog, commit/tag, push
 		inputAnswers:   []string{"chore(release): release v${version}", "v${version}"},
 	}
 
@@ -161,7 +161,7 @@ func TestRunInit_CommitTagEnabled_PushDisabled(t *testing.T) {
 
 	p := &mockPrompter{
 		selectAnswers:  []int{2, 0},                     // Git tag only, Conventional Changelog
-		confirmAnswers: []bool{true, true, false, true}, // writeChangelog, commit/tag YES, push NO, requireConventional
+		confirmAnswers: []bool{true, true, false}, // writeChangelog, commit/tag YES, push NO
 		inputAnswers:   []string{"chore(release): release v${version}", "v${version}"},
 	}
 
@@ -259,7 +259,7 @@ func TestRunInit_ExistingNativeConfig_Overwrite(t *testing.T) {
 	}
 
 	p := &mockPrompter{
-		confirmAnswers: []bool{true, true, true, true, true}, // overwrite, writeChangelog, commit/tag, push, requireConventional
+		confirmAnswers: []bool{true, true, true, true}, // overwrite, writeChangelog, commit/tag, push
 		selectAnswers:  []int{0, 0},                                // GitHub, Conventional
 		inputAnswers:   []string{"chore(release): release v${version}", "v${version}"},
 	}
@@ -283,7 +283,7 @@ func TestRunInit_ChangelogEnabled_NoFile(t *testing.T) {
 
 	p := &mockPrompter{
 		selectAnswers:  []int{0, 0},                                                            // GitHub, Conventional Changelog
-		confirmAnswers: []bool{false, true, true, true},                                         // writeChangelog=NO, commit/tag, push, requireConventional
+		confirmAnswers: []bool{false, true, true},                                                // writeChangelog=NO, commit/tag, push, requireConventional
 		inputAnswers:   []string{"chore(release): release v${version}", "v${version}"}, // commit msg, tag format
 	}
 
