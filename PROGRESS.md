@@ -371,6 +371,7 @@
 - [x] BUG: Init adimi ✗ gosteriyor (basarili olmasina ragmen) (2026-02-16) → GetRepoInfo opsiyonel hata spinner'i erken Stop(false) ile kapatiyor. Fix: Opsiyonel hatalarda spinner kapatilmiyor.
 - [x] BUG: printSummary lipgloss kutu gereksiz ve tekrarli (2026-02-16) → Kullanici geri bildirimi: cerceve gereksiz detay. Fix: Duz, minimal cikti formatina gecildi.
 - [x] BUG: --preRelease ayni ID ile tekrar calistirildiginda versiyon artmiyor (2026-02-16) → `1.6.0-deneme2.0 → 1.6.0-deneme2.0` ayni versiyon uretiliyor, tag zaten var hatasi. Sebep: `prepatch` increment mevcut pre-release'i dusuruyordu sonra ayni .0 ile basliyordu. Fix: Mevcut versiyon ayni pre-release ID'ye sahipse `"prerelease"` increment kullan (sayi arttirir: `.0 → .1`).
+- [x] BUG: --check-commits gecersiz commit type'lari kabul ediyor (2026-02-16) → `fic: deneme commit` gibi gecersiz type'lar conventional commit olarak geciyordu. Sebep: regex `\w+` herhangi bir kelimeyi type olarak kabul ediyordu. Fix: `allowedTypes` map eklendi (Angular preset: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert), type dogrulamasi yapiliyor. Gecersiz type icin "unknown type: fic" sebebi doner. --verbose ile kontrol edilen commitlerin listesi gosteriliyor.
 
 ---
 
@@ -396,6 +397,7 @@
 | 2026-02-16 | Claude | Phase 10 tamamlandi: UI/Output iyilestirmesi - ikon sabitleri, FormatBold, Logger.Print(), Verbose dim format, CI spinner ikonlari, banner, printSummary lipgloss box |
 | 2026-02-16 | Claude | fix: UI/Output iyilestirmesi v2 - CI spinner cift satir kaldirma, init ✗ bug fix, "no commits" graceful exit, printSummary kutu kaldirma, spinner mesajlari past-tense |
 | 2026-02-16 | Claude | fix: pre-release ayni ID ile versiyon artmama hatasi (prepatch → prerelease increment) |
+| 2026-02-16 | Claude | fix: commit lint type validation - allowedTypes map ile gecersiz type'lar reddediliyor, --verbose ile commit listesi gosteriliyor |
 
 ---
 

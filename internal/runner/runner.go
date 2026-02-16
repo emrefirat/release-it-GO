@@ -334,8 +334,19 @@ func (r *Runner) RunCheckCommits() error {
 
 	passed, failed := changelog.LintCommits(lintInputs)
 
+	// Verbose: show all checked commits with their status
+	if r.ctx.Logger.GetVerbose() >= 1 {
+		for _, p := range passed {
+			r.ctx.Logger.Print("  %s %s %s", ui.FormatSuccess(ui.IconSuccess), p.Hash[:7], p.Subject)
+		}
+		for _, f := range failed {
+			r.ctx.Logger.Print("  %s %s %s ← %s", ui.FormatError(ui.IconFail), f.Hash[:7], f.Subject, f.Reason)
+		}
+		fmt.Fprintln(os.Stderr)
+	}
+
 	if len(failed) == 0 {
-		fmt.Printf("All %d commits are conventional. ✓\n", len(passed))
+		fmt.Printf("All %d commits are conventional. %s\n", len(passed), ui.IconSuccess)
 		return nil
 	}
 
