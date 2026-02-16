@@ -97,3 +97,58 @@ func TestNonInteractivePrompter_Input(t *testing.T) {
 		t.Errorf("expected 1.0.0, got %s", result)
 	}
 }
+
+func TestNonInteractivePrompter_Select(t *testing.T) {
+	p := &NonInteractivePrompter{}
+
+	tests := []struct {
+		name         string
+		options      []string
+		defaultIndex int
+		expected     int
+	}{
+		{"default index 0", []string{"a", "b", "c"}, 0, 0},
+		{"default index 1", []string{"a", "b", "c"}, 1, 1},
+		{"default index 2", []string{"a", "b", "c"}, 2, 2},
+		{"out of bounds negative", []string{"a", "b"}, -1, 0},
+		{"out of bounds positive", []string{"a", "b"}, 5, 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			idx, err := p.Select("Choose:", tt.options, tt.defaultIndex)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if idx != tt.expected {
+				t.Errorf("expected %d, got %d", tt.expected, idx)
+			}
+		})
+	}
+}
+
+func TestGenericSelectModel_Init(t *testing.T) {
+	m := genericSelectModel{
+		question: "Pick one:",
+		options:  []string{"A", "B", "C"},
+		cursor:   0,
+	}
+
+	cmd := m.Init()
+	if cmd != nil {
+		t.Error("Init should return nil")
+	}
+}
+
+func TestGenericSelectModel_View(t *testing.T) {
+	m := genericSelectModel{
+		question: "Pick one:",
+		options:  []string{"A", "B", "C"},
+		cursor:   1,
+	}
+
+	view := m.View()
+	if view == "" {
+		t.Error("View should not be empty")
+	}
+}

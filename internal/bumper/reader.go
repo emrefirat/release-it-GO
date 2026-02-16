@@ -6,9 +6,9 @@ import (
 	"os"
 	"strings"
 
-	"release-it-go/internal/config"
 	toml "github.com/pelletier/go-toml/v2"
 	yaml "go.yaml.in/yaml/v3"
+	"release-it-go/internal/config"
 )
 
 // ReadVersionFromFile reads a version string from the specified file.
