@@ -2,6 +2,8 @@ package runner
 
 import (
 	"fmt"
+	"os"
+	"strings"
 	"time"
 
 	"release-it-go/internal/bumper"
@@ -30,13 +32,24 @@ type pipelineStep struct {
 	fn   func() error
 }
 
+// printBanner prints the release-it-go banner at the start of the pipeline.
+func (r *Runner) printBanner() {
+	if r.ctx.IsDryRun {
+		fmt.Fprintf(os.Stderr, "\n%s %s %s\n\n", ui.IconDryRun, ui.FormatBold("release-it-go"), ui.FormatDim("(dry-run)"))
+	} else {
+		fmt.Fprintf(os.Stderr, "\n%s %s\n\n", ui.IconRocket, ui.FormatBold("release-it-go"))
+	}
+}
+
 // Run executes the full release pipeline.
 func (r *Runner) Run() error {
 	start := time.Now()
+	r.printBanner()
 
 	steps := []pipelineStep{
 		{"init", r.init},
 		{"prerequisites", r.checkPrerequisites},
+		{"commitlint", r.checkCommitLint},
 		{"version", r.determineVersion},
 		{"bump", r.bumpFiles},
 		{"changelog", r.generateChangelog},
@@ -52,6 +65,11 @@ func (r *Runner) Run() error {
 
 		if err := step.fn(); err != nil {
 			return fmt.Errorf("%s: %w", step.name, err)
+		}
+
+		// Early exit if no commits to release
+		if r.ctx.noCommits {
+			return nil
 		}
 
 		r.ctx.UpdateVars()
@@ -110,6 +128,8 @@ func (r *Runner) RunReleaseVersionOnly() error {
 
 // RunOnlyVersion prompts for version selection, then runs the rest automatically.
 func (r *Runner) RunOnlyVersion() error {
+	r.printBanner()
+
 	if err := r.init(); err != nil {
 		return err
 	}
@@ -148,6 +168,8 @@ func (r *Runner) RunOnlyVersion() error {
 
 // RunNoIncrement runs the release pipeline without incrementing the version.
 func (r *Runner) RunNoIncrement() error {
+	r.printBanner()
+
 	if err := r.init(); err != nil {
 		return err
 	}
@@ -196,11 +218,10 @@ func (r *Runner) RunNoIncrement() error {
 
 // init initializes the release context with repo info and branch name.
 func (r *Runner) init() error {
-	r.ctx.Spinner.Start("Initializing")
+	r.ctx.Spinner.Start("Initialized")
 
 	repoInfo, err := git.GetRepoInfo("")
 	if err != nil {
-		r.ctx.Spinner.Stop(false)
 		r.ctx.Logger.Verbose("Could not get repo info: %v", err)
 		// Non-fatal: repo info is optional for local-only operations
 	} else {
@@ -209,7 +230,6 @@ func (r *Runner) init() error {
 
 	branchName, err := git.GetBranchName()
 	if err != nil {
-		r.ctx.Spinner.Stop(false)
 		r.ctx.Logger.Verbose("Could not get branch name: %v", err)
 	} else {
 		r.ctx.BranchName = branchName
@@ -220,17 +240,118 @@ func (r *Runner) init() error {
 	return nil
 }
 
+// errNoCommits is a sentinel value to detect the "no commits" condition.
+var errNoCommits = "no commits since latest tag"
+
 // checkPrerequisites runs all prerequisite checks.
 func (r *Runner) checkPrerequisites() error {
-	r.ctx.Spinner.Start("Checking prerequisites")
+	r.ctx.Spinner.Start("Prerequisites checked")
 
 	if err := r.ctx.Git.CheckPrerequisites(); err != nil {
+		if strings.Contains(err.Error(), errNoCommits) {
+			r.ctx.Spinner.Stop(true)
+			r.ctx.Logger.Print("  %s No commits since latest tag. Nothing to release.", ui.IconWarning)
+			r.ctx.noCommits = true
+			return nil
+		}
 		r.ctx.Spinner.Stop(false)
 		return err
 	}
 
 	r.ctx.Spinner.Stop(true)
 	return nil
+}
+
+// checkCommitLint validates that commits since last tag follow conventional commit format.
+func (r *Runner) checkCommitLint() error {
+	if !r.ctx.Config.Git.RequireConventionalCommits {
+		return nil
+	}
+
+	r.ctx.Spinner.Start("Commit conventions checked")
+
+	latestTag := latestVersionToTag(r.ctx.LatestVersion)
+	if r.ctx.LatestVersion == "" {
+		// Try to get latest tag for lint check before version is determined
+		tag, err := r.ctx.Git.GetLatestTag()
+		if err == nil && tag != "" {
+			latestTag = tag
+		}
+	}
+
+	commitInfos, err := r.ctx.Git.GetCommitsWithHashSinceTag(latestTag)
+	if err != nil {
+		r.ctx.Spinner.Stop(false)
+		return fmt.Errorf("getting commits for lint: %w", err)
+	}
+
+	if len(commitInfos) == 0 {
+		r.ctx.Spinner.Stop(true)
+		return nil
+	}
+
+	lintInputs := make([]changelog.LintInput, len(commitInfos))
+	for i, ci := range commitInfos {
+		lintInputs[i] = changelog.LintInput{Hash: ci.Hash, Subject: ci.Subject}
+	}
+
+	_, failed := changelog.LintCommits(lintInputs)
+	if len(failed) > 0 {
+		r.ctx.Spinner.Stop(false)
+		return formatLintError(failed, len(commitInfos))
+	}
+
+	r.ctx.Spinner.Stop(true)
+	return nil
+}
+
+// RunCheckCommits runs commit lint as a standalone operation and prints results.
+func (r *Runner) RunCheckCommits() error {
+	if err := r.init(); err != nil {
+		return err
+	}
+
+	latestTag, err := r.ctx.Git.GetLatestTag()
+	if err != nil {
+		r.ctx.Logger.Verbose("No previous tags found")
+		latestTag = ""
+	}
+
+	commitInfos, err := r.ctx.Git.GetCommitsWithHashSinceTag(latestTag)
+	if err != nil {
+		return fmt.Errorf("getting commits: %w", err)
+	}
+
+	if len(commitInfos) == 0 {
+		fmt.Println("No commits found to lint.")
+		return nil
+	}
+
+	lintInputs := make([]changelog.LintInput, len(commitInfos))
+	for i, ci := range commitInfos {
+		lintInputs[i] = changelog.LintInput{Hash: ci.Hash, Subject: ci.Subject}
+	}
+
+	passed, failed := changelog.LintCommits(lintInputs)
+
+	if len(failed) == 0 {
+		fmt.Printf("All %d commits are conventional. ✓\n", len(passed))
+		return nil
+	}
+
+	return formatLintError(failed, len(commitInfos))
+}
+
+// formatLintError builds a formatted error message for failed commit lints.
+func formatLintError(failed []changelog.LintResult, total int) error {
+	var b strings.Builder
+	b.WriteString("Commit lint failed:\n")
+	for _, f := range failed {
+		b.WriteString(fmt.Sprintf("  %-10s %-40s ← %s\n", f.Hash, f.Subject, f.Reason))
+	}
+	b.WriteString(fmt.Sprintf("\n  %d of %d commits are not conventional.\n", len(failed), total))
+	b.WriteString("  Use --ignore-commit-lint to bypass.\n")
+	return fmt.Errorf("%s", b.String())
 }
 
 // determineVersion determines the next version based on config and commits.
@@ -298,7 +419,7 @@ func (r *Runner) determineCalVer(latestVersion string) error {
 
 	r.ctx.Version = newVersion
 	r.ctx.TagName = renderTagName(r.ctx.Config.Git.TagName, newVersion)
-	r.ctx.Logger.Info("Version (CalVer): %s → %s", latestVersion, newVersion)
+	r.ctx.Logger.Print("  %s Version (CalVer): %s → %s", ui.IconVersion, latestVersion, newVersion)
 	return nil
 }
 
@@ -345,7 +466,7 @@ func (r *Runner) determineSemVer(latestVersion string) error {
 
 	r.ctx.Version = newVersionStr
 	r.ctx.TagName = renderTagName(r.ctx.Config.Git.TagName, newVersionStr)
-	r.ctx.Logger.Info("Version: %s → %s", latestVersion, newVersionStr)
+	r.ctx.Logger.Print("  %s Version: %s → %s", ui.IconVersion, latestVersion, newVersionStr)
 	return nil
 }
 
@@ -355,7 +476,7 @@ func (r *Runner) bumpFiles() error {
 		return nil
 	}
 
-	r.ctx.Spinner.Start("Updating version files")
+	r.ctx.Spinner.Start("Version files updated")
 
 	b := bumper.NewBumper(&r.ctx.Config.Bumper, r.ctx.Logger, r.ctx.IsDryRun)
 	if err := b.WriteVersion(r.ctx.Version); err != nil {
@@ -421,7 +542,7 @@ func (r *Runner) generateChangelog() error {
 		return nil
 	}
 
-	r.ctx.Spinner.Start("Generating changelog")
+	r.ctx.Spinner.Start("Changelog generated")
 
 	latestTag := latestVersionToTag(r.ctx.LatestVersion)
 
@@ -471,7 +592,7 @@ func (r *Runner) gitRelease() error {
 
 	// Stage
 	if cfg.Commit {
-		r.ctx.Spinner.Start("Staging files")
+		r.ctx.Spinner.Start("Files staged")
 		if err := r.ctx.Git.Stage(); err != nil {
 			r.ctx.Spinner.Stop(false)
 			return fmt.Errorf("staging: %w", err)
@@ -487,12 +608,12 @@ func (r *Runner) gitRelease() error {
 				return err
 			}
 			if !confirmed {
-				r.ctx.Logger.Info("Skipped commit")
+				r.ctx.Logger.Print("  %s Skipped commit", ui.IconSkip)
 				return nil
 			}
 		}
 
-		r.ctx.Spinner.Start("Creating commit")
+		r.ctx.Spinner.Start("Committed")
 		if err := r.ctx.Git.Commit(commitMsg); err != nil {
 			r.ctx.Spinner.Stop(false)
 			return fmt.Errorf("commit: %w", err)
@@ -511,12 +632,12 @@ func (r *Runner) gitRelease() error {
 				return err
 			}
 			if !confirmed {
-				r.ctx.Logger.Info("Skipped tag")
+				r.ctx.Logger.Print("  %s Skipped tag", ui.IconSkip)
 				return nil
 			}
 		}
 
-		r.ctx.Spinner.Start(fmt.Sprintf("Creating tag %s", r.ctx.TagName))
+		r.ctx.Spinner.Start(fmt.Sprintf("Tagged %s", r.ctx.TagName))
 		if err := r.ctx.Git.CreateTag(r.ctx.TagName, annotation); err != nil {
 			r.ctx.Spinner.Stop(false)
 			return fmt.Errorf("tag: %w", err)
@@ -532,12 +653,12 @@ func (r *Runner) gitRelease() error {
 				return err
 			}
 			if !confirmed {
-				r.ctx.Logger.Info("Skipped push")
+				r.ctx.Logger.Print("  %s Skipped push", ui.IconSkip)
 				return nil
 			}
 		}
 
-		r.ctx.Spinner.Start("Pushing to remote")
+		r.ctx.Spinner.Start("Pushed to remote")
 		if err := r.ctx.Git.Push(); err != nil {
 			r.ctx.Spinner.Stop(false)
 			return fmt.Errorf("push: %w", err)
@@ -562,12 +683,12 @@ func (r *Runner) githubRelease() error {
 			return err
 		}
 		if !confirmed {
-			r.ctx.Logger.Info("Skipped GitHub release")
+			r.ctx.Logger.Print("  %s Skipped GitHub release", ui.IconSkip)
 			return nil
 		}
 	}
 
-	r.ctx.Spinner.Start("Creating GitHub release")
+	r.ctx.Spinner.Start("GitHub release created")
 
 	client, err := release.NewGitHubClient(&r.ctx.Config.GitHub, r.ctx.RepoInfo, r.ctx.Logger, r.ctx.IsDryRun)
 	if err != nil {
@@ -633,12 +754,12 @@ func (r *Runner) gitlabRelease() error {
 			return err
 		}
 		if !confirmed {
-			r.ctx.Logger.Info("Skipped GitLab release")
+			r.ctx.Logger.Print("  %s Skipped GitLab release", ui.IconSkip)
 			return nil
 		}
 	}
 
-	r.ctx.Spinner.Start("Creating GitLab release")
+	r.ctx.Spinner.Start("GitLab release created")
 
 	client, err := release.NewGitLabClient(&r.ctx.Config.GitLab, r.ctx.RepoInfo, r.ctx.Logger, r.ctx.IsDryRun)
 	if err != nil {
@@ -685,64 +806,13 @@ func (r *Runner) gitlabRelease() error {
 	return nil
 }
 
-// printSummary prints the release summary after successful completion.
+// printSummary prints a brief completion message.
 func (r *Runner) printSummary(duration time.Duration) {
-	fmt.Println()
-
+	fmt.Fprintln(os.Stderr)
 	if r.ctx.IsDryRun {
-		fmt.Printf("release-it-go %s (dry-run)\n\n", r.ctx.Version)
+		fmt.Fprintf(os.Stderr, "%s Done %s\n", ui.FormatSuccess(ui.IconSuccess), ui.FormatDim("(dry-run, no changes made)"))
 	} else {
-		fmt.Printf("release-it-go %s\n\n", r.ctx.Version)
-	}
-
-	cfg := &r.ctx.Config.Git
-	prefix := ""
-	if r.ctx.IsDryRun {
-		prefix = "[dry-run] "
-	}
-
-	if r.ctx.Changelog != "" {
-		if r.ctx.IsDryRun {
-			fmt.Printf("  %sChangelog: %s would be updated\n", prefix, r.ctx.Config.Changelog.Infile)
-		} else {
-			fmt.Printf("  Changelog: %s updated\n", r.ctx.Config.Changelog.Infile)
-		}
-	}
-
-	if cfg.Commit {
-		commitMsg := renderTagName(cfg.CommitMessage, r.ctx.Version)
-		if r.ctx.IsDryRun {
-			fmt.Printf("  %sWould commit: %s\n", prefix, commitMsg)
-		} else {
-			fmt.Printf("  Committed: %s\n", commitMsg)
-		}
-	}
-
-	if cfg.Tag {
-		if r.ctx.IsDryRun {
-			fmt.Printf("  %sWould tag: %s\n", prefix, r.ctx.TagName)
-		} else {
-			fmt.Printf("  Tagged: %s\n", r.ctx.TagName)
-		}
-	}
-
-	if cfg.Push {
-		if r.ctx.IsDryRun {
-			fmt.Printf("  %sWould push to: %s\n", prefix, cfg.PushRepo)
-		} else {
-			fmt.Printf("  Pushed: %s (%s)\n", cfg.PushRepo, r.ctx.BranchName)
-		}
-	}
-
-	if r.ctx.ReleaseURL != "" && r.ctx.ReleaseURL != "(dry-run)" {
-		fmt.Printf("  Release: %s\n", r.ctx.ReleaseURL)
-	}
-
-	fmt.Println()
-	if r.ctx.IsDryRun {
-		fmt.Println(ui.FormatDim("Done! (dry-run, no changes made)"))
-	} else {
-		fmt.Printf("Done! (in %.1fs)\n", duration.Seconds())
+		fmt.Fprintf(os.Stderr, "%s Done in %.1fs\n", ui.FormatSuccess(ui.IconSuccess), duration.Seconds())
 	}
 }
 
