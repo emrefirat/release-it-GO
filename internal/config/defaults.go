@@ -12,9 +12,10 @@ func DefaultConfig() *Config {
 			Push:                   true,
 			PushArgs:               []string{"--follow-tags"},
 			PushRepo:               "origin",
-			RequireCleanWorkingDir: true,
-			RequireUpstream:        true,
-			RequireCommits:         true,
+			RequireCleanWorkingDir:     true,
+			RequireUpstream:            true,
+			RequireCommits:             true,
+			RequireConventionalCommits: true,
 			Changelog:              `git log --pretty=format:"* %s (%h)" ${latestTag}...HEAD`,
 		},
 		GitHub: GitHubConfig{
