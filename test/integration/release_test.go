@@ -1,0 +1,635 @@
+package integration
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/emfi/release-it-go/internal/config"
+	"github.com/emfi/release-it-go/internal/runner"
+)
+
+// newTestConfig creates a config suitable for integration tests.
+// It disables push, upstream check, and CI-related features.
+// Uses v-prefixed tags to match the convention used by changelog (v${version}).
+func newTestConfig(dir string) *config.Config {
+	cfg := config.DefaultConfig()
+	cfg.CI = true
+	cfg.Git.Push = false
+	cfg.Git.RequireUpstream = false
+	cfg.Git.RequireCleanWorkingDir = false
+	cfg.Git.AddUntrackedFiles = true
+	cfg.Git.TagName = "v${version}"
+	cfg.GitHub.Release = false
+	cfg.GitLab.Release = false
+	cfg.Changelog.Infile = filepath.Join(dir, "CHANGELOG.md")
+	return cfg
+}
+
+func TestIntegration_FullReleasePipeline(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	initGitRepo(t, dir)
+	createTag(t, dir, "v1.0.0")
+	createCommits(t, dir, []string{
+		"feat: add user authentication",
+		"fix: resolve login timeout",
+	})
+
+	cfg := newTestConfig(dir)
+	cfg.Increment = "minor"
+
+	r := runner.NewRunner(cfg)
+	err := r.Run()
+	if err != nil {
+		t.Fatalf("Run() failed: %v", err)
+	}
+
+	// Verify tag was created (v-prefixed)
+	assertTagExists(t, dir, "v1.1.0")
+
+	// Verify commit message
+	msg := getLatestCommitMsg(t, dir)
+	if !strings.Contains(msg, "release v1.1.0") {
+		t.Errorf("expected commit message to contain 'release v1.1.0', got %q", msg)
+	}
+
+	// Verify CHANGELOG.md was created/updated
+	assertChangelogContains(t, dir, "1.1.0")
+	assertChangelogContains(t, dir, "user authentication")
+}
+
+func TestIntegration_PatchBump(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	initGitRepo(t, dir)
+	createTag(t, dir, "v2.3.1")
+	createCommits(t, dir, []string{
+		"fix: resolve crash on startup",
+	})
+
+	cfg := newTestConfig(dir)
+	cfg.Increment = "patch"
+
+	r := runner.NewRunner(cfg)
+	err := r.Run()
+	if err != nil {
+		t.Fatalf("Run() failed: %v", err)
+	}
+
+	assertTagExists(t, dir, "v2.3.2")
+}
+
+func TestIntegration_MajorBump(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	initGitRepo(t, dir)
+	createTag(t, dir, "v1.0.0")
+	createCommits(t, dir, []string{
+		"feat!: redesign API endpoints",
+	})
+
+	cfg := newTestConfig(dir)
+	cfg.Increment = "major"
+
+	r := runner.NewRunner(cfg)
+	err := r.Run()
+	if err != nil {
+		t.Fatalf("Run() failed: %v", err)
+	}
+
+	assertTagExists(t, dir, "v2.0.0")
+}
+
+func TestIntegration_DryRun(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	initGitRepo(t, dir)
+	createTag(t, dir, "v1.0.0")
+	createCommits(t, dir, []string{
+		"feat: add new feature",
+	})
+
+	cfg := newTestConfig(dir)
+	cfg.DryRun = true
+	cfg.Increment = "minor"
+
+	r := runner.NewRunner(cfg)
+	err := r.Run()
+	if err != nil {
+		t.Fatalf("Run() in dry-run failed: %v", err)
+	}
+
+	// In dry-run mode, no tag should be created
+	assertTagNotExists(t, dir, "v1.1.0")
+}
+
+func TestIntegration_NoExistingTags(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	initGitRepo(t, dir)
+	createCommits(t, dir, []string{
+		"feat: initial feature",
+	})
+
+	cfg := newTestConfig(dir)
+	cfg.Increment = "minor"
+	// Disable changelog and commit since there's no previous tag to compute commits from
+	cfg.Changelog.Enabled = false
+	cfg.Git.Commit = false
+
+	r := runner.NewRunner(cfg)
+	err := r.Run()
+	if err != nil {
+		t.Fatalf("Run() with no tags failed: %v", err)
+	}
+
+	// Should start from 0.0.0 and bump to 0.1.0
+	assertTagExists(t, dir, "v0.1.0")
+}
+
+func TestIntegration_ChangelogOnly(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	initGitRepo(t, dir)
+	createTag(t, dir, "v1.0.0")
+	createCommits(t, dir, []string{
+		"feat: add search functionality",
+		"fix: handle empty query",
+	})
+
+	cfg := newTestConfig(dir)
+	cfg.Increment = "minor"
+
+	r := runner.NewRunner(cfg)
+	err := r.RunChangelogOnly()
+	if err != nil {
+		t.Fatalf("RunChangelogOnly() failed: %v", err)
+	}
+
+	// No tag should be created in changelog-only mode
+	assertTagNotExists(t, dir, "v1.1.0")
+}
+
+func TestIntegration_ReleaseVersionOnly(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	initGitRepo(t, dir)
+	createTag(t, dir, "v3.2.1")
+	createCommits(t, dir, []string{
+		"feat: add export",
+	})
+
+	cfg := newTestConfig(dir)
+	cfg.Increment = "minor"
+
+	r := runner.NewRunner(cfg)
+	err := r.RunReleaseVersionOnly()
+	if err != nil {
+		t.Fatalf("RunReleaseVersionOnly() failed: %v", err)
+	}
+
+	// No tag should be created in release-version mode
+	assertTagNotExists(t, dir, "v3.3.0")
+}
+
+func TestIntegration_DisableCommitAndTag(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	initGitRepo(t, dir)
+	createTag(t, dir, "v1.0.0")
+	createCommits(t, dir, []string{
+		"fix: minor fix",
+	})
+
+	cfg := newTestConfig(dir)
+	cfg.Increment = "patch"
+	cfg.Git.Commit = false
+	cfg.Git.Tag = false
+
+	r := runner.NewRunner(cfg)
+	err := r.Run()
+	if err != nil {
+		t.Fatalf("Run() failed: %v", err)
+	}
+
+	// Tag should NOT be created when git.tag is false
+	assertTagNotExists(t, dir, "v1.0.1")
+}
+
+func TestIntegration_ConventionalCommitAutoIncrement(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	initGitRepo(t, dir)
+	createTag(t, dir, "v1.0.0")
+	createCommits(t, dir, []string{
+		"feat: add new dashboard",
+		"feat: add analytics page",
+	})
+
+	cfg := newTestConfig(dir)
+	// Don't set Increment - let conventional commits auto-detect minor
+
+	r := runner.NewRunner(cfg)
+	err := r.Run()
+	if err != nil {
+		t.Fatalf("Run() failed: %v", err)
+	}
+
+	// Two feat commits should result in a minor bump: 1.0.0 -> 1.1.0
+	assertTagExists(t, dir, "v1.1.0")
+}
+
+func TestIntegration_BreakingChangeAutoMajor(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	initGitRepo(t, dir)
+	createTag(t, dir, "v1.0.0")
+	createCommits(t, dir, []string{
+		"feat!: remove legacy API",
+	})
+
+	cfg := newTestConfig(dir)
+	// Don't set Increment - let conventional commits auto-detect major
+
+	r := runner.NewRunner(cfg)
+	err := r.Run()
+	if err != nil {
+		t.Fatalf("Run() failed: %v", err)
+	}
+
+	// Breaking change should result in major bump: 1.0.0 -> 2.0.0
+	assertTagExists(t, dir, "v2.0.0")
+}
+
+func TestIntegration_BumperFileUpdate(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	// Create package.json with version
+	pkgJSON := filepath.Join(dir, "package.json")
+	writeFile(t, pkgJSON, `{"name": "test-app", "version": "1.0.0"}`)
+
+	// Create VERSION file
+	versionFile := filepath.Join(dir, "VERSION")
+	writeFile(t, versionFile, "1.0.0\n")
+
+	initGitRepo(t, dir)
+	createTag(t, dir, "v1.0.0")
+	createCommits(t, dir, []string{
+		"feat: add feature",
+	})
+
+	cfg := newTestConfig(dir)
+	cfg.Increment = "minor"
+	cfg.Bumper.Enabled = true
+	cfg.Bumper.Out = []config.BumperFile{
+		{File: pkgJSON, Path: "version"},
+		{File: versionFile, ConsumeWholeFile: true},
+	}
+
+	r := runner.NewRunner(cfg)
+	err := r.Run()
+	if err != nil {
+		t.Fatalf("Run() failed: %v", err)
+	}
+
+	// Verify package.json was updated
+	data, _ := os.ReadFile(pkgJSON)
+	if !strings.Contains(string(data), `"version": "1.1.0"`) {
+		t.Errorf("package.json version not updated, got: %s", string(data))
+	}
+
+	// Verify VERSION file was updated
+	data, _ = os.ReadFile(versionFile)
+	if strings.TrimSpace(string(data)) != "1.1.0" {
+		t.Errorf("VERSION file not updated, got: %q", string(data))
+	}
+}
+
+func TestIntegration_KeepAChangelog(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	initGitRepo(t, dir)
+	createTag(t, dir, "v1.0.0")
+	createCommits(t, dir, []string{
+		"feat: add user profiles",
+		"fix: correct email validation",
+	})
+
+	cfg := newTestConfig(dir)
+	cfg.Increment = "minor"
+	cfg.Changelog.KeepAChangelog = true
+
+	r := runner.NewRunner(cfg)
+	err := r.Run()
+	if err != nil {
+		t.Fatalf("Run() failed: %v", err)
+	}
+
+	// Keep-a-changelog format uses "Added" and "Fixed" sections
+	assertChangelogContains(t, dir, "## [1.1.0]")
+	assertChangelogContains(t, dir, "Added")
+}
+
+func TestIntegration_HookExecution(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	markerFile := filepath.Join(dir, "hook_executed.txt")
+
+	initGitRepo(t, dir)
+	createTag(t, dir, "v1.0.0")
+	createCommits(t, dir, []string{
+		"feat: new feature",
+	})
+
+	cfg := newTestConfig(dir)
+	cfg.Increment = "patch"
+	cfg.Hooks.AfterInit = []string{"echo hook_ran > " + markerFile}
+
+	r := runner.NewRunner(cfg)
+	err := r.Run()
+	if err != nil {
+		t.Fatalf("Run() failed: %v", err)
+	}
+
+	// Verify hook was executed
+	if _, err := os.Stat(markerFile); os.IsNotExist(err) {
+		t.Error("expected after:init hook to create marker file")
+	}
+}
+
+func TestIntegration_HookFailure(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	initGitRepo(t, dir)
+	createTag(t, dir, "v1.0.0")
+	createCommits(t, dir, []string{
+		"feat: new feature",
+	})
+
+	cfg := newTestConfig(dir)
+	cfg.Increment = "patch"
+	cfg.Hooks.BeforeInit = []string{"exit 1"}
+
+	r := runner.NewRunner(cfg)
+	err := r.Run()
+	if err == nil {
+		t.Error("expected Run() to fail when before:init hook fails")
+	}
+	if !strings.Contains(err.Error(), "hook") {
+		t.Errorf("expected hook error, got: %v", err)
+	}
+}
+
+func TestIntegration_ConfigFromJSON(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	configContent := `{
+		"git": {
+			"commit": true,
+			"tag": true,
+			"push": false,
+			"requireUpstream": false,
+			"requireCleanWorkingDir": false,
+			"addUntrackedFiles": true,
+			"tagName": "v${version}",
+			"commitMessage": "chore: release v${version}"
+		},
+		"ci": true,
+		"increment": "patch"
+	}`
+	configPath := filepath.Join(dir, ".release-it.json")
+	writeFile(t, configPath, configContent)
+
+	initGitRepo(t, dir)
+	createTag(t, dir, "v1.0.0")
+	createCommits(t, dir, []string{"fix: bug fix"})
+
+	cfg, err := config.LoadConfig(configPath)
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+	cfg.Changelog.Infile = filepath.Join(dir, "CHANGELOG.md")
+
+	r := runner.NewRunner(cfg)
+	err = r.Run()
+	if err != nil {
+		t.Fatalf("Run() failed: %v", err)
+	}
+
+	assertTagExists(t, dir, "v1.0.1")
+}
+
+func TestIntegration_ConfigFromYAML(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	configContent := `git:
+  commit: true
+  tag: true
+  push: false
+  requireUpstream: false
+  requireCleanWorkingDir: false
+  addUntrackedFiles: true
+  tagName: "v${version}"
+  commitMessage: "chore: release v${version}"
+ci: true
+increment: minor
+`
+	configPath := filepath.Join(dir, ".release-it.yaml")
+	writeFile(t, configPath, configContent)
+
+	initGitRepo(t, dir)
+	createTag(t, dir, "v2.0.0")
+	createCommits(t, dir, []string{"feat: new feature"})
+
+	cfg, err := config.LoadConfig(configPath)
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+	cfg.Changelog.Infile = filepath.Join(dir, "CHANGELOG.md")
+
+	r := runner.NewRunner(cfg)
+	err = r.Run()
+	if err != nil {
+		t.Fatalf("Run() failed: %v", err)
+	}
+
+	assertTagExists(t, dir, "v2.1.0")
+}
+
+func TestIntegration_NoIncrement(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	initGitRepo(t, dir)
+	createTag(t, dir, "v1.5.0")
+	createCommits(t, dir, []string{
+		"chore: update docs",
+	})
+
+	cfg := newTestConfig(dir)
+	cfg.Git.Commit = false
+	cfg.Git.Tag = false
+
+	r := runner.NewRunner(cfg)
+	err := r.RunNoIncrement()
+	if err != nil {
+		t.Fatalf("RunNoIncrement() failed: %v", err)
+	}
+
+	// Should still generate changelog but not create new tags beyond v1.5.0
+	assertTagNotExists(t, dir, "v1.5.1")
+}
+
+func TestIntegration_SequentialReleases(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	initGitRepo(t, dir)
+	createTag(t, dir, "v1.0.0")
+
+	// First release
+	createCommits(t, dir, []string{"fix: first fix"})
+	cfg1 := newTestConfig(dir)
+	cfg1.Increment = "patch"
+	r1 := runner.NewRunner(cfg1)
+	if err := r1.Run(); err != nil {
+		t.Fatalf("First Run() failed: %v", err)
+	}
+	assertTagExists(t, dir, "v1.0.1")
+
+	// Second release
+	createCommits(t, dir, []string{"feat: new feature"})
+	cfg2 := newTestConfig(dir)
+	cfg2.Increment = "minor"
+	r2 := runner.NewRunner(cfg2)
+	if err := r2.Run(); err != nil {
+		t.Fatalf("Second Run() failed: %v", err)
+	}
+	assertTagExists(t, dir, "v1.1.0")
+}
