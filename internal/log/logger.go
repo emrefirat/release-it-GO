@@ -57,10 +57,18 @@ func (l *Logger) Info(msg string, args ...any) {
 	l.slogger.Info(fmt.Sprintf(msg, args...))
 }
 
+// Print writes a user-friendly message directly to output (no slog format).
+// Always visible. Use for banner, version info, skip messages, etc.
+func (l *Logger) Print(msg string, args ...any) {
+	formatted := fmt.Sprintf(msg, args...)
+	fmt.Fprintln(l.output, formatted)
+}
+
 // Verbose logs a message visible only with -V flag (verbose >= 1).
+// Outputs in indented dim format: "    ↳ message"
 func (l *Logger) Verbose(msg string, args ...any) {
 	if l.verbose >= VerboseLevel {
-		l.slogger.Info(fmt.Sprintf(msg, args...))
+		fmt.Fprintf(l.output, "    ↳ %s\n", fmt.Sprintf(msg, args...))
 	}
 }
 

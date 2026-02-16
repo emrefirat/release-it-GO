@@ -47,8 +47,12 @@ func TestLogger_Verbose_VisibleAtVerboseLevel(t *testing.T) {
 
 	logger.Verbose("verbose message")
 
-	if !strings.Contains(buf.String(), "verbose message") {
-		t.Errorf("Verbose should be visible at verbose level, got: %q", buf.String())
+	output := buf.String()
+	if !strings.Contains(output, "verbose message") {
+		t.Errorf("Verbose should be visible at verbose level, got: %q", output)
+	}
+	if !strings.Contains(output, "↳") {
+		t.Errorf("Verbose should contain ↳ prefix, got: %q", output)
 	}
 }
 
@@ -160,5 +164,46 @@ func TestLogger_InfoFormatting(t *testing.T) {
 	output := buf.String()
 	if !strings.Contains(output, "version 1.0.0 released on 2026-02-16") {
 		t.Errorf("Info should support fmt.Sprintf formatting, got: %q", output)
+	}
+}
+
+func TestLogger_Print_AlwaysVisible(t *testing.T) {
+	var buf bytes.Buffer
+	logger := NewLoggerWithWriter(VerboseNormal, false, &buf)
+
+	logger.Print("  📦 Version: %s → %s", "1.0.0", "1.1.0")
+
+	output := buf.String()
+	if !strings.Contains(output, "📦 Version: 1.0.0 → 1.1.0") {
+		t.Errorf("Print should output formatted message directly, got: %q", output)
+	}
+	// Print should NOT contain slog format elements
+	if strings.Contains(output, "level=") || strings.Contains(output, "time=") {
+		t.Errorf("Print should not use slog format, got: %q", output)
+	}
+}
+
+func TestLogger_Print_Formatting(t *testing.T) {
+	var buf bytes.Buffer
+	logger := NewLoggerWithWriter(VerboseNormal, false, &buf)
+
+	logger.Print("hello %s", "world")
+
+	output := buf.String()
+	if output != "hello world\n" {
+		t.Errorf("Print should output 'hello world\\n', got: %q", output)
+	}
+}
+
+func TestLogger_Verbose_DimFormat(t *testing.T) {
+	var buf bytes.Buffer
+	logger := NewLoggerWithWriter(VerboseLevel, false, &buf)
+
+	logger.Verbose("repo: %s/%s", "owner", "repo")
+
+	output := buf.String()
+	expected := "    ↳ repo: owner/repo\n"
+	if output != expected {
+		t.Errorf("Verbose should output %q, got: %q", expected, output)
 	}
 }
