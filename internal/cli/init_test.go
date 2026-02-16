@@ -57,7 +57,7 @@ func TestRunInit_WizardCreatesConfig(t *testing.T) {
 
 	p := &mockPrompter{
 		selectAnswers:  []int{0, 0},                                                            // GitHub, Conventional Changelog
-		confirmAnswers: []bool{true, true, true},                                               // commit/tag, push, requireCommits
+		confirmAnswers: []bool{true, true, true, true, true},                                   // writeChangelog, commit/tag, push, requireCommits, requireConventional
 		inputAnswers:   []string{"chore(release): release v${version}", "v${version}", "main"}, // commit msg, tag format, branch
 	}
 
@@ -90,8 +90,8 @@ func TestRunInit_GitLabPlatform(t *testing.T) {
 	os.Chdir(dir)
 
 	p := &mockPrompter{
-		selectAnswers:  []int{1, 1},        // GitLab, Keep a Changelog
-		confirmAnswers: []bool{true, true}, // commit/tag enabled, push enabled
+		selectAnswers:  []int{1, 1},                    // GitLab, Keep a Changelog
+		confirmAnswers: []bool{true, true, true, true}, // writeChangelog, commit/tag, push, requireCommits (requireConventional defaults to true)
 		inputAnswers:   []string{"chore(release): release v${version}", "v${version}", "main"},
 	}
 
@@ -160,8 +160,8 @@ func TestRunInit_CommitTagEnabled_PushDisabled(t *testing.T) {
 	os.Chdir(dir)
 
 	p := &mockPrompter{
-		selectAnswers:  []int{2, 0},         // Git tag only, Conventional Changelog
-		confirmAnswers: []bool{true, false}, // commit/tag YES, push NO
+		selectAnswers:  []int{2, 0},                     // Git tag only, Conventional Changelog
+		confirmAnswers: []bool{true, true, false, true}, // writeChangelog, commit/tag YES, push NO, requireCommits
 		inputAnswers:   []string{"chore(release): release v${version}", "v${version}", "main"},
 	}
 
@@ -259,8 +259,8 @@ func TestRunInit_ExistingNativeConfig_Overwrite(t *testing.T) {
 	}
 
 	p := &mockPrompter{
-		confirmAnswers: []bool{true, true, true}, // overwrite, commit/tag enabled, push enabled
-		selectAnswers:  []int{0, 0},              // GitHub, Conventional
+		confirmAnswers: []bool{true, true, true, true, true, true}, // overwrite, writeChangelog, commit/tag, push, requireCommits, requireConventional
+		selectAnswers:  []int{0, 0},                                // GitHub, Conventional
 		inputAnswers:   []string{"chore(release): release v${version}", "v${version}", "main"},
 	}
 
@@ -272,6 +272,35 @@ func TestRunInit_ExistingNativeConfig_Overwrite(t *testing.T) {
 	data, _ := os.ReadFile(config.NativeConfigFile)
 	if string(data) == "{}" {
 		t.Error("config file should have been overwritten with wizard output")
+	}
+}
+
+func TestRunInit_ChangelogEnabled_NoFile(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	defer os.Chdir(origDir)
+	os.Chdir(dir)
+
+	p := &mockPrompter{
+		selectAnswers:  []int{0, 0},                                                            // GitHub, Conventional Changelog
+		confirmAnswers: []bool{false, true, true, true, true},                                  // writeChangelog=NO, commit/tag, push, requireCommits, requireConventional
+		inputAnswers:   []string{"chore(release): release v${version}", "v${version}", "main"}, // commit msg, tag format, branch
+	}
+
+	if err := runInitWithPrompter(p); err != nil {
+		t.Fatalf("runInitWithPrompter failed: %v", err)
+	}
+
+	cfg, err := config.LoadConfig(config.NativeConfigFile)
+	if err != nil {
+		t.Fatalf("loading created config: %v", err)
+	}
+
+	if !cfg.Changelog.Enabled {
+		t.Error("expected changelog.enabled=true")
+	}
+	if cfg.Changelog.Infile != "" {
+		t.Errorf("expected changelog.infile to be empty, got %q", cfg.Changelog.Infile)
 	}
 }
 

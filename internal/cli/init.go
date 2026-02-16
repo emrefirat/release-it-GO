@@ -111,6 +111,17 @@ func runInitWithPrompter(prompter ui.Prompter) error {
 		cfg.Changelog.Enabled = false
 	}
 
+	// If changelog is enabled, ask whether to write CHANGELOG.md file
+	if cfg.Changelog.Enabled {
+		writeFile, err := prompter.Confirm("Write CHANGELOG.md file?", true)
+		if err != nil {
+			return err
+		}
+		if !writeFile {
+			cfg.Changelog.Infile = ""
+		}
+	}
+
 	// Git commit and tag
 	commitTag, err := prompter.Confirm("Enable git commit and tag?", true)
 	if err != nil {
