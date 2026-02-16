@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/emfi/release-it-go/internal/config"
+	"release-it-go/internal/config"
 )
 
 func TestReadVersionFromFile_JSON(t *testing.T) {

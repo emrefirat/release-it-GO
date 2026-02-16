@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/emfi/release-it-go/internal/config"
+	"release-it-go/internal/config"
 )
 
 func TestWriteVersionToFile_JSON(t *testing.T) {

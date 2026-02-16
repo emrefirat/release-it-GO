@@ -4,8 +4,8 @@ import (
 	"os/exec"
 	"testing"
 
-	"github.com/emfi/release-it-go/internal/config"
-	applog "github.com/emfi/release-it-go/internal/log"
+	"release-it-go/internal/config"
+	applog "release-it-go/internal/log"
 )
 
 func TestNewHookRunner(t *testing.T) {

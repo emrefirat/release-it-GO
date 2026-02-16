@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/emfi/release-it-go/internal/git"
+	"release-it-go/internal/git"
 )
 
 // DefaultHeader is the default changelog file header.

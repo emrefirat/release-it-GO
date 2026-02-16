@@ -3,8 +3,8 @@ package runner
 import (
 	"testing"
 
-	"github.com/emfi/release-it-go/internal/config"
-	"github.com/emfi/release-it-go/internal/git"
+	"release-it-go/internal/config"
+	"release-it-go/internal/git"
 )
 
 func TestNewReleaseContext(t *testing.T) {

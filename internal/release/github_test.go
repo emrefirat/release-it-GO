@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/emfi/release-it-go/internal/config"
-	"github.com/emfi/release-it-go/internal/git"
-	applog "github.com/emfi/release-it-go/internal/log"
+	"release-it-go/internal/config"
+	"release-it-go/internal/git"
+	applog "release-it-go/internal/log"
 )
 
 func testRepoInfo() *git.RepoInfo {

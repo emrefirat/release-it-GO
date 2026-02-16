@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/emfi/release-it-go/internal/config"
+	"release-it-go/internal/config"
 )
 
 // Supported file format identifiers.
