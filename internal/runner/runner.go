@@ -452,6 +452,11 @@ func (r *Runner) generateChangelog() error {
 			r.ctx.Spinner.Stop(false)
 			return fmt.Errorf("updating changelog file: %w", err)
 		}
+		// Explicitly stage the changelog file so it's included in the release commit
+		if err := r.ctx.Git.StageFile(r.ctx.Config.Changelog.Infile); err != nil {
+			r.ctx.Spinner.Stop(false)
+			return fmt.Errorf("staging changelog file: %w", err)
+		}
 	} else if r.ctx.Config.Changelog.Infile != "" && r.ctx.IsDryRun {
 		r.ctx.Logger.DryRun("Would update %s", r.ctx.Config.Changelog.Infile)
 	}

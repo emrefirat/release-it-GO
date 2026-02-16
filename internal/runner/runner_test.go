@@ -735,6 +735,10 @@ func TestRunner_GenerateChangelog_UpdateFile(t *testing.T) {
 			output: "feat: new feature",
 			err:    nil,
 		},
+		"git add " + changelogFile: {
+			output: "",
+			err:    nil,
+		},
 	})
 
 	runner.ctx.LatestVersion = "1.0.0"

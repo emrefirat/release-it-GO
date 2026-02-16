@@ -136,6 +136,30 @@ func TestCommit_WithArgs(t *testing.T) {
 	}
 }
 
+func TestStageFile(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	var executedArgs []string
+	commandExecutor = func(name string, args ...string) (string, error) {
+		executedArgs = args
+		return "", nil
+	}
+
+	cfg := &config.GitConfig{}
+	g := newTestGitWithConfig(cfg, false)
+
+	err := g.StageFile("CHANGELOG.md")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	cmd := strings.Join(executedArgs, " ")
+	if !strings.Contains(cmd, "add CHANGELOG.md") {
+		t.Errorf("expected 'add CHANGELOG.md', got: %v", executedArgs)
+	}
+}
+
 func TestCommit_DryRun(t *testing.T) {
 	original := commandExecutor
 	defer func() { commandExecutor = original }()

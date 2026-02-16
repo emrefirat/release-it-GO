@@ -12,6 +12,13 @@ func (g *Git) Stage() error {
 	return err
 }
 
+// StageFile explicitly adds a specific file to the staging area.
+// Used for files generated during the release process (e.g. CHANGELOG.md).
+func (g *Git) StageFile(path string) error {
+	_, err := g.run("add", path)
+	return err
+}
+
 // Commit creates a commit with the given message.
 // Additional commit arguments from config are appended.
 func (g *Git) Commit(message string) error {
