@@ -343,6 +343,13 @@ func TestRunInit_FullExample(t *testing.T) {
 			t.Errorf("expected full example to contain %s", check)
 		}
 	}
+
+	// Should NOT have runtime flags
+	for _, flag := range []string{"\"ci\"", "\"dry-run\"", "\"verbose\"", "\"preReleaseId\""} {
+		if contains(content, flag) {
+			t.Errorf("full example should not contain runtime flag %s", flag)
+		}
+	}
 }
 
 func contains(s, substr string) bool {

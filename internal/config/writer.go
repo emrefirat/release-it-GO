@@ -96,19 +96,125 @@ func diffChangelog(a, b *ChangelogConfig) map[string]interface{} {
 	return diffStruct(a, b)
 }
 
-// WriteFullConfigJSON writes the entire config struct to a JSON file,
-// including all fields regardless of whether they match defaults.
-func WriteFullConfigJSON(cfg *Config, path string) error {
-	data, err := json.MarshalIndent(cfg, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshaling full config to JSON: %w", err)
-	}
+// fullExampleJSON is a curated JSON string showing all available config options
+// with sensible, usable example values. Only meaningful options are included —
+// runtime flags (ci, dry-run, verbose) and zero-value noise are omitted.
+const fullExampleJSON = `{
+  "git": {
+    "commit": true,
+    "commitMessage": "chore: release v${version}",
+    "commitArgs": [],
+    "tag": true,
+    "tagName": "v${version}",
+    "tagMatch": "v*",
+    "tagExclude": "*-rc.*",
+    "tagAnnotation": "Release ${version}",
+    "tagArgs": [],
+    "push": true,
+    "pushArgs": ["--follow-tags"],
+    "pushRepo": "origin",
+    "requireBranch": "main",
+    "requireCleanWorkingDir": true,
+    "requireUpstream": true,
+    "requireCommits": true,
+    "requireConventionalCommits": true,
+    "getLatestTagFromAllRefs": false,
+    "addUntrackedFiles": false
+  },
+  "github": {
+    "release": true,
+    "releaseName": "Release ${version}",
+    "draft": false,
+    "preRelease": false,
+    "makeLatest": true,
+    "autoGenerate": false,
+    "assets": ["dist/*.tar.gz", "dist/*.zip"],
+    "host": "api.github.com",
+    "tokenRef": "GITHUB_TOKEN",
+    "timeout": 30,
+    "skipChecks": false,
+    "web": false,
+    "comments": {
+      "submit": false,
+      "issue": ":rocket: _This issue has been resolved in v${version}._",
+      "pr": ":rocket: _This pull request is included in v${version}._"
+    }
+  },
+  "gitlab": {
+    "release": false,
+    "releaseName": "Release ${version}",
+    "preRelease": false,
+    "milestones": [],
+    "assets": [],
+    "tokenRef": "GITLAB_TOKEN",
+    "tokenHeader": "Private-Token",
+    "origin": "https://gitlab.example.com",
+    "skipChecks": false,
+    "secure": false
+  },
+  "hooks": {
+    "before:init": [],
+    "after:init": [],
+    "before:bump": [],
+    "after:bump": ["echo 'Bumped to v${version}'"],
+    "before:release": [],
+    "after:release": ["echo 'Released v${version}'"],
+    "before:git:release": [],
+    "after:git:release": [],
+    "before:github:release": [],
+    "after:github:release": [],
+    "before:gitlab:release": [],
+    "after:gitlab:release": []
+  },
+  "changelog": {
+    "enabled": true,
+    "preset": "angular",
+    "infile": "CHANGELOG.md",
+    "header": "# Changelog",
+    "keepAChangelog": false,
+    "addUnreleased": false,
+    "keepUnreleased": false,
+    "addVersionUrl": false
+  },
+  "bumper": {
+    "enabled": false,
+    "in": {
+      "file": "VERSION",
+      "consumeWholeFile": true
+    },
+    "out": [
+      { "file": "VERSION", "consumeWholeFile": true },
+      { "file": "package.json", "path": "version" }
+    ]
+  },
+  "calver": {
+    "enabled": false,
+    "format": "yy.mm.minor",
+    "increment": "calendar",
+    "fallbackIncrement": "minor"
+  },
+  "notification": {
+    "enabled": false,
+    "webhooks": [
+      {
+        "type": "slack",
+        "urlRef": "SLACK_WEBHOOK_URL"
+      },
+      {
+        "type": "teams",
+        "urlRef": "TEAMS_WEBHOOK_URL",
+        "messageTemplate": "🚀 ${repo.repository} v${version} released!\n${releaseUrl}",
+        "timeout": 30
+      }
+    ]
+  }
+}
+`
 
-	data = append(data, '\n')
-
-	if err := os.WriteFile(path, data, 0644); err != nil {
+// WriteFullExampleJSON writes the curated full example config to a file.
+func WriteFullExampleJSON(path string) error {
+	if err := os.WriteFile(path, []byte(fullExampleJSON), 0644); err != nil {
 		return fmt.Errorf("writing config file %s: %w", path, err)
 	}
-
 	return nil
 }

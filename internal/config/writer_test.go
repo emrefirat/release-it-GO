@@ -139,13 +139,12 @@ func TestWriteConfigJSON_ChangedChangelog(t *testing.T) {
 	}
 }
 
-func TestWriteFullConfigJSON(t *testing.T) {
+func TestWriteFullExampleJSON(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, ".release-it-go-full.json")
 
-	cfg := FullExampleConfig()
-	if err := WriteFullConfigJSON(cfg, path); err != nil {
-		t.Fatalf("WriteFullConfigJSON failed: %v", err)
+	if err := WriteFullExampleJSON(path); err != nil {
+		t.Fatalf("WriteFullExampleJSON failed: %v", err)
 	}
 
 	data, err := os.ReadFile(path)
@@ -166,25 +165,30 @@ func TestWriteFullConfigJSON(t *testing.T) {
 			t.Errorf("expected section %q in full config", section)
 		}
 	}
+
+	// Should NOT have runtime flags
+	for _, flag := range []string{"ci", "dry-run", "verbose", "increment", "preReleaseId"} {
+		if _, ok := result[flag]; ok {
+			t.Errorf("full example should not contain runtime flag %q", flag)
+		}
+	}
 }
 
-func TestFullExampleConfig_HasAllSections(t *testing.T) {
-	cfg := FullExampleConfig()
+func TestFullExampleJSON_IsLoadable(t *testing.T) {
+	// Verify the curated JSON can be loaded as a valid config
+	cfg, err := LoadConfigFromBytes([]byte(fullExampleJSON), "json")
+	if err != nil {
+		t.Fatalf("fullExampleJSON is not loadable: %v", err)
+	}
 
-	if cfg.GitHub.Release != true {
+	if !cfg.GitHub.Release {
 		t.Error("expected github.release=true in full example")
 	}
-	if len(cfg.GitHub.Assets) == 0 {
-		t.Error("expected github.assets to have example entries")
-	}
-	if cfg.Bumper.In == nil {
-		t.Error("expected bumper.in to be set in full example")
-	}
-	if len(cfg.Bumper.Out) == 0 {
-		t.Error("expected bumper.out to have example entries")
+	if cfg.Git.TagName != "v${version}" {
+		t.Errorf("expected git.tagName=v${version}, got %s", cfg.Git.TagName)
 	}
 	if len(cfg.Notification.Webhooks) == 0 {
-		t.Error("expected notification.webhooks to have example entries")
+		t.Error("expected notification.webhooks to have entries")
 	}
 }
 
