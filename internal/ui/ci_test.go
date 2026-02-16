@@ -3,6 +3,8 @@ package ui
 import (
 	"os"
 	"testing"
+
+	"github.com/mattn/go-isatty"
 )
 
 func TestIsCI_NoEnvVars(t *testing.T) {
@@ -11,8 +13,14 @@ func TestIsCI_NoEnvVars(t *testing.T) {
 		os.Unsetenv(env)
 	}
 
-	if IsCI() {
-		t.Error("expected IsCI() to return false when no CI env vars are set")
+	result := IsCI()
+	hasTTY := isatty.IsTerminal(os.Stdin.Fd()) || isatty.IsCygwinTerminal(os.Stdin.Fd())
+
+	if hasTTY && result {
+		t.Error("expected IsCI() to return false when no CI env vars and TTY is available")
+	}
+	if !hasTTY && !result {
+		t.Error("expected IsCI() to return true when no TTY is available")
 	}
 }
 
