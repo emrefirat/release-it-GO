@@ -144,11 +144,11 @@ func TestCheckUpstream(t *testing.T) {
 
 func TestCheckGitIdentity(t *testing.T) {
 	tests := []struct {
-		name    string
-		commit  bool
-		gitName string
+		name     string
+		commit   bool
+		gitName  string
 		gitEmail string
-		wantErr bool
+		wantErr  bool
 	}{
 		{"commit disabled, no identity", false, "", "", false},
 		{"commit enabled, both set", true, "Test User", "test@example.com", false},

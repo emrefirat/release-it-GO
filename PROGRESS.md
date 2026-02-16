@@ -22,10 +22,11 @@
 | 11 | Docker Container Destegi | Tamamlandi | 100% |
 | 12 | Docker Pre-flight Kontrolleri | Tamamlandi | 100% |
 | 13 | Webhook Notification (Slack + Teams) | Tamamlandi | 100% |
+| 14 | YAML Config Yazma + Init Format Secimi | Tamamlandi | 100% |
 
 **Son Guncelleme:** 2026-02-17
 **Aktif Gelistirici:** Claude
-**Mevcut Versiyon:** dev (Phase 13 Webhook Notification destegi tamamlandi - production-ready)
+**Mevcut Versiyon:** dev (Phase 14 YAML config yazma + init format secimi tamamlandi - production-ready)
 
 ---
 
@@ -444,6 +445,45 @@
 
 ---
 
+## Faz 14: YAML Config Yazma + Init Format Secimi
+
+**Durum:** Tamamlandi
+**PRD:** `docs/phase_14.md`
+
+### Yapilacaklar
+
+- [x] `internal/config/writer.go` - WriteConfigYAML + WriteConfigYAMLWith fonksiyonlari
+- [x] `internal/config/writer.go` - WriteConfigJSONWith fonksiyonu (ForceFields destegi)
+- [x] `internal/config/writer.go` - ForceFields tipi ve toConfigMap (diffStructForce)
+- [x] `internal/config/writer.go` - fullExampleYAML sabiti (yorumlu YAML referans)
+- [x] `internal/config/writer.go` - fullExampleJSON ve WriteFullExampleJSON kaldirildi
+- [x] `internal/config/migrate.go` - NativeConfigFileYAML sabiti
+- [x] `internal/config/migrate.go` - NativeConfigFileForFormat() fonksiyonu
+- [x] `internal/config/migrate.go` - DetectNativeConfigAny() fonksiyonu
+- [x] `internal/config/migrate.go` - MigrateLegacyConfigTo() fonksiyonu (format parametreli)
+- [x] `internal/cli/init.go` - Format secim sorusu (JSON / YAML, ilk soru)
+- [x] `internal/cli/init.go` - ForceFields ile wizard-configured alanlarin explicit yazimi
+- [x] `internal/cli/init.go` - Format degisiminde eski config'i .bak olarak yeniden adlandirma
+- [x] `internal/cli/init.go` - --full-example YAML ciktisi (.release-it-go-full.yaml)
+- [x] `internal/config/writer_test.go` - YAML yazma testleri (default, non-default, full example, loadable)
+- [x] `internal/config/writer_test.go` - TestToConfigMap_ForceFieldsIncludesDefaults
+- [x] `internal/cli/init_test.go` - TestRunInit_YAMLFormat
+- [x] `internal/cli/init_test.go` - TestRunInit_FormatSwitch_RenamesOldConfig
+- [x] `internal/cli/init_test.go` - TestRunInit_WizardWritesExplicitFields
+- [x] `docs/phase_14.md` - PRD dokumani
+- [x] Tum testler gecti (`go test ./... -race`)
+- [x] `go vet` ve `go fmt` temiz
+
+### Notlar
+
+- YAML yorum satiri destegi sayesinde `--full-example` artik her opsiyon icin aciklama icerir
+- ForceFields mekanizmasi: wizard'in sordugu her alan default olsa bile config dosyasina yazilir (ornegin `commit: true`, `infile: "CHANGELOG.md"`)
+- Format degisiminde (JSON→YAML) eski dosya `.bak` olarak yedeklenir, iki config yan yana kalmaz
+- Migration da format secimini destekliyor (MigrateLegacyConfigTo)
+- `go.yaml.in/yaml/v3` (Viper'in indirect dependency'si) artik dogrudan kullaniliyor
+
+---
+
 ## Bugs
 
 - [x] BUG: Ilk release'de changelog "exit status 128" hatasi (2026-02-16) → `LatestVersion=0.0.0` iken `v0.0.0` tag'i araniyordu ama repo'da boyle bir tag yok. `latestVersionToTag()` helper fonksiyonu eklendi: `0.0.0` veya bos string icin bos doner, bu sayede `GetCommitsSinceTag("")` tum commitleri alir. 3 yer etkilendi: `RunChangelogOnly`, `generateChangelog`, `autoDetectIncrement`.
@@ -490,6 +530,12 @@
 | 2026-02-17 | Claude | fix: init wizard'dan gereksiz "Require new commits" sorusu kaldirildi - default davranis (true) yeterli |
 | 2026-02-17 | Claude | feat: requireConventionalCommits default true yapildi, init wizard'dan sorusu kaldirildi |
 | 2026-02-17 | Claude | feat: init --full-example komutu eklendi - tum config seceneklerini gosteren ornek dosya olusturma |
+| 2026-02-17 | Claude | feat: YAML config yazma destegi + init wizard'a format secimi (JSON/YAML) eklendi |
+| 2026-02-17 | Claude | feat: init --full-example artik yorumlu YAML uretiyor (.release-it-go-full.yaml) |
+| 2026-02-17 | Claude | feat: MigrateLegacyConfigTo ile migration formata gore cikti verebiliyor |
+| 2026-02-17 | Claude | feat: DetectNativeConfigAny ile hem JSON hem YAML native config tespiti |
+| 2026-02-17 | Claude | feat: ForceFields ile wizard-configured alanlarin explicit config'e yazimi (default olsa bile) |
+| 2026-02-17 | Claude | fix: format degisiminde (JSON→YAML) eski config .bak olarak yedekleniyor, cift config onlendi |
 
 ---
 

@@ -4,19 +4,19 @@ package config
 func DefaultConfig() *Config {
 	return &Config{
 		Git: GitConfig{
-			Commit:                 true,
-			CommitMessage:          "chore: release v${version}",
-			Tag:                    true,
-			TagName:                "${version}",
-			TagAnnotation:          "Release ${version}",
-			Push:                   true,
-			PushArgs:               []string{"--follow-tags"},
-			PushRepo:               "origin",
+			Commit:                     true,
+			CommitMessage:              "chore: release v${version}",
+			Tag:                        true,
+			TagName:                    "${version}",
+			TagAnnotation:              "Release ${version}",
+			Push:                       true,
+			PushArgs:                   []string{"--follow-tags"},
+			PushRepo:                   "origin",
 			RequireCleanWorkingDir:     true,
 			RequireUpstream:            true,
 			RequireCommits:             true,
 			RequireConventionalCommits: true,
-			Changelog:              `git log --pretty=format:"* %s (%h)" ${latestTag}...HEAD`,
+			Changelog:                  `git log --pretty=format:"* %s (%h)" ${latestTag}...HEAD`,
 		},
 		GitHub: GitHubConfig{
 			ReleaseName: "Release ${version}",

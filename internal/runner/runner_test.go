@@ -2711,7 +2711,7 @@ func TestRunner_GitRelease_CI_AddUntrackedFiles(t *testing.T) {
 
 func TestRunner_CheckTokens_NoRelease(t *testing.T) {
 	cfg := &config.Config{
-		CI: true,
+		CI:     true,
 		GitHub: config.GitHubConfig{Release: false},
 		GitLab: config.GitLabConfig{Release: false},
 	}
@@ -2881,7 +2881,7 @@ func TestRunner_CheckTokens_BothEnabled_BothSet(t *testing.T) {
 	t.Setenv("GITLAB_TOKEN", "glpat-test")
 
 	cfg := &config.Config{
-		CI: true,
+		CI:     true,
 		GitHub: config.GitHubConfig{Release: true},
 		GitLab: config.GitLabConfig{Release: true},
 	}
