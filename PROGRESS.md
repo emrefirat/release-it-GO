@@ -536,6 +536,7 @@
 | 2026-02-17 | Claude | feat: DetectNativeConfigAny ile hem JSON hem YAML native config tespiti |
 | 2026-02-17 | Claude | feat: ForceFields ile wizard-configured alanlarin explicit config'e yazimi (default olsa bile) |
 | 2026-02-17 | Claude | fix: format degisiminde (JSON→YAML) eski config .bak olarak yedekleniyor, cift config onlendi |
+| 2026-02-17 | Claude | fix: clean working dir kontrolu untracked dosyalari artik yok sayiyor (-uno flag) |
 
 ---
 
