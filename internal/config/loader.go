@@ -44,9 +44,18 @@ func loadFromFile(cfg *Config, path string) (*Config, error) {
 	}
 
 	ext := strings.ToLower(filepath.Ext(path))
+	format := extToViperType(ext)
+
+	// Keep original data for plugin compat processing
+	originalData := data
+
+	// Pre-process JSON to fix type mismatches from npm release-it format
+	if format == "json" {
+		data = normalizeJSON(data)
+	}
 
 	v := viper.New()
-	v.SetConfigType(extToViperType(ext))
+	v.SetConfigType(format)
 
 	if err := v.ReadConfig(strings.NewReader(string(data))); err != nil {
 		return nil, fmt.Errorf("parsing config file %s: %w", path, err)
@@ -55,6 +64,9 @@ func loadFromFile(cfg *Config, path string) (*Config, error) {
 	if err := v.Unmarshal(cfg); err != nil {
 		return nil, fmt.Errorf("unmarshaling config file %s: %w", path, err)
 	}
+
+	// Apply backward compatibility for release-it npm plugin settings
+	applyPluginCompat(cfg, originalData, format)
 
 	return cfg, nil
 }
