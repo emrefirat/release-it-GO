@@ -289,6 +289,10 @@
 - Migration akisi: legacy oku → backup al → normalizeJSON + applyPluginCompat → native yaz
 - Init wizard: platform, changelog, git ops, commit msg, tag format, branch secimi
 - Mevcut runner_test.go mock prompter'lara Select metodu eklendi (interface uyumlulugu)
+- Init wizard'da git push kapatildiginda `requireUpstream` otomatik false yapilir (upstream kontrolu push olmadan anlamsiz)
+- `requireCleanWorkingDir` push durumundan bagimsiz olarak HER ZAMAN aktif kalir (commit/tag atarken kirli working dir tehlikeli)
+- Init komutuna ozel flag yok, root'tan gelen `--ci` flag'i NonInteractivePrompter ile tum sorulari default yanitlar
+- `--ci` modunda mevcut `.release-it-go.json` varsa Confirm("Overwrite?", default=false) → abort eder (guvenli davranis)
 
 ---
 
