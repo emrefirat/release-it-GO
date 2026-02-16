@@ -1,0 +1,16 @@
+ci = true
+increment = "major"
+
+[git]
+commit = true
+commitMessage = "chore: release v${version}"
+tag = true
+tagName = "${version}"
+push = false
+requireUpstream = false
+requireCleanWorkingDir = false
+addUntrackedFiles = true
+
+[changelog]
+enabled = true
+preset = "angular"
