@@ -145,6 +145,12 @@ func TestRunInit_GitTagOnly_NoChangelog(t *testing.T) {
 	if cfg.Git.Commit {
 		t.Error("expected git.commit=false")
 	}
+	if cfg.Git.RequireUpstream {
+		t.Error("expected git.requireUpstream=false when push disabled")
+	}
+	if cfg.Git.RequireCleanWorkingDir {
+		t.Error("expected git.requireCleanWorkingDir=false when push disabled")
+	}
 }
 
 func TestRunInit_MigrateLegacy(t *testing.T) {
