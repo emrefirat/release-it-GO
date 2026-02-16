@@ -19,6 +19,7 @@
 | 8 | Init Command & Dual Config | Tamamlandi | 100% |
 | 9 | Conventional Commit Linting | Tamamlandi | 100% |
 | 10 | UI/Output Iyilestirmesi | Tamamlandi | 100% |
+| 11 | Docker Container Destegi | Tamamlandi | 100% |
 
 **Son Guncelleme:** 2026-02-16
 **Aktif Gelistirici:** Claude
@@ -360,6 +361,32 @@
 
 ---
 
+## Faz 11: Docker Container Destegi
+
+**Durum:** Tamamlandi
+**PRD:** `docs/phase_11.md`
+
+### Yapilacaklar
+
+- [x] `docs/phase_11.md` PRD dokumani
+- [x] `.dockerignore` build context filtresi
+- [x] `Dockerfile` multi-stage build (golang:1.24.3-alpine → alpine:3.21)
+- [x] `Makefile` docker-build ve docker-run target'lari
+- [x] `PROGRESS.md` Phase 11 guncelleme
+
+### Notlar
+
+- Multi-stage build: builder (golang:1.24.3-alpine) + runtime (alpine:3.21)
+- Static binary: CGO_ENABLED=0 GOOS=linux, -trimpath -ldflags="-s -w"
+- Runtime paketler: git, openssh-client, ca-certificates
+- Non-root user: releaser (UID/GID 1000, build arg ile degistirilebilir)
+- git safe.directory '*' ile mount edilen repo'lar icin guvenli erisim
+- Build ARG'lar: VERSION, COMMIT, BUILD_DATE, USER_UID, USER_GID
+- Tahmini image boyutu: ~30MB
+- OCI metadata labels eklendi
+
+---
+
 ## Bugs
 
 - [x] BUG: Ilk release'de changelog "exit status 128" hatasi (2026-02-16) → `LatestVersion=0.0.0` iken `v0.0.0` tag'i araniyordu ama repo'da boyle bir tag yok. `latestVersionToTag()` helper fonksiyonu eklendi: `0.0.0` veya bos string icin bos doner, bu sayede `GetCommitsSinceTag("")` tum commitleri alir. 3 yer etkilendi: `RunChangelogOnly`, `generateChangelog`, `autoDetectIncrement`.
@@ -398,6 +425,7 @@
 | 2026-02-16 | Claude | fix: UI/Output iyilestirmesi v2 - CI spinner cift satir kaldirma, init ✗ bug fix, "no commits" graceful exit, printSummary kutu kaldirma, spinner mesajlari past-tense |
 | 2026-02-16 | Claude | fix: pre-release ayni ID ile versiyon artmama hatasi (prepatch → prerelease increment) |
 | 2026-02-16 | Claude | fix: commit lint type validation - allowedTypes map ile gecersiz type'lar reddediliyor, --verbose ile commit listesi gosteriliyor |
+| 2026-02-16 | Claude | Phase 11 tamamlandi: Docker container destegi - multi-stage Dockerfile, .dockerignore, Makefile docker target'lari |
 
 ---
 

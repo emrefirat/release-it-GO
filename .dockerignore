@@ -1,0 +1,44 @@
+# Build artifacts
+bin/
+tools/
+
+# Git
+.git/
+.gitignore
+
+# Tests
+test/
+
+# Documentation (README.md hariç)
+docs/
+PROGRESS.md
+CLAUDE.md
+CHANGELOG.md
+
+# CI/CD configs
+.github/
+.gitlab/
+.goreleaser.yaml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Binary artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.prof
+
+# Docker
+Dockerfile
+.dockerignore
