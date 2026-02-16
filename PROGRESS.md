@@ -11,7 +11,7 @@
 |-----|--------|-------|----------|
 | 1 | Core Foundation | Tamamlandi | 100% |
 | 2 | Git Operations | Tamamlandi | 100% |
-| 3 | Conventional Commits + Changelog | Baslanmadi | 0% |
+| 3 | Conventional Commits + Changelog | Tamamlandi | 100% |
 | 4 | GitHub + GitLab Releases | Baslanmadi | 0% |
 | 5 | Interactive UI + Hooks + Pipeline | Baslanmadi | 0% |
 | 6 | Advanced Features | Baslanmadi | 0% |
@@ -19,7 +19,7 @@
 
 **Son Guncelleme:** 2026-02-16
 **Aktif Gelistirici:** Claude
-**Mevcut Versiyon:** dev (Phase 2 tamamlandi)
+**Mevcut Versiyon:** dev (Phase 3 tamamlandi)
 
 ---
 
@@ -83,21 +83,26 @@
 
 ## Faz 3: Conventional Commits + Changelog
 
-**Durum:** Baslanmadi
+**Durum:** Tamamlandi
 **PRD:** `docs/phase_3.md`
 
 ### Yapilacaklar
 
-- [ ] Conventional commit parser
-- [ ] Bump analyzer (major/minor/patch)
-- [ ] Conventional-changelog formati
-- [ ] Keep-a-changelog formati
-- [ ] CHANGELOG.md dosya guncelleme
-- [ ] Unit testler
+- [x] Conventional commit parser
+- [x] Bump analyzer (major/minor/patch)
+- [x] Conventional-changelog formati
+- [x] Keep-a-changelog formati
+- [x] CHANGELOG.md dosya guncelleme
+- [x] Unit testler
 
 ### Notlar
 
--
+- Test coverage: changelog=%93.3
+- Regex ile conventional commit parse (type, scope, !, description, body, footers)
+- Breaking change algilama: footer (BREAKING CHANGE:) ve bang (feat!) destegi
+- Conventional-changelog: Features, Bug Fixes, Performance Improvements, Reverts, BREAKING CHANGES bolumleri
+- Keep-a-changelog: Added, Changed, Fixed, Removed bolumleri
+- insertAfterHeader ile mevcut CHANGELOG.md icerigini koruyarak prepend
 
 ---
 
@@ -199,6 +204,7 @@
 | 2026-02-16 | - | Proje baslatildi, PRD dosyalari olusturuldu |
 | 2026-02-16 | Claude | Phase 1 tamamlandi: CLI, config, version, logger, template, tests |
 | 2026-02-16 | Claude | Phase 2 tamamlandi: git runner, prerequisites, commit, tag, push, repo info, changelog, tests |
+| 2026-02-16 | Claude | Phase 3 tamamlandi: conventional commit parser, bump analyzer, changelog renderers (conventional + keep-a-changelog), file update |
 
 ---
 
