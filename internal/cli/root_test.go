@@ -119,3 +119,73 @@ func TestNewRootCommand_HasVersionSubcommand(t *testing.T) {
 		t.Error("root command should have 'version' subcommand")
 	}
 }
+
+func TestNewRootCommand_HasCompletionSubcommand(t *testing.T) {
+	cmd := NewRootCommand()
+	found := false
+	for _, sub := range cmd.Commands() {
+		if sub.Use == "completion [bash|zsh|fish|powershell]" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("root command should have 'completion' subcommand")
+	}
+}
+
+func TestNewRootCommand_CompletionBash(t *testing.T) {
+	cmd := NewRootCommand()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetArgs([]string{"completion", "bash"})
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("completion bash failed: %v", err)
+	}
+	if buf.Len() == 0 {
+		t.Error("bash completion output should not be empty")
+	}
+}
+
+func TestNewRootCommand_CompletionZsh(t *testing.T) {
+	cmd := NewRootCommand()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetArgs([]string{"completion", "zsh"})
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("completion zsh failed: %v", err)
+	}
+}
+
+func TestNewRootCommand_CompletionFish(t *testing.T) {
+	cmd := NewRootCommand()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetArgs([]string{"completion", "fish"})
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("completion fish failed: %v", err)
+	}
+}
+
+func TestNewRootCommand_CompletionPowershell(t *testing.T) {
+	cmd := NewRootCommand()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetArgs([]string{"completion", "powershell"})
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("completion powershell failed: %v", err)
+	}
+}
+
+func TestNewRootCommand_CompletionInvalidShell(t *testing.T) {
+	cmd := NewRootCommand()
+	cmd.SetArgs([]string{"completion", "invalid"})
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error for invalid shell")
+	}
+}
