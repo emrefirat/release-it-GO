@@ -7,29 +7,32 @@ import (
 
 func TestParseRepoURL(t *testing.T) {
 	tests := []struct {
-		name      string
-		url       string
-		wantProto string
-		wantHost  string
-		wantOwner string
-		wantRepo  string
-		wantErr   bool
+		name       string
+		url        string
+		wantProto  string
+		wantHost   string
+		wantOwner  string
+		wantRepo   string
+		wantRemote string // expected sanitized Remote URL (empty = same as cleaned https URL)
+		wantErr    bool
 	}{
 		{
-			name:      "HTTPS with .git",
-			url:       "https://github.com/emfi/release-it-go.git",
-			wantProto: "https",
-			wantHost:  "github.com",
-			wantOwner: "emfi",
-			wantRepo:  "release-it-go",
+			name:       "HTTPS with .git",
+			url:        "https://github.com/emfi/release-it-go.git",
+			wantProto:  "https",
+			wantHost:   "github.com",
+			wantOwner:  "emfi",
+			wantRepo:   "release-it-go",
+			wantRemote: "https://github.com/emfi/release-it-go",
 		},
 		{
-			name:      "HTTPS without .git",
-			url:       "https://github.com/emfi/release-it-go",
-			wantProto: "https",
-			wantHost:  "github.com",
-			wantOwner: "emfi",
-			wantRepo:  "release-it-go",
+			name:       "HTTPS without .git",
+			url:        "https://github.com/emfi/release-it-go",
+			wantProto:  "https",
+			wantHost:   "github.com",
+			wantOwner:  "emfi",
+			wantRepo:   "release-it-go",
+			wantRemote: "https://github.com/emfi/release-it-go",
 		},
 		{
 			name:      "SSH format",
@@ -48,12 +51,13 @@ func TestParseRepoURL(t *testing.T) {
 			wantRepo:  "release-it-go",
 		},
 		{
-			name:      "GitLab HTTPS",
-			url:       "https://gitlab.com/mygroup/myproject.git",
-			wantProto: "https",
-			wantHost:  "gitlab.com",
-			wantOwner: "mygroup",
-			wantRepo:  "myproject",
+			name:       "GitLab HTTPS",
+			url:        "https://gitlab.com/mygroup/myproject.git",
+			wantProto:  "https",
+			wantHost:   "gitlab.com",
+			wantOwner:  "mygroup",
+			wantRepo:   "myproject",
+			wantRemote: "https://gitlab.com/mygroup/myproject",
 		},
 		{
 			name:      "GitLab SSH",
@@ -64,12 +68,40 @@ func TestParseRepoURL(t *testing.T) {
 			wantRepo:  "myproject",
 		},
 		{
-			name:      "Self-hosted HTTPS",
-			url:       "https://git.example.com/team/repo.git",
-			wantProto: "https",
-			wantHost:  "git.example.com",
-			wantOwner: "team",
-			wantRepo:  "repo",
+			name:       "Self-hosted HTTPS",
+			url:        "https://git.example.com/team/repo.git",
+			wantProto:  "https",
+			wantHost:   "git.example.com",
+			wantOwner:  "team",
+			wantRepo:   "repo",
+			wantRemote: "https://git.example.com/team/repo",
+		},
+		{
+			name:       "HTTPS with credentials (oauth2)",
+			url:        "https://oauth2:secret-token@gitlab.com/mygroup/myproject.git",
+			wantProto:  "https",
+			wantHost:   "gitlab.com",
+			wantOwner:  "mygroup",
+			wantRepo:   "myproject",
+			wantRemote: "https://gitlab.com/mygroup/myproject",
+		},
+		{
+			name:       "HTTPS with user:password credentials",
+			url:        "https://user:password123@github.com/owner/repo.git",
+			wantProto:  "https",
+			wantHost:   "github.com",
+			wantOwner:  "owner",
+			wantRepo:   "repo",
+			wantRemote: "https://github.com/owner/repo",
+		},
+		{
+			name:       "HTTPS with token-only credential",
+			url:        "https://x-access-token:ghp_abc123@github.com/owner/repo",
+			wantProto:  "https",
+			wantHost:   "github.com",
+			wantOwner:  "owner",
+			wantRepo:   "repo",
+			wantRemote: "https://github.com/owner/repo",
 		},
 		{
 			name:    "invalid URL",
@@ -105,7 +137,14 @@ func TestParseRepoURL(t *testing.T) {
 			if info.Repository != tt.wantRepo {
 				t.Errorf("Repository = %q, want %q", info.Repository, tt.wantRepo)
 			}
-			if info.Remote != tt.url {
+			// For HTTPS URLs, Remote should be the clean URL (no credentials)
+			if tt.wantRemote != "" {
+				if info.Remote != tt.wantRemote {
+					t.Errorf("Remote = %q, want %q", info.Remote, tt.wantRemote)
+				}
+			}
+			// For SSH URLs, Remote should be the original URL
+			if tt.wantProto == "ssh" && info.Remote != tt.url {
 				t.Errorf("Remote = %q, want %q", info.Remote, tt.url)
 			}
 		})
