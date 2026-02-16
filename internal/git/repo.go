@@ -16,7 +16,8 @@ type RepoInfo struct {
 }
 
 // httpsPattern matches HTTPS remote URLs like https://github.com/owner/repo.git
-var httpsPattern = regexp.MustCompile(`^https?://([^/]+)/([^/]+)/([^/]+?)(?:\.git)?$`)
+// Also handles URLs with credentials like https://user:token@github.com/owner/repo.git
+var httpsPattern = regexp.MustCompile(`^https?://(?:[^@]+@)?([^/]+)/([^/]+)/([^/]+?)(?:\.git)?$`)
 
 // sshPattern matches SSH remote URLs like git@github.com:owner/repo.git
 var sshPattern = regexp.MustCompile(`^git@([^:]+):([^/]+)/([^/]+?)(?:\.git)?$`)
@@ -38,10 +39,13 @@ func GetRepoInfo(remoteName string) (*RepoInfo, error) {
 
 // ParseRepoURL parses a git remote URL into RepoInfo.
 // Supports both HTTPS and SSH formats.
+// Credentials in HTTPS URLs (user:token@host) are stripped for security.
 func ParseRepoURL(url string) (*RepoInfo, error) {
 	if matches := httpsPattern.FindStringSubmatch(url); matches != nil {
+		// Build a clean remote URL without credentials
+		cleanRemote := fmt.Sprintf("https://%s/%s/%s", matches[1], matches[2], matches[3])
 		return &RepoInfo{
-			Remote:     url,
+			Remote:     cleanRemote,
 			Protocol:   "https",
 			Host:       matches[1],
 			Owner:      matches[2],
