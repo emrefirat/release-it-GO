@@ -57,7 +57,7 @@ func TestRunInit_WizardCreatesConfig(t *testing.T) {
 
 	p := &mockPrompter{
 		selectAnswers:  []int{0, 0},                                                            // GitHub, Conventional Changelog
-		confirmAnswers: []bool{true, true},                                                     // commit/tag enabled, push enabled
+		confirmAnswers: []bool{true, true, true},                                               // commit/tag, push, requireCommits
 		inputAnswers:   []string{"chore(release): release v${version}", "v${version}", "main"}, // commit msg, tag format, branch
 	}
 

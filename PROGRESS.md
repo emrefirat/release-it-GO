@@ -301,6 +301,7 @@
 - [x] BUG: Ilk release'de changelog "exit status 128" hatasi (2026-02-16) → `LatestVersion=0.0.0` iken `v0.0.0` tag'i araniyordu ama repo'da boyle bir tag yok. `latestVersionToTag()` helper fonksiyonu eklendi: `0.0.0` veya bos string icin bos doner, bu sayede `GetCommitsSinceTag("")` tum commitleri alir. 3 yer etkilendi: `RunChangelogOnly`, `generateChangelog`, `autoDetectIncrement`.
 - [x] BUG: Init wizard commit/tag/push'u tek soru olarak soruyordu (2026-02-16) → Kullanici commit+tag isteyip push istemeyince ikilem yasiyordu. Sorular ayrildi: "Enable git commit and tag?" + "Enable git push?" olarak iki ayri prompt yapildi. Push kapaliyken `requireUpstream` otomatik false.
 - [x] BUG: CHANGELOG.md olusturulduktan sonra commit'e dahil edilmiyordu (2026-02-16) → `Stage()` default'ta `git add . --update` ile sadece tracked dosyalari ekliyor. Yeni olusturulan CHANGELOG.md untracked oldugu icin atlaniyordu. Fix: `StageFile()` metodu eklendi, `generateChangelog()` sonunda CHANGELOG.md explicit olarak `git add` ile stage'leniyor.
+- [x] BUG: Commit yokken bile release cikiyordu, bos CHANGELOG entry'leri olusuyordu (2026-02-16) → `git.requireCommits` default'u `false` idi, commit olmadan ard arda release atilabiliyordu. Fix: default `true` yapildi. Init wizard'a "Require new commits before release?" sorusu eklendi. Artik son tag'den beri commit yoksa `no commits since latest tag` hatasi verir.
 
 ---
 
