@@ -85,6 +85,7 @@ func TestCheckCleanWorkingDir(t *testing.T) {
 		{"clean", true, "", false},
 		{"dirty", true, "M file.go", true},
 		{"dirty with whitespace", true, " M file.go\n", true},
+		{"untracked files ignored", true, "", false}, // -uno flag excludes untracked
 	}
 
 	for _, tt := range tests {
@@ -104,6 +105,33 @@ func TestCheckCleanWorkingDir(t *testing.T) {
 				t.Errorf("checkCleanWorkingDir() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestCheckCleanWorkingDir_UsesUnoFlag(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	var capturedArgs []string
+	commandExecutor = func(name string, args ...string) (string, error) {
+		capturedArgs = args
+		return "", nil
+	}
+
+	cfg := &config.GitConfig{RequireCleanWorkingDir: true}
+	g := newTestGitWithConfig(cfg, false)
+	_ = g.checkCleanWorkingDir()
+
+	// Verify -uno flag is passed to exclude untracked files
+	found := false
+	for _, arg := range capturedArgs {
+		if arg == "-uno" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected -uno flag in git status args, got %v", capturedArgs)
 	}
 }
 
