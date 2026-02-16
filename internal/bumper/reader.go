@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/emfi/release-it-go/internal/config"
+	"release-it-go/internal/config"
 	toml "github.com/pelletier/go-toml/v2"
 	yaml "go.yaml.in/yaml/v3"
 )

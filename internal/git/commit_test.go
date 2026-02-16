@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/emfi/release-it-go/internal/config"
+	"release-it-go/internal/config"
 )
 
 func TestStage_UpdateOnly(t *testing.T) {

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/emfi/release-it-go/internal/config"
-	applog "github.com/emfi/release-it-go/internal/log"
-	"github.com/emfi/release-it-go/internal/runner"
+	"release-it-go/internal/config"
+	applog "release-it-go/internal/log"
+	"release-it-go/internal/runner"
 	"github.com/spf13/cobra"
 )
 

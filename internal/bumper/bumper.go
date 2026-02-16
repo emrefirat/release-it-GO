@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/emfi/release-it-go/internal/config"
-	applog "github.com/emfi/release-it-go/internal/log"
+	"release-it-go/internal/config"
+	applog "release-it-go/internal/log"
 )
 
 // Bumper reads and writes version strings across multiple files.

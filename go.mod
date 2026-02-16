@@ -1,4 +1,4 @@
-module github.com/emfi/release-it-go
+module release-it-go
 
 go 1.24.3
 

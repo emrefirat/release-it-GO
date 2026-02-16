@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/emfi/release-it-go/internal/config"
-	"github.com/emfi/release-it-go/internal/git"
-	"github.com/emfi/release-it-go/internal/ui"
+	"release-it-go/internal/config"
+	"release-it-go/internal/git"
+	"release-it-go/internal/ui"
 )
 
 func TestRenderTagName(t *testing.T) {
@@ -1616,7 +1616,7 @@ func TestRunner_Init(t *testing.T) {
 		output string
 		err    error
 	}{
-		"git remote get-url origin":       {output: "https://github.com/emfi/release-it-go.git", err: nil},
+		"git remote get-url origin":       {output: "https://github.com/testowner/testrepo.git", err: nil},
 		"git rev-parse --abbrev-ref HEAD": {output: "main", err: nil},
 	})
 
@@ -1811,11 +1811,11 @@ func TestRunner_GithubRelease_Interactive_Declined(t *testing.T) {
 
 	runner := NewRunner(cfg)
 	runner.ctx.RepoInfo = &git.RepoInfo{
-		Remote:     "https://github.com/emfi/release-it-go.git",
+		Remote:     "https://github.com/testowner/testrepo.git",
 		Protocol:   "https",
 		Host:       "github.com",
-		Owner:      "emfi",
-		Repository: "release-it-go",
+		Owner:      "testowner",
+		Repository: "testrepo",
 	}
 	runner.ctx.Version = "1.0.0"
 	runner.ctx.TagName = "v1.0.0"
@@ -1844,11 +1844,11 @@ func TestRunner_GithubRelease_Interactive_ConfirmError(t *testing.T) {
 
 	runner := NewRunner(cfg)
 	runner.ctx.RepoInfo = &git.RepoInfo{
-		Remote:     "https://github.com/emfi/release-it-go.git",
+		Remote:     "https://github.com/testowner/testrepo.git",
 		Protocol:   "https",
 		Host:       "github.com",
-		Owner:      "emfi",
-		Repository: "release-it-go",
+		Owner:      "testowner",
+		Repository: "testrepo",
 	}
 	runner.ctx.Version = "1.0.0"
 	runner.ctx.TagName = "v1.0.0"
@@ -2308,7 +2308,7 @@ func TestRunner_Run_FullPipeline_DryRun(t *testing.T) {
 		output string
 		err    error
 	}{
-		"git remote get-url origin":               {output: "https://github.com/emfi/release-it-go.git", err: nil},
+		"git remote get-url origin":               {output: "https://github.com/testowner/testrepo.git", err: nil},
 		"git rev-parse --abbrev-ref HEAD":         {output: "main", err: nil},
 		"git rev-parse --is-inside-work-tree":     {output: "true", err: nil},
 		"git status --porcelain":                  {output: "", err: nil},
@@ -2343,7 +2343,7 @@ func TestRunner_RunChangelogOnly(t *testing.T) {
 		output string
 		err    error
 	}{
-		"git remote get-url origin":               {output: "https://github.com/emfi/release-it-go.git", err: nil},
+		"git remote get-url origin":               {output: "https://github.com/testowner/testrepo.git", err: nil},
 		"git rev-parse --abbrev-ref HEAD":         {output: "main", err: nil},
 		"git describe --tags --abbrev=0":          {output: "v1.0.0", err: nil},
 		"git log v1.0.0..HEAD --pretty=format:%s": {output: "feat: new feature\nfix: bug fix", err: nil},
@@ -2368,7 +2368,7 @@ func TestRunner_RunReleaseVersionOnly(t *testing.T) {
 		output string
 		err    error
 	}{
-		"git remote get-url origin":       {output: "https://github.com/emfi/release-it-go.git", err: nil},
+		"git remote get-url origin":       {output: "https://github.com/testowner/testrepo.git", err: nil},
 		"git rev-parse --abbrev-ref HEAD": {output: "main", err: nil},
 		"git describe --tags --abbrev=0":  {output: "v2.0.0", err: nil},
 	})
@@ -2405,7 +2405,7 @@ func TestRunner_RunOnlyVersion(t *testing.T) {
 		output string
 		err    error
 	}{
-		"git remote get-url origin":       {output: "https://github.com/emfi/release-it-go.git", err: nil},
+		"git remote get-url origin":       {output: "https://github.com/testowner/testrepo.git", err: nil},
 		"git rev-parse --abbrev-ref HEAD": {output: "main", err: nil},
 		"git describe --tags --abbrev=0":  {output: "v1.0.0", err: nil},
 	})
@@ -2441,7 +2441,7 @@ func TestRunner_RunNoIncrement(t *testing.T) {
 		output string
 		err    error
 	}{
-		"git remote get-url origin":       {output: "https://github.com/emfi/release-it-go.git", err: nil},
+		"git remote get-url origin":       {output: "https://github.com/testowner/testrepo.git", err: nil},
 		"git rev-parse --abbrev-ref HEAD": {output: "main", err: nil},
 		"git describe --tags --abbrev=0":  {output: "v3.2.1", err: nil},
 	})

@@ -3,7 +3,7 @@ package bumper
 import (
 	"testing"
 
-	"github.com/emfi/release-it-go/internal/config"
+	"release-it-go/internal/config"
 )
 
 func TestDetectFormat(t *testing.T) {

@@ -13,9 +13,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/emfi/release-it-go/internal/config"
-	"github.com/emfi/release-it-go/internal/git"
-	applog "github.com/emfi/release-it-go/internal/log"
+	"release-it-go/internal/config"
+	"release-it-go/internal/git"
+	applog "release-it-go/internal/log"
 )
 
 // GitLabClient implements ReleaseProvider for GitLab.
