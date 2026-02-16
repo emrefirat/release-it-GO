@@ -1,6 +1,10 @@
 package changelog
 
-import "testing"
+import (
+	"fmt"
+	"strings"
+	"testing"
+)
 
 func TestLintCommits_AllConventional(t *testing.T) {
 	commits := []LintInput{
@@ -139,5 +143,42 @@ func TestLintCommits_WhitespaceHandling(t *testing.T) {
 	}
 	if len(failed) != 1 {
 		t.Errorf("expected 1 failed, got %d", len(failed))
+	}
+}
+
+func TestLintCommits_InvalidType(t *testing.T) {
+	commits := []LintInput{
+		{Hash: "aaa1111", Subject: "fic: deneme commit"},
+		{Hash: "bbb2222", Subject: "foo: bar baz"},
+		{Hash: "ccc3333", Subject: "feature: new thing"},
+	}
+
+	passed, failed := LintCommits(commits)
+	if len(passed) != 0 {
+		t.Errorf("expected 0 passed, got %d", len(passed))
+	}
+	if len(failed) != 3 {
+		t.Errorf("expected 3 failed, got %d", len(failed))
+	}
+	for _, f := range failed {
+		if !strings.HasPrefix(f.Reason, "unknown type:") {
+			t.Errorf("expected 'unknown type:' reason, got %q", f.Reason)
+		}
+	}
+}
+
+func TestLintCommits_AllValidTypes(t *testing.T) {
+	types := []string{"feat", "fix", "docs", "style", "refactor", "perf", "test", "build", "ci", "chore", "revert"}
+	commits := make([]LintInput, len(types))
+	for i, typ := range types {
+		commits[i] = LintInput{Hash: fmt.Sprintf("hash%d", i), Subject: typ + ": something"}
+	}
+
+	passed, failed := LintCommits(commits)
+	if len(passed) != len(types) {
+		t.Errorf("expected %d passed, got %d", len(types), len(passed))
+	}
+	if len(failed) != 0 {
+		t.Errorf("expected 0 failed, got %d", len(failed))
 	}
 }
