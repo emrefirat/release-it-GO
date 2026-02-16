@@ -16,6 +16,7 @@
 | 5 | Interactive UI + Hooks + Pipeline | Tamamlandi | 100% |
 | 6 | Advanced Features | Tamamlandi | 100% |
 | 7 | Testing, CI/CD, Documentation | Tamamlandi | 100% |
+| 8 | Init Command & Dual Config | Tamamlandi | 100% |
 
 **Son Guncelleme:** 2026-02-16
 **Aktif Gelistirici:** Claude
@@ -265,6 +266,32 @@
 
 ---
 
+## Faz 8: Init Command & Dual Config File Support
+
+**Durum:** Tamamlandi
+**PRD:** `docs/phase_8.md`
+
+### Yapilacaklar
+
+- [x] configSearchFiles'a `.release-it-go.*` dosyalarini oncelikli ekle
+- [x] Prompter interface'ine generic `Select` metodu ekle (bubbletea + non-interactive)
+- [x] `config/writer.go` - WriteConfigJSON (smart defaults omission)
+- [x] `config/migrate.go` - DetectLegacyConfig + MigrateLegacyConfig
+- [x] `cli/init.go` - Init komutu ve wizard akisi
+- [x] Init komutunu root.go'ya kaydet
+- [x] Unit testler (writer, migrate, init, prompt select, config priority)
+- [x] docs/phase_8.md PRD dokumani
+
+### Notlar
+
+- Native config (.release-it-go.*) legacy config'den (.release-it.*) once aranir
+- WriteConfigJSON sadece default'tan farkli alanlari yazar (minimal JSON ciktisi)
+- Migration akisi: legacy oku → backup al → normalizeJSON + applyPluginCompat → native yaz
+- Init wizard: platform, changelog, git ops, commit msg, tag format, branch secimi
+- Mevcut runner_test.go mock prompter'lara Select metodu eklendi (interface uyumlulugu)
+
+---
+
 ## Degisiklik Gecmisi
 
 | Tarih | Gelistirici | Degisiklik |
@@ -281,6 +308,7 @@
 | 2026-02-16 | Claude | Config compat: npm release-it format uyumlulugu (normalizeJSON, applyPluginCompat) |
 | 2026-02-16 | Claude | feat: --preRelease shorthand flag, GitLab PreRelease alani |
 | 2026-02-16 | Claude | Gercek ortam testleri: GitLab CI pipeline (main + sub-branch prerelease) basarili |
+| 2026-02-16 | Claude | Phase 8 tamamlandi: init command, dual config support, legacy migration, smart config writer |
 
 ---
 
