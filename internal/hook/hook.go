@@ -8,8 +8,8 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/emfi/release-it-go/internal/config"
-	applog "github.com/emfi/release-it-go/internal/log"
+	"release-it-go/internal/config"
+	applog "release-it-go/internal/log"
 )
 
 // execCommand is a function variable for creating exec.Cmd, allowing test mocking.

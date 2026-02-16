@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/emfi/release-it-go/internal/bumper"
-	"github.com/emfi/release-it-go/internal/changelog"
-	"github.com/emfi/release-it-go/internal/config"
-	"github.com/emfi/release-it-go/internal/git"
-	"github.com/emfi/release-it-go/internal/release"
-	"github.com/emfi/release-it-go/internal/ui"
-	"github.com/emfi/release-it-go/internal/version"
+	"release-it-go/internal/bumper"
+	"release-it-go/internal/changelog"
+	"release-it-go/internal/config"
+	"release-it-go/internal/git"
+	"release-it-go/internal/release"
+	"release-it-go/internal/ui"
+	"release-it-go/internal/version"
 )
 
 // Runner orchestrates the release pipeline.

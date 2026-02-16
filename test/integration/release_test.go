@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/emfi/release-it-go/internal/config"
-	"github.com/emfi/release-it-go/internal/runner"
+	"release-it-go/internal/config"
+	"release-it-go/internal/runner"
 )
 
 // newTestConfig creates a config suitable for integration tests.
