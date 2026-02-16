@@ -111,17 +111,23 @@ func runInitWithPrompter(prompter ui.Prompter) error {
 		cfg.Changelog.Enabled = false
 	}
 
-	// Git commit/tag/push
-	gitEnabled, err := prompter.Confirm("Enable git commit, tag, and push?", true)
+	// Git commit and tag
+	commitTag, err := prompter.Confirm("Enable git commit and tag?", true)
 	if err != nil {
 		return err
 	}
-	cfg.Git.Commit = gitEnabled
-	cfg.Git.Tag = gitEnabled
-	cfg.Git.Push = gitEnabled
+	cfg.Git.Commit = commitTag
+	cfg.Git.Tag = commitTag
+
+	// Git push (separate from commit/tag)
+	pushEnabled, err := prompter.Confirm("Enable git push?", true)
+	if err != nil {
+		return err
+	}
+	cfg.Git.Push = pushEnabled
 
 	// When push is disabled, upstream check is irrelevant
-	if !gitEnabled {
+	if !pushEnabled {
 		cfg.Git.RequireUpstream = false
 	}
 

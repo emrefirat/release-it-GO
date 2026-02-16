@@ -57,7 +57,7 @@ func TestRunInit_WizardCreatesConfig(t *testing.T) {
 
 	p := &mockPrompter{
 		selectAnswers:  []int{0, 0},                                                            // GitHub, Conventional Changelog
-		confirmAnswers: []bool{true},                                                           // git enabled
+		confirmAnswers: []bool{true, true},                                                     // commit/tag enabled, push enabled
 		inputAnswers:   []string{"chore(release): release v${version}", "v${version}", "main"}, // commit msg, tag format, branch
 	}
 
@@ -90,8 +90,8 @@ func TestRunInit_GitLabPlatform(t *testing.T) {
 	os.Chdir(dir)
 
 	p := &mockPrompter{
-		selectAnswers:  []int{1, 1},  // GitLab, Keep a Changelog
-		confirmAnswers: []bool{true}, // git enabled
+		selectAnswers:  []int{1, 1},        // GitLab, Keep a Changelog
+		confirmAnswers: []bool{true, true}, // commit/tag enabled, push enabled
 		inputAnswers:   []string{"chore(release): release v${version}", "v${version}", "main"},
 	}
 
@@ -119,8 +119,8 @@ func TestRunInit_GitTagOnly_NoChangelog(t *testing.T) {
 	os.Chdir(dir)
 
 	p := &mockPrompter{
-		selectAnswers:  []int{2, 2},   // Git tag only, No changelog
-		confirmAnswers: []bool{false}, // git disabled
+		selectAnswers:  []int{2, 2},          // Git tag only, No changelog
+		confirmAnswers: []bool{false, false}, // commit/tag disabled, push disabled
 		inputAnswers:   []string{"chore(release): release v${version}", "v${version}", "main"},
 	}
 
@@ -145,8 +145,49 @@ func TestRunInit_GitTagOnly_NoChangelog(t *testing.T) {
 	if cfg.Git.Commit {
 		t.Error("expected git.commit=false")
 	}
+	if cfg.Git.Push {
+		t.Error("expected git.push=false")
+	}
 	if cfg.Git.RequireUpstream {
 		t.Error("expected git.requireUpstream=false when push disabled")
+	}
+}
+
+func TestRunInit_CommitTagEnabled_PushDisabled(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	defer os.Chdir(origDir)
+	os.Chdir(dir)
+
+	p := &mockPrompter{
+		selectAnswers:  []int{2, 0},         // Git tag only, Conventional Changelog
+		confirmAnswers: []bool{true, false}, // commit/tag YES, push NO
+		inputAnswers:   []string{"chore(release): release v${version}", "v${version}", "main"},
+	}
+
+	if err := runInitWithPrompter(p); err != nil {
+		t.Fatalf("runInitWithPrompter failed: %v", err)
+	}
+
+	cfg, err := config.LoadConfig(config.NativeConfigFile)
+	if err != nil {
+		t.Fatalf("loading created config: %v", err)
+	}
+
+	if !cfg.Git.Commit {
+		t.Error("expected git.commit=true")
+	}
+	if !cfg.Git.Tag {
+		t.Error("expected git.tag=true")
+	}
+	if cfg.Git.Push {
+		t.Error("expected git.push=false")
+	}
+	if cfg.Git.RequireUpstream {
+		t.Error("expected git.requireUpstream=false when push disabled")
+	}
+	if !cfg.Git.RequireCleanWorkingDir {
+		t.Error("expected git.requireCleanWorkingDir=true regardless of push")
 	}
 }
 
@@ -218,8 +259,8 @@ func TestRunInit_ExistingNativeConfig_Overwrite(t *testing.T) {
 	}
 
 	p := &mockPrompter{
-		confirmAnswers: []bool{true, true}, // overwrite, git enabled
-		selectAnswers:  []int{0, 0},        // GitHub, Conventional
+		confirmAnswers: []bool{true, true, true}, // overwrite, commit/tag enabled, push enabled
+		selectAnswers:  []int{0, 0},              // GitHub, Conventional
 		inputAnswers:   []string{"chore(release): release v${version}", "v${version}", "main"},
 	}
 
