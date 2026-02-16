@@ -9,20 +9,37 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// fullExampleFlag controls whether to generate a full example config.
+var fullExampleFlag bool
+
 // newInitCommand creates the "init" subcommand for interactive config setup.
 func newInitCommand() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Initialize a new release-it-go configuration",
 		Long: `Interactively create a .release-it-go.json configuration file.
-If a legacy .release-it.json file is found, it can be migrated automatically.`,
+If a legacy .release-it.json file is found, it can be migrated automatically.
+
+Use --full-example to generate a comprehensive example config file
+showing all available options with their default values.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE:          runInit,
 	}
+
+	cmd.Flags().BoolVar(&fullExampleFlag, "full-example", false, "Generate a full example config with all options")
+
+	return cmd
 }
 
+// fullExampleFile is the output filename for --full-example.
+const fullExampleFile = ".release-it-go-full.json"
+
 func runInit(cmd *cobra.Command, args []string) error {
+	if fullExampleFlag {
+		return runInitFullExample()
+	}
+
 	var prompter ui.Prompter
 	if ciMode {
 		prompter = &ui.NonInteractivePrompter{}
@@ -31,6 +48,19 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 
 	return runInitWithPrompter(prompter)
+}
+
+// runInitFullExample generates a full example config file with all options.
+func runInitFullExample() error {
+	cfg := config.FullExampleConfig()
+
+	if err := config.WriteFullConfigJSON(cfg, fullExampleFile); err != nil {
+		return fmt.Errorf("writing full example config: %w", err)
+	}
+
+	fmt.Printf("Created %s with all available options.\n", fullExampleFile)
+	fmt.Println("Copy the options you need to .release-it-go.json and customize them.")
+	return nil
 }
 
 // runInitWithPrompter runs the init wizard with the given prompter (testable).
