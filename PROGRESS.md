@@ -14,12 +14,12 @@
 | 3 | Conventional Commits + Changelog | Tamamlandi | 100% |
 | 4 | GitHub + GitLab Releases | Tamamlandi | 100% |
 | 5 | Interactive UI + Hooks + Pipeline | Tamamlandi | 100% |
-| 6 | Advanced Features | Baslanmadi | 0% |
+| 6 | Advanced Features | Tamamlandi | 100% |
 | 7 | Testing, CI/CD, Documentation | Baslanmadi | 0% |
 
 **Son Guncelleme:** 2026-02-16
 **Aktif Gelistirici:** Claude
-**Mevcut Versiyon:** dev (Phase 5 tamamlandi)
+**Mevcut Versiyon:** dev (Phase 6 tamamlandi)
 
 ---
 
@@ -169,23 +169,36 @@
 
 ## Faz 6: Advanced Features
 
-**Durum:** Baslanmadi
+**Durum:** Tamamlandi
 **PRD:** `docs/phase_6.md`
 
 ### Yapilacaklar
 
-- [ ] Bumper: dosyadan versiyon okuma (JSON/YAML/TOML/INI/text)
-- [ ] Bumper: dosyaya versiyon yazma
-- [ ] Bumper: glob pattern destegi
-- [ ] CalVer implementasyonu
-- [ ] Pre-release flows
-- [ ] --no-increment modu
-- [ ] Verbose/debug modlari
-- [ ] Unit testler
+- [x] Bumper: dosyadan versiyon okuma (JSON/YAML/TOML/INI/text)
+- [x] Bumper: dosyaya versiyon yazma
+- [x] Bumper: glob pattern destegi
+- [x] CalVer runner entegrasyonu
+- [x] Pre-release flows (Phase 1'de semver.go'da implement edilmisti)
+- [x] --no-increment modu
+- [x] --only-version modu
+- [x] --changelog ve --release-version CLI modlari
+- [x] CalVer + SemVer conflict detection
+- [x] Bumper pipeline step (bump adimi)
+- [x] Unit testler
 
 ### Notlar
 
--
+- Test coverage: bumper=%87.8
+- Bumper: JSON (nested path), YAML, TOML, INI ([section].key), text (consumeWholeFile) destegi
+- Bumper: glob pattern (*.json, charts/*/Chart.yaml), prefix (^, ~), dry-run destegi
+- CalVer: runner.determineCalVer() ile pipeline'a entegre edildi
+- CalVer + pre-release birlikte kullanilamiyor (CLI'da validation)
+- Pipeline'a "bump" adimi eklendi: version -> bump -> changelog
+- CLI modlari: RunChangelogOnly, RunReleaseVersionOnly, RunOnlyVersion, RunNoIncrement
+- RunOnlyVersion: versiyon secimi sonrasi otomatik CI moduna gecer
+- RunNoIncrement: versiyon artirmadan changelog ve release gunceller
+- Mevcut YAML/TOML dependency'leri kullanildi (go-yaml, go-toml via Viper)
+- INI icin stdlib ile basit parser yazildi (harici dependency yok)
 
 ---
 
@@ -221,6 +234,7 @@
 | 2026-02-16 | Claude | Phase 3 tamamlandi: conventional commit parser, bump analyzer, changelog renderers (conventional + keep-a-changelog), file update |
 | 2026-02-16 | Claude | Phase 4 tamamlandi: GitHub + GitLab API client, release create, asset upload, comment, token management, GHE/CA cert support |
 | 2026-02-16 | Claude | Phase 5 tamamlandi: bubbletea UI, lipgloss colors, spinner, CI detection, hook runner, pipeline orchestrator, dry-run, tests |
+| 2026-02-16 | Claude | Phase 6 tamamlandi: bumper (JSON/YAML/TOML/INI/text), CalVer entegrasyonu, CLI modlari, pre-release flows, pipeline bump adimi |
 
 ---
 

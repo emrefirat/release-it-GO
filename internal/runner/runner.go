@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/emfi/release-it-go/internal/bumper"
 	"github.com/emfi/release-it-go/internal/changelog"
 	"github.com/emfi/release-it-go/internal/config"
 	"github.com/emfi/release-it-go/internal/git"
@@ -37,6 +38,7 @@ func (r *Runner) Run() error {
 		{"init", r.init},
 		{"prerequisites", r.checkPrerequisites},
 		{"version", r.determineVersion},
+		{"bump", r.bumpFiles},
 		{"changelog", r.generateChangelog},
 		{"git:release", r.gitRelease},
 		{"github:release", r.githubRelease},
@@ -109,6 +111,92 @@ func (r *Runner) RunReleaseVersionOnly() error {
 	return nil
 }
 
+// RunOnlyVersion prompts for version selection, then runs the rest automatically.
+func (r *Runner) RunOnlyVersion() error {
+	if err := r.init(); err != nil {
+		return err
+	}
+	if err := r.determineVersion(); err != nil {
+		return err
+	}
+
+	// After version is selected, run rest in CI mode (no prompts)
+	r.ctx.IsCI = true
+
+	steps := []pipelineStep{
+		{"bump", r.bumpFiles},
+		{"changelog", r.generateChangelog},
+		{"git:release", r.gitRelease},
+		{"github:release", r.githubRelease},
+		{"gitlab:release", r.gitlabRelease},
+	}
+
+	start := time.Now()
+	for _, step := range steps {
+		if err := r.ctx.HookRunner.RunHooks("before:" + step.name); err != nil {
+			return fmt.Errorf("before:%s hook: %w", step.name, err)
+		}
+		if err := step.fn(); err != nil {
+			return fmt.Errorf("%s: %w", step.name, err)
+		}
+		r.ctx.UpdateVars()
+		if err := r.ctx.HookRunner.RunHooks("after:" + step.name); err != nil {
+			return fmt.Errorf("after:%s hook: %w", step.name, err)
+		}
+	}
+
+	r.printSummary(time.Since(start))
+	return nil
+}
+
+// RunNoIncrement runs the release pipeline without incrementing the version.
+func (r *Runner) RunNoIncrement() error {
+	if err := r.init(); err != nil {
+		return err
+	}
+
+	// Get latest version but don't increment
+	latestTag, err := r.ctx.Git.GetLatestTag()
+	if err != nil {
+		return fmt.Errorf("getting latest tag: %w", err)
+	}
+
+	parsed, parseErr := version.ParseVersion(latestTag)
+	if parseErr != nil {
+		return fmt.Errorf("parsing version %q: %w", latestTag, parseErr)
+	}
+
+	r.ctx.LatestVersion = parsed.String()
+	r.ctx.Version = parsed.String()
+	r.ctx.TagName = renderTagName(r.ctx.Config.Git.TagName, r.ctx.Version)
+	r.ctx.UpdateVars()
+
+	// Run remaining steps
+	start := time.Now()
+	steps := []pipelineStep{
+		{"changelog", r.generateChangelog},
+		{"git:release", r.gitRelease},
+		{"github:release", r.githubRelease},
+		{"gitlab:release", r.gitlabRelease},
+	}
+
+	for _, step := range steps {
+		if err := r.ctx.HookRunner.RunHooks("before:" + step.name); err != nil {
+			return fmt.Errorf("before:%s hook: %w", step.name, err)
+		}
+		if err := step.fn(); err != nil {
+			return fmt.Errorf("%s: %w", step.name, err)
+		}
+		r.ctx.UpdateVars()
+		if err := r.ctx.HookRunner.RunHooks("after:" + step.name); err != nil {
+			return fmt.Errorf("after:%s hook: %w", step.name, err)
+		}
+	}
+
+	r.printSummary(time.Since(start))
+	return nil
+}
+
 // init initializes the release context with repo info and branch name.
 func (r *Runner) init() error {
 	r.ctx.Spinner.Start("Initializing")
@@ -150,11 +238,29 @@ func (r *Runner) checkPrerequisites() error {
 
 // determineVersion determines the next version based on config and commits.
 func (r *Runner) determineVersion() error {
+	// Try reading version from bumper input file first
+	var bumperVersion string
+	if r.ctx.Config.Bumper.Enabled && r.ctx.Config.Bumper.In != nil {
+		b := bumper.NewBumper(&r.ctx.Config.Bumper, r.ctx.Logger, r.ctx.IsDryRun)
+		v, err := b.ReadVersion()
+		if err != nil {
+			r.ctx.Logger.Verbose("Could not read version from bumper: %v", err)
+		} else if v != "" {
+			bumperVersion = v
+			r.ctx.Logger.Verbose("Read version from bumper: %s", v)
+		}
+	}
+
 	// Get latest version from git tags
 	latestTag, err := r.ctx.Git.GetLatestTag()
 	if err != nil {
 		r.ctx.Logger.Verbose("No previous tags found, starting from 0.0.0")
 		latestTag = "0.0.0"
+	}
+
+	// Use bumper version if available and no git tag
+	if bumperVersion != "" && latestTag == "0.0.0" {
+		latestTag = bumperVersion
 	}
 
 	latestVersion := latestTag
@@ -171,15 +277,44 @@ func (r *Runner) determineVersion() error {
 		return nil
 	}
 
+	// CalVer mode
+	if r.ctx.Config.CalVer.Enabled {
+		return r.determineCalVer(latestVersion)
+	}
+
+	// SemVer mode
+	return r.determineSemVer(latestVersion)
+}
+
+// determineCalVer calculates the next calendar version.
+func (r *Runner) determineCalVer(latestVersion string) error {
+	cv := version.NewCalVer(
+		r.ctx.Config.CalVer.Format,
+		r.ctx.Config.CalVer.Increment,
+		r.ctx.Config.CalVer.FallbackIncrement,
+	)
+
+	newVersion, err := cv.NextVersion(latestVersion)
+	if err != nil {
+		return fmt.Errorf("calculating CalVer: %w", err)
+	}
+
+	r.ctx.Version = newVersion
+	r.ctx.TagName = renderTagName(r.ctx.Config.Git.TagName, newVersion)
+	r.ctx.Logger.Info("Version (CalVer): %s → %s", latestVersion, newVersion)
+	return nil
+}
+
+// determineSemVer calculates the next semantic version.
+func (r *Runner) determineSemVer(latestVersion string) error {
 	// Determine increment type
 	increment := r.ctx.Config.Increment
 	if increment == "" {
-		// Auto-detect from conventional commits
 		increment = r.autoDetectIncrement()
 	}
 
 	if increment == "" {
-		increment = "patch" // fallback
+		increment = "patch"
 	}
 
 	parsedCurrent, parseErr := version.ParseVersion(latestVersion)
@@ -214,6 +349,24 @@ func (r *Runner) determineVersion() error {
 	r.ctx.Version = newVersionStr
 	r.ctx.TagName = renderTagName(r.ctx.Config.Git.TagName, newVersionStr)
 	r.ctx.Logger.Info("Version: %s → %s", latestVersion, newVersionStr)
+	return nil
+}
+
+// bumpFiles writes the new version to configured bumper output files.
+func (r *Runner) bumpFiles() error {
+	if !r.ctx.Config.Bumper.Enabled || len(r.ctx.Config.Bumper.Out) == 0 {
+		return nil
+	}
+
+	r.ctx.Spinner.Start("Updating version files")
+
+	b := bumper.NewBumper(&r.ctx.Config.Bumper, r.ctx.Logger, r.ctx.IsDryRun)
+	if err := b.WriteVersion(r.ctx.Version); err != nil {
+		r.ctx.Spinner.Stop(false)
+		return fmt.Errorf("bumping version files: %w", err)
+	}
+
+	r.ctx.Spinner.Stop(true)
 	return nil
 }
 
