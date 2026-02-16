@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"os"
 	"testing"
 
 	"github.com/emfi/release-it-go/internal/config"
@@ -340,5 +341,202 @@ func TestRunner_DetermineVersion_NoIncrement(t *testing.T) {
 	tagName := renderTagName(cfg.Git.TagName, "1.0.0")
 	if tagName != "v1.0.0" {
 		t.Errorf("expected v1.0.0, got %s", tagName)
+	}
+}
+
+func TestRunner_BumpFiles_Disabled(t *testing.T) {
+	cfg := &config.Config{
+		CI: true,
+		Bumper: config.BumperConfig{
+			Enabled: false,
+		},
+	}
+	runner := NewRunner(cfg)
+
+	err := runner.bumpFiles()
+	if err != nil {
+		t.Errorf("expected no error when bumper is disabled, got: %v", err)
+	}
+}
+
+func TestRunner_BumpFiles_NoOut(t *testing.T) {
+	cfg := &config.Config{
+		CI: true,
+		Bumper: config.BumperConfig{
+			Enabled: true,
+		},
+	}
+	runner := NewRunner(cfg)
+
+	err := runner.bumpFiles()
+	if err != nil {
+		t.Errorf("expected no error when no out files, got: %v", err)
+	}
+}
+
+func TestRunner_BumpFiles_DryRun(t *testing.T) {
+	dir := t.TempDir()
+	file := dir + "/VERSION"
+	os.WriteFile(file, []byte("1.0.0\n"), 0644)
+
+	cfg := &config.Config{
+		CI:     true,
+		DryRun: true,
+		Bumper: config.BumperConfig{
+			Enabled: true,
+			Out: []config.BumperFile{
+				{File: file, ConsumeWholeFile: true},
+			},
+		},
+	}
+	runner := NewRunner(cfg)
+	runner.ctx.Version = "2.0.0"
+
+	err := runner.bumpFiles()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// File should not be modified
+	data, _ := os.ReadFile(file)
+	if string(data) != "1.0.0\n" {
+		t.Errorf("file should not be modified in dry-run, got %q", string(data))
+	}
+}
+
+func TestRunner_BumpFiles_Success(t *testing.T) {
+	dir := t.TempDir()
+	file := dir + "/VERSION"
+	os.WriteFile(file, []byte("1.0.0\n"), 0644)
+
+	cfg := &config.Config{
+		CI: true,
+		Bumper: config.BumperConfig{
+			Enabled: true,
+			Out: []config.BumperFile{
+				{File: file, ConsumeWholeFile: true},
+			},
+		},
+	}
+	runner := NewRunner(cfg)
+	runner.ctx.Version = "2.0.0"
+
+	err := runner.bumpFiles()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(file)
+	if string(data) != "2.0.0\n" {
+		t.Errorf("expected '2.0.0\\n', got %q", string(data))
+	}
+}
+
+func TestRunner_DetermineCalVer(t *testing.T) {
+	cfg := &config.Config{
+		CI: true,
+		CalVer: config.CalVerConfig{
+			Enabled: true,
+			Format:  "yyyy.mm.minor",
+		},
+		Git: config.GitConfig{
+			TagName: "v${version}",
+		},
+	}
+	runner := NewRunner(cfg)
+
+	err := runner.determineCalVer("2025.1.5")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if runner.ctx.Version == "" {
+		t.Error("expected non-empty version")
+	}
+	if runner.ctx.TagName == "" {
+		t.Error("expected non-empty tag name")
+	}
+}
+
+func TestRunner_DetermineCalVer_Empty(t *testing.T) {
+	cfg := &config.Config{
+		CI: true,
+		CalVer: config.CalVerConfig{
+			Enabled: true,
+			Format:  "yyyy.mm.minor",
+		},
+		Git: config.GitConfig{
+			TagName: "v${version}",
+		},
+	}
+	runner := NewRunner(cfg)
+
+	err := runner.determineCalVer("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if runner.ctx.Version == "" {
+		t.Error("expected non-empty version")
+	}
+}
+
+func TestRunner_DetermineSemVer(t *testing.T) {
+	cfg := &config.Config{
+		CI:        true,
+		Increment: "minor",
+		Git: config.GitConfig{
+			TagName: "v${version}",
+		},
+	}
+	runner := NewRunner(cfg)
+
+	err := runner.determineSemVer("1.0.0")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if runner.ctx.Version != "1.1.0" {
+		t.Errorf("expected 1.1.0, got %s", runner.ctx.Version)
+	}
+	if runner.ctx.TagName != "v1.1.0" {
+		t.Errorf("expected v1.1.0, got %s", runner.ctx.TagName)
+	}
+}
+
+func TestRunner_DetermineSemVer_PreRelease(t *testing.T) {
+	cfg := &config.Config{
+		CI:           true,
+		Increment:    "major",
+		PreReleaseID: "beta",
+		Git: config.GitConfig{
+			TagName: "v${version}",
+		},
+	}
+	runner := NewRunner(cfg)
+
+	err := runner.determineSemVer("1.0.0")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if runner.ctx.Version != "2.0.0-beta.0" {
+		t.Errorf("expected 2.0.0-beta.0, got %s", runner.ctx.Version)
+	}
+}
+
+func TestRunner_DetermineSemVer_InvalidVersion(t *testing.T) {
+	cfg := &config.Config{
+		CI:        true,
+		Increment: "patch",
+		Git: config.GitConfig{
+			TagName: "v${version}",
+		},
+	}
+	runner := NewRunner(cfg)
+
+	err := runner.determineSemVer("invalid")
+	if err == nil {
+		t.Error("expected error for invalid version")
 	}
 }
