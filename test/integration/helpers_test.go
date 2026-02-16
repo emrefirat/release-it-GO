@@ -22,7 +22,7 @@ func initGitRepo(t *testing.T, dir string) {
 	// Create initial file and commit
 	writeFile(t, filepath.Join(dir, "README.md"), "# Test Project\n")
 	runGit(t, dir, "add", ".")
-	runGit(t, dir, "commit", "-m", "initial commit")
+	runGit(t, dir, "commit", "-m", "chore: initial commit")
 }
 
 // createCommits creates commits with the given messages in the repo.

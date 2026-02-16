@@ -159,13 +159,6 @@ func runInitWithPrompter(prompter ui.Prompter) error {
 	}
 	cfg.Git.TagName = tagName
 
-	// Require conventional commits
-	requireConventional, err := prompter.Confirm("Require conventional commits?", true)
-	if err != nil {
-		return err
-	}
-	cfg.Git.RequireConventionalCommits = requireConventional
-
 	// Write config
 	if err := config.WriteConfigJSON(cfg, config.NativeConfigFile); err != nil {
 		return fmt.Errorf("writing config: %w", err)
