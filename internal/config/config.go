@@ -11,7 +11,8 @@ type Config struct {
 	Hooks        HooksConfig     `json:"hooks" yaml:"hooks" toml:"hooks" mapstructure:"hooks"`
 	Changelog    ChangelogConfig `json:"changelog" yaml:"changelog" toml:"changelog" mapstructure:"changelog"`
 	Bumper       BumperConfig    `json:"bumper" yaml:"bumper" toml:"bumper" mapstructure:"bumper"`
-	CalVer       CalVerConfig    `json:"calver" yaml:"calver" toml:"calver" mapstructure:"calver"`
+	CalVer       CalVerConfig       `json:"calver" yaml:"calver" toml:"calver" mapstructure:"calver"`
+	Notification NotificationConfig `json:"notification" yaml:"notification" toml:"notification" mapstructure:"notification"`
 	CI           bool            `json:"ci" yaml:"ci" toml:"ci" mapstructure:"ci"`
 	DryRun       bool            `json:"dry-run" yaml:"dry-run" toml:"dry-run" mapstructure:"dry-run"`
 	Verbose      int             `json:"verbose" yaml:"verbose" toml:"verbose" mapstructure:"verbose"`
@@ -140,4 +141,18 @@ type CalVerConfig struct {
 	Format            string `json:"format" yaml:"format" toml:"format" mapstructure:"format"`
 	Increment         string `json:"increment" yaml:"increment" toml:"increment" mapstructure:"increment"`
 	FallbackIncrement string `json:"fallbackIncrement" yaml:"fallbackIncrement" toml:"fallbackIncrement" mapstructure:"fallbackIncrement"`
+}
+
+// NotificationConfig holds webhook notification configuration.
+type NotificationConfig struct {
+	Enabled  bool            `json:"enabled" yaml:"enabled" toml:"enabled" mapstructure:"enabled"`
+	Webhooks []WebhookConfig `json:"webhooks" yaml:"webhooks" toml:"webhooks" mapstructure:"webhooks"`
+}
+
+// WebhookConfig holds a single webhook endpoint configuration.
+type WebhookConfig struct {
+	Type            string `json:"type" yaml:"type" toml:"type" mapstructure:"type"`
+	URLRef          string `json:"urlRef" yaml:"urlRef" toml:"urlRef" mapstructure:"urlRef"`
+	MessageTemplate string `json:"messageTemplate" yaml:"messageTemplate" toml:"messageTemplate" mapstructure:"messageTemplate"`
+	Timeout         int    `json:"timeout" yaml:"timeout" toml:"timeout" mapstructure:"timeout"`
 }
