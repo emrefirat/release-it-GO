@@ -7,6 +7,7 @@ import (
 
 	"github.com/emfi/release-it-go/internal/config"
 	applog "github.com/emfi/release-it-go/internal/log"
+	"github.com/emfi/release-it-go/internal/runner"
 	"github.com/spf13/cobra"
 )
 
@@ -112,25 +113,37 @@ func runRelease(cmd *cobra.Command, args []string) error {
 
 	logger.Debug("config loaded successfully")
 
-	// Handle special modes
+	// Handle no-increment flag
+	if noIncrement {
+		cfg.Increment = "no-increment"
+	}
+
+	// Validate CalVer + SemVer conflict
+	if cfg.CalVer.Enabled && cfg.PreReleaseID != "" {
+		return fmt.Errorf("CalVer and pre-release cannot be used together")
+	}
+
+	// Create runner and handle special modes
+	r := runner.NewRunner(cfg)
+
 	if showChangelog {
-		logger.Info("changelog mode - not yet implemented")
-		return nil
+		return r.RunChangelogOnly()
 	}
 
 	if releaseVersion {
-		logger.Info("release-version mode - not yet implemented")
-		return nil
+		return r.RunReleaseVersionOnly()
 	}
 
 	if onlyVersion {
-		logger.Info("only-version mode - not yet implemented")
-		return nil
+		return r.RunOnlyVersion()
 	}
 
-	// Main release pipeline placeholder
-	logger.Info("release pipeline - not yet implemented (Phase 2+)")
-	return nil
+	if cfg.Increment == "no-increment" {
+		return r.RunNoIncrement()
+	}
+
+	// Main release pipeline
+	return r.Run()
 }
 
 // Execute runs the root command.
