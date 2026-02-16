@@ -44,5 +44,9 @@ func DefaultConfig() *Config {
 			Increment:         "calendar",
 			FallbackIncrement: "minor",
 		},
+		Notification: NotificationConfig{
+			Enabled:  false,
+			Webhooks: []WebhookConfig{},
+		},
 	}
 }
