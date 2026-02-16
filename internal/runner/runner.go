@@ -10,6 +10,7 @@ import (
 	"release-it-go/internal/changelog"
 	"release-it-go/internal/config"
 	"release-it-go/internal/git"
+	"release-it-go/internal/notification"
 	"release-it-go/internal/release"
 	"release-it-go/internal/ui"
 	"release-it-go/internal/version"
@@ -56,6 +57,7 @@ func (r *Runner) Run() error {
 		{"git:release", r.gitRelease},
 		{"github:release", r.githubRelease},
 		{"gitlab:release", r.gitlabRelease},
+		{"notification", r.sendNotification},
 	}
 
 	for _, step := range steps {
@@ -146,6 +148,7 @@ func (r *Runner) RunOnlyVersion() error {
 		{"git:release", r.gitRelease},
 		{"github:release", r.githubRelease},
 		{"gitlab:release", r.gitlabRelease},
+		{"notification", r.sendNotification},
 	}
 
 	start := time.Now()
@@ -197,6 +200,7 @@ func (r *Runner) RunNoIncrement() error {
 		{"git:release", r.gitRelease},
 		{"github:release", r.githubRelease},
 		{"gitlab:release", r.gitlabRelease},
+		{"notification", r.sendNotification},
 	}
 
 	for _, step := range steps {
@@ -860,6 +864,27 @@ func (r *Runner) gitlabRelease() error {
 				return err
 			}
 		}
+	}
+
+	r.ctx.Spinner.Stop(true)
+	return nil
+}
+
+// sendNotification sends webhook notifications to configured endpoints.
+// This step is non-fatal: if notifications fail, a warning is logged but the pipeline continues.
+func (r *Runner) sendNotification() error {
+	cfg := r.ctx.Config.Notification
+	if !cfg.Enabled || len(cfg.Webhooks) == 0 {
+		return nil
+	}
+
+	r.ctx.Spinner.Start("Notifications sent")
+
+	client := notification.NewClient(cfg.Webhooks, r.ctx.Vars, r.ctx.Logger, r.ctx.IsDryRun)
+	if err := client.SendAll(); err != nil {
+		r.ctx.Spinner.Stop(false)
+		r.ctx.Logger.Warn("Notification failed: %v", err)
+		return nil // Non-fatal
 	}
 
 	r.ctx.Spinner.Stop(true)

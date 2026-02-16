@@ -2893,5 +2893,58 @@ func TestRunner_CheckTokens_BothEnabled_BothSet(t *testing.T) {
 	}
 }
 
+// --- sendNotification tests ---
+
+func TestRunner_SendNotification_Disabled(t *testing.T) {
+	cfg := &config.Config{
+		CI: true,
+		Notification: config.NotificationConfig{
+			Enabled: false,
+		},
+	}
+	runner := NewRunner(cfg)
+
+	err := runner.sendNotification()
+	if err != nil {
+		t.Errorf("expected no error when notification is disabled, got: %v", err)
+	}
+}
+
+func TestRunner_SendNotification_EmptyWebhooks(t *testing.T) {
+	cfg := &config.Config{
+		CI: true,
+		Notification: config.NotificationConfig{
+			Enabled:  true,
+			Webhooks: []config.WebhookConfig{},
+		},
+	}
+	runner := NewRunner(cfg)
+
+	err := runner.sendNotification()
+	if err != nil {
+		t.Errorf("expected no error with empty webhooks, got: %v", err)
+	}
+}
+
+func TestRunner_SendNotification_NonFatal(t *testing.T) {
+	// Missing env var should cause notification to fail, but runner should not return error
+	cfg := &config.Config{
+		CI: true,
+		Notification: config.NotificationConfig{
+			Enabled: true,
+			Webhooks: []config.WebhookConfig{
+				{Type: "slack", URLRef: "NONEXISTENT_WEBHOOK_URL_XYZ"},
+			},
+		},
+	}
+	runner := NewRunner(cfg)
+	runner.ctx.Vars = map[string]string{"version": "1.0.0"}
+
+	err := runner.sendNotification()
+	if err != nil {
+		t.Errorf("notification errors should be non-fatal, got: %v", err)
+	}
+}
+
 // Ensure imports are used
 var _ = errors.New

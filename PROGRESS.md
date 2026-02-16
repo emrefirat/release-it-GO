@@ -21,10 +21,11 @@
 | 10 | UI/Output Iyilestirmesi | Tamamlandi | 100% |
 | 11 | Docker Container Destegi | Tamamlandi | 100% |
 | 12 | Docker Pre-flight Kontrolleri | Tamamlandi | 100% |
+| 13 | Webhook Notification (Slack + Teams) | Tamamlandi | 100% |
 
-**Son Guncelleme:** 2026-02-16
+**Son Guncelleme:** 2026-02-17
 **Aktif Gelistirici:** Claude
-**Mevcut Versiyon:** dev (Phase 10 UI/Output iyilestirmesi tamamlandi - production-ready)
+**Mevcut Versiyon:** dev (Phase 13 Webhook Notification destegi tamamlandi - production-ready)
 
 ---
 
@@ -413,6 +414,36 @@
 
 ---
 
+## Faz 13: Webhook Notification Destegi (Slack + Teams)
+
+**Durum:** Tamamlandi
+**PRD:** `docs/phase_13.md`
+
+### Yapilacaklar
+
+- [x] `internal/config/config.go` - NotificationConfig + WebhookConfig struct'lari
+- [x] `internal/config/defaults.go` - Default notification config (disabled, bos webhooks)
+- [x] `internal/notification/notification.go` - Client, SendAll, HTTP POST, resolveURL, renderMessage
+- [x] `internal/notification/slack.go` - Slack payload builder ({"text": "..."})
+- [x] `internal/notification/teams.go` - Teams MessageCard payload builder
+- [x] `internal/notification/notification_test.go` - 13 test, %98+ coverage (httptest mock server)
+- [x] `internal/runner/runner.go` - sendNotification() pipeline adimi (tum pipeline'lara eklendi)
+- [x] `internal/runner/runner_test.go` - 3 test: disabled, empty webhooks, non-fatal error
+- [x] `docs/phase_13.md` - PRD dokumani
+- [x] Tum testler gecti (`go test ./... -race`)
+- [x] `go vet` ve `go build` temiz
+
+### Notlar
+
+- Notification non-fatal: basarisiz olursa uyari loglanir, pipeline durmaz
+- Webhook URL guvenlik icin config'e dogrudan yazilmaz, `urlRef` ile env variable adi belirtilir
+- Slack ve Teams icin platform-spesifik default sablonlar mevcut
+- Kullanici `messageTemplate` ile ozel sablon tanimlayabilir
+- Timeout configurable (default: 30 saniye)
+- Dry-run modunda HTTP cagrisi yapilmaz
+
+---
+
 ## Bugs
 
 - [x] BUG: Ilk release'de changelog "exit status 128" hatasi (2026-02-16) → `LatestVersion=0.0.0` iken `v0.0.0` tag'i araniyordu ama repo'da boyle bir tag yok. `latestVersionToTag()` helper fonksiyonu eklendi: `0.0.0` veya bos string icin bos doner, bu sayede `GetCommitsSinceTag("")` tum commitleri alir. 3 yer etkilendi: `RunChangelogOnly`, `generateChangelog`, `autoDetectIncrement`.
@@ -453,6 +484,7 @@
 | 2026-02-16 | Claude | fix: commit lint type validation - allowedTypes map ile gecersiz type'lar reddediliyor, --verbose ile commit listesi gosteriliyor |
 | 2026-02-16 | Claude | Phase 11 tamamlandi: Docker container destegi - multi-stage Dockerfile, .dockerignore, Makefile docker target'lari |
 | 2026-02-16 | Claude | Phase 12 tamamlandi: Docker pre-flight kontrolleri - git identity check, token pre-flight check (GitHub/GitLab) |
+| 2026-02-17 | Claude | Phase 13 tamamlandi: Webhook notification destegi - Slack + Teams, non-fatal pipeline adimi, urlRef guvenlik pattern'i, %98+ coverage |
 
 ---
 
