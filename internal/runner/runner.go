@@ -74,10 +74,7 @@ func (r *Runner) RunChangelogOnly() error {
 		return err
 	}
 
-	latestTag := r.ctx.LatestVersion
-	if latestTag != "" && !hasPrefix(latestTag, "v") {
-		latestTag = "v" + latestTag
-	}
+	latestTag := latestVersionToTag(r.ctx.LatestVersion)
 
 	commits, err := r.ctx.Git.GetCommitsSinceTag(latestTag)
 	if err != nil {
@@ -372,10 +369,7 @@ func (r *Runner) bumpFiles() error {
 
 // autoDetectIncrement uses conventional commits to determine the bump type.
 func (r *Runner) autoDetectIncrement() string {
-	latestTag := r.ctx.LatestVersion
-	if latestTag != "" && !hasPrefix(latestTag, "v") {
-		latestTag = "v" + latestTag
-	}
+	latestTag := latestVersionToTag(r.ctx.LatestVersion)
 
 	commits, err := r.ctx.Git.GetCommitsSinceTag(latestTag)
 	if err != nil || len(commits) == 0 {
@@ -429,10 +423,7 @@ func (r *Runner) generateChangelog() error {
 
 	r.ctx.Spinner.Start("Generating changelog")
 
-	latestTag := r.ctx.LatestVersion
-	if latestTag != "" && !hasPrefix(latestTag, "v") {
-		latestTag = "v" + latestTag
-	}
+	latestTag := latestVersionToTag(r.ctx.LatestVersion)
 
 	commits, err := r.ctx.Git.GetCommitsSinceTag(latestTag)
 	if err != nil {
@@ -781,4 +772,17 @@ func indexOf(s, substr string) int {
 // hasPrefix checks if s starts with prefix.
 func hasPrefix(s, prefix string) bool {
 	return len(s) >= len(prefix) && s[:len(prefix)] == prefix
+}
+
+// latestVersionToTag converts LatestVersion to a git tag for commit range queries.
+// Returns empty string for initial release (0.0.0) since no tag exists yet,
+// which causes GetCommitsSinceTag to return all commits.
+func latestVersionToTag(latestVersion string) string {
+	if latestVersion == "" || latestVersion == "0.0.0" {
+		return ""
+	}
+	if !hasPrefix(latestVersion, "v") {
+		return "v" + latestVersion
+	}
+	return latestVersion
 }

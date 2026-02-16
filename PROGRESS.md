@@ -296,6 +296,13 @@
 
 ---
 
+## Bugs
+
+- [x] BUG: Ilk release'de changelog "exit status 128" hatasi (2026-02-16) → `LatestVersion=0.0.0` iken `v0.0.0` tag'i araniyordu ama repo'da boyle bir tag yok. `latestVersionToTag()` helper fonksiyonu eklendi: `0.0.0` veya bos string icin bos doner, bu sayede `GetCommitsSinceTag("")` tum commitleri alir. 3 yer etkilendi: `RunChangelogOnly`, `generateChangelog`, `autoDetectIncrement`.
+- [x] BUG: Init wizard commit/tag/push'u tek soru olarak soruyordu (2026-02-16) → Kullanici commit+tag isteyip push istemeyince ikilem yasiyordu. Sorular ayrildi: "Enable git commit and tag?" + "Enable git push?" olarak iki ayri prompt yapildi. Push kapaliyken `requireUpstream` otomatik false.
+
+---
+
 ## Degisiklik Gecmisi
 
 | Tarih | Gelistirici | Degisiklik |
@@ -313,6 +320,7 @@
 | 2026-02-16 | Claude | feat: --preRelease shorthand flag, GitLab PreRelease alani |
 | 2026-02-16 | Claude | Gercek ortam testleri: GitLab CI pipeline (main + sub-branch prerelease) basarili |
 | 2026-02-16 | Claude | Phase 8 tamamlandi: init command, dual config support, legacy migration, smart config writer |
+| 2026-02-16 | Claude | fix: ilk release changelog hatasi (0.0.0 tag bulunamama), init wizard commit/tag/push ayirma |
 
 ---
 
