@@ -62,15 +62,12 @@ func (g *Git) checkBranch() error {
 }
 
 // checkCleanWorkingDir verifies there are no uncommitted changes.
-// Untracked files are ignored — only staged and unstaged modifications count.
 func (g *Git) checkCleanWorkingDir() error {
 	if !g.config.RequireCleanWorkingDir {
 		return nil
 	}
 
-	// -uno excludes untracked files from the output.
-	// Untracked files are not "uncommitted changes" and should not block a release.
-	out, err := g.runSilent("status", "--porcelain", "-uno")
+	out, err := g.runSilent("status", "--porcelain")
 	if err != nil {
 		return fmt.Errorf("failed to check working directory status: %w", err)
 	}
