@@ -8,3 +8,7 @@ release-it-go
 *.test
 *.prof
 .DS_Store
+
+# Generated config files (init --full-example output)
+.release-it-go-full.json
+.release-it-go-full.yaml
