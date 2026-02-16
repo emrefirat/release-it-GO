@@ -75,6 +75,7 @@ type GitLabConfig struct {
 	Release                              bool     `json:"release" yaml:"release" toml:"release" mapstructure:"release"`
 	ReleaseName                          string   `json:"releaseName" yaml:"releaseName" toml:"releaseName" mapstructure:"releaseName"`
 	ReleaseNotes                         string   `json:"releaseNotes" yaml:"releaseNotes" toml:"releaseNotes" mapstructure:"releaseNotes"`
+	PreRelease                           bool     `json:"preRelease" yaml:"preRelease" toml:"preRelease" mapstructure:"preRelease"`
 	Milestones                           []string `json:"milestones" yaml:"milestones" toml:"milestones" mapstructure:"milestones"`
 	Assets                               []string `json:"assets" yaml:"assets" toml:"assets" mapstructure:"assets"`
 	TokenRef                             string   `json:"tokenRef" yaml:"tokenRef" toml:"tokenRef" mapstructure:"tokenRef"`

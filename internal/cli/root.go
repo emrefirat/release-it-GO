@@ -26,6 +26,7 @@ var (
 	verboseCount   int
 	increment      string
 	preReleaseID   string
+	preRelease     string
 	showChangelog  bool
 	releaseVersion bool
 	onlyVersion    bool
@@ -55,6 +56,7 @@ It is a Go reimplementation of release-it without Node.js dependencies.`,
 	rootCmd.PersistentFlags().CountVarP(&verboseCount, "verbose", "V", "verbose output (-V for verbose, -VV for debug)")
 	rootCmd.PersistentFlags().StringVarP(&increment, "increment", "i", "", "version increment type (major/minor/patch/pre*)")
 	rootCmd.PersistentFlags().StringVar(&preReleaseID, "preReleaseId", "", "pre-release identifier (e.g., beta, alpha)")
+	rootCmd.PersistentFlags().StringVar(&preRelease, "preRelease", "", "shorthand for pre-release (sets preReleaseId and marks release as pre-release)")
 
 	// Mode flags
 	rootCmd.Flags().BoolVar(&showChangelog, "changelog", false, "show changelog only")
@@ -69,6 +71,7 @@ It is a Go reimplementation of release-it without Node.js dependencies.`,
 
 	// Subcommands
 	rootCmd.AddCommand(newVersionCommand())
+	rootCmd.AddCommand(newCompletionCommand())
 
 	return rootCmd
 }
@@ -84,12 +87,64 @@ func newVersionCommand() *cobra.Command {
 	}
 }
 
+// newCompletionCommand creates the "completion" subcommand for shell completion generation.
+func newCompletionCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "completion [bash|zsh|fish|powershell]",
+		Short: "Generate shell completion scripts",
+		Long: `Generate shell completion scripts for your shell.
+
+To load completions:
+
+Bash:
+  $ source <(release-it-go completion bash)
+  # To load completions for each session, execute once:
+  # Linux:
+  $ release-it-go completion bash > /etc/bash_completion.d/release-it-go
+  # macOS:
+  $ release-it-go completion bash > $(brew --prefix)/etc/bash_completion.d/release-it-go
+
+Zsh:
+  $ release-it-go completion zsh > "${fpath[1]}/_release-it-go"
+
+Fish:
+  $ release-it-go completion fish > ~/.config/fish/completions/release-it-go.fish
+
+PowerShell:
+  PS> release-it-go completion powershell | Out-String | Invoke-Expression
+`,
+		ValidArgs:             []string{"bash", "zsh", "fish", "powershell"},
+		Args:                  cobra.ExactArgs(1),
+		DisableFlagsInUseLine: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			out := cmd.OutOrStdout()
+			switch args[0] {
+			case "bash":
+				return cmd.Root().GenBashCompletion(out)
+			case "zsh":
+				return cmd.Root().GenZshCompletion(out)
+			case "fish":
+				return cmd.Root().GenFishCompletion(out, true)
+			case "powershell":
+				return cmd.Root().GenPowerShellCompletionWithDesc(out)
+			default:
+				return fmt.Errorf("unsupported shell: %s", args[0])
+			}
+		},
+	}
+}
+
 // runRelease is the main entry point for the release command.
 func runRelease(cmd *cobra.Command, args []string) error {
 	// Load config
 	cfg, err := config.LoadConfig(cfgFile)
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
+	}
+
+	// Expand --preRelease shorthand into preReleaseId + github/gitlab preRelease
+	if preRelease != "" && preReleaseID == "" {
+		preReleaseID = preRelease
 	}
 
 	// Apply CLI flag overrides
@@ -103,6 +158,12 @@ func runRelease(cmd *cobra.Command, args []string) error {
 		NoTag:        &noTag,
 		NoPush:       &noPush,
 	})
+
+	// When preRelease is set, auto-mark GitHub/GitLab releases as pre-release
+	if preRelease != "" {
+		cfg.GitHub.PreRelease = true
+		cfg.GitLab.PreRelease = true
+	}
 
 	// Create logger
 	logger := applog.NewLogger(cfg.Verbose, cfg.DryRun)
