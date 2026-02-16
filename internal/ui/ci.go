@@ -2,7 +2,11 @@
 // spinners, colored output, and CI environment detection.
 package ui
 
-import "os"
+import (
+	"os"
+
+	"github.com/mattn/go-isatty"
+)
 
 // ciEnvVars lists environment variables that indicate a CI environment.
 var ciEnvVars = []string{
@@ -20,12 +24,17 @@ var ciEnvVars = []string{
 }
 
 // IsCI checks if the program is running in a CI environment
-// by looking for known CI environment variables.
+// by looking for known CI environment variables or detecting
+// that no TTY is available (e.g. Docker without -it flags).
 func IsCI() bool {
 	for _, envVar := range ciEnvVars {
 		if os.Getenv(envVar) != "" {
 			return true
 		}
+	}
+	// No TTY means interactive prompts cannot work
+	if !isatty.IsTerminal(os.Stdin.Fd()) && !isatty.IsCygwinTerminal(os.Stdin.Fd()) {
+		return true
 	}
 	return false
 }
