@@ -139,6 +139,55 @@ func TestWriteConfigJSON_ChangedChangelog(t *testing.T) {
 	}
 }
 
+func TestWriteFullConfigJSON(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".release-it-go-full.json")
+
+	cfg := FullExampleConfig()
+	if err := WriteFullConfigJSON(cfg, path); err != nil {
+		t.Fatalf("WriteFullConfigJSON failed: %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("reading written file: %v", err)
+	}
+
+	// Should be valid JSON
+	var result map[string]interface{}
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("parsing written JSON: %v", err)
+	}
+
+	// Full config should have all top-level sections
+	expectedSections := []string{"git", "github", "gitlab", "hooks", "changelog", "bumper", "calver", "notification"}
+	for _, section := range expectedSections {
+		if _, ok := result[section]; !ok {
+			t.Errorf("expected section %q in full config", section)
+		}
+	}
+}
+
+func TestFullExampleConfig_HasAllSections(t *testing.T) {
+	cfg := FullExampleConfig()
+
+	if cfg.GitHub.Release != true {
+		t.Error("expected github.release=true in full example")
+	}
+	if len(cfg.GitHub.Assets) == 0 {
+		t.Error("expected github.assets to have example entries")
+	}
+	if cfg.Bumper.In == nil {
+		t.Error("expected bumper.in to be set in full example")
+	}
+	if len(cfg.Bumper.Out) == 0 {
+		t.Error("expected bumper.out to have example entries")
+	}
+	if len(cfg.Notification.Webhooks) == 0 {
+		t.Error("expected notification.webhooks to have example entries")
+	}
+}
+
 func TestToMinimalMap_EmptyForDefaults(t *testing.T) {
 	cfg := DefaultConfig()
 	m := toMinimalMap(cfg)

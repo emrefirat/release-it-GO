@@ -95,3 +95,20 @@ func diffGitLab(a, b *GitLabConfig) map[string]interface{} {
 func diffChangelog(a, b *ChangelogConfig) map[string]interface{} {
 	return diffStruct(a, b)
 }
+
+// WriteFullConfigJSON writes the entire config struct to a JSON file,
+// including all fields regardless of whether they match defaults.
+func WriteFullConfigJSON(cfg *Config, path string) error {
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshaling full config to JSON: %w", err)
+	}
+
+	data = append(data, '\n')
+
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return fmt.Errorf("writing config file %s: %w", path, err)
+	}
+
+	return nil
+}

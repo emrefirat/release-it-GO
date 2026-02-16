@@ -489,6 +489,7 @@
 | 2026-02-17 | Claude | fix: init wizard'dan gereksiz "Required branch" sorusu kaldirildi - opsiyonel ayar, config'den eklenebilir |
 | 2026-02-17 | Claude | fix: init wizard'dan gereksiz "Require new commits" sorusu kaldirildi - default davranis (true) yeterli |
 | 2026-02-17 | Claude | feat: requireConventionalCommits default true yapildi, init wizard'dan sorusu kaldirildi |
+| 2026-02-17 | Claude | feat: init --full-example komutu eklendi - tum config seceneklerini gosteren ornek dosya olusturma |
 
 ---
 
