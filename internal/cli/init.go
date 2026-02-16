@@ -120,6 +120,12 @@ func runInitWithPrompter(prompter ui.Prompter) error {
 	cfg.Git.Tag = gitEnabled
 	cfg.Git.Push = gitEnabled
 
+	// When push is disabled, upstream check is irrelevant
+	if !gitEnabled {
+		cfg.Git.RequireUpstream = false
+		cfg.Git.RequireCleanWorkingDir = false
+	}
+
 	// Commit message template
 	commitMsg, err := prompter.Input(
 		"Commit message template",
