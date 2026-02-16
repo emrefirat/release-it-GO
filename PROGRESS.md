@@ -487,6 +487,7 @@
 | 2026-02-17 | Claude | Phase 13 tamamlandi: Webhook notification destegi - Slack + Teams, non-fatal pipeline adimi, urlRef guvenlik pattern'i, %98+ coverage |
 | 2026-02-17 | Claude | feat: init wizard'a "Write CHANGELOG.md file?" sorusu eklendi - changelog etkinken dosya yazmayi kapama imkani |
 | 2026-02-17 | Claude | fix: init wizard'dan gereksiz "Required branch" sorusu kaldirildi - opsiyonel ayar, config'den eklenebilir |
+| 2026-02-17 | Claude | fix: init wizard'dan gereksiz "Require new commits" sorusu kaldirildi - default davranis (true) yeterli |
 
 ---
 
