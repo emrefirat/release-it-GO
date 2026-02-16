@@ -13,13 +13,13 @@
 | 2 | Git Operations | Tamamlandi | 100% |
 | 3 | Conventional Commits + Changelog | Tamamlandi | 100% |
 | 4 | GitHub + GitLab Releases | Tamamlandi | 100% |
-| 5 | Interactive UI + Hooks + Pipeline | Baslanmadi | 0% |
+| 5 | Interactive UI + Hooks + Pipeline | Tamamlandi | 100% |
 | 6 | Advanced Features | Baslanmadi | 0% |
 | 7 | Testing, CI/CD, Documentation | Baslanmadi | 0% |
 
 **Son Guncelleme:** 2026-02-16
 **Aktif Gelistirici:** Claude
-**Mevcut Versiyon:** dev (Phase 4 tamamlandi)
+**Mevcut Versiyon:** dev (Phase 5 tamamlandi)
 
 ---
 
@@ -136,25 +136,34 @@
 
 ## Faz 5: Interactive UI + Hooks + Pipeline
 
-**Durum:** Baslanmadi
+**Durum:** Tamamlandi
 **PRD:** `docs/phase_5.md`
 
 ### Yapilacaklar
 
-- [ ] Versiyon secim prompt
-- [ ] Onay prompt'lari
-- [ ] Spinner animasyonu
-- [ ] Renkli cikti
-- [ ] CI ortam algilama
-- [ ] Hook runner (before/after lifecycle)
-- [ ] Ana pipeline orchestrator
-- [ ] Ozel modlar (--changelog, --release-version, --only-version)
-- [ ] Ozet ciktisi
-- [ ] Unit testler
+- [x] Versiyon secim prompt
+- [x] Onay prompt'lari
+- [x] Spinner animasyonu
+- [x] Renkli cikti
+- [x] CI ortam algilama
+- [x] Hook runner (before/after lifecycle)
+- [x] Ana pipeline orchestrator
+- [x] Ozel modlar (--changelog, --release-version, --only-version)
+- [x] Ozet ciktisi
+- [x] Unit testler
 
 ### Notlar
 
--
+- Test coverage: ui=%42.9 (bubbletea interactive models terminal gerektiriyor), hook=%100, runner=%25.3 (pipeline adimlarinda git mock gerekli)
+- Bubbletea v1.3.10 ile interaktif terminal UI (selectModel, confirmModel, inputModel)
+- Lipgloss v1.1.0 ile renklendirme, NO_COLOR environment variable destegi
+- CI algilama: GITHUB_ACTIONS, GITLAB_CI, CIRCLECI, TRAVIS, JENKINS_URL, BITBUCKET_PIPELINE, CODEBUILD_BUILD_ID, TF_BUILD
+- NonInteractivePrompter: CI modunda tum prompt'lari otomatik yanitlar
+- HookRunner: 12 lifecycle event (before/after: init, bump, release, git:release, github:release, gitlab:release)
+- Template variable rendering: ${version}, ${tagName}, ${changelog}, ${releaseUrl}, ${branchName}, ${repo.*}
+- Pipeline: init -> prerequisites -> version -> changelog -> git:release -> github:release -> gitlab:release
+- Her adimda before/after hook calistirma ve UpdateVars ile degisken guncelleme
+- Dry-run tum adimlarda destekleniyor
 
 ---
 
@@ -211,6 +220,7 @@
 | 2026-02-16 | Claude | Phase 2 tamamlandi: git runner, prerequisites, commit, tag, push, repo info, changelog, tests |
 | 2026-02-16 | Claude | Phase 3 tamamlandi: conventional commit parser, bump analyzer, changelog renderers (conventional + keep-a-changelog), file update |
 | 2026-02-16 | Claude | Phase 4 tamamlandi: GitHub + GitLab API client, release create, asset upload, comment, token management, GHE/CA cert support |
+| 2026-02-16 | Claude | Phase 5 tamamlandi: bubbletea UI, lipgloss colors, spinner, CI detection, hook runner, pipeline orchestrator, dry-run, tests |
 
 ---
 
