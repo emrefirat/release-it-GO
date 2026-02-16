@@ -307,7 +307,16 @@ var (
 
 ---
 
-## 10. Her Commit Oncesi Checklist
+## 10. Bug Takibi
+
+- Kullanicidan gelen veya tespit edilen her bug `PROGRESS.md` dosyasindaki **Bugs** bolumune eklenir.
+- Format: `- [ ] BUG: Kisa aciklama (tarih)` (acik) veya `- [x] BUG: Kisa aciklama (tarih) → cozum ozeti` (kapali)
+- Bug fix commit'i atildiktan sonra ilgili satir `[x]` ile isaretlenir ve cozum ozeti eklenir.
+- Edge case'ler ve ilk release gibi ozel senaryolar mutlaka test edilmeli.
+
+---
+
+## 11. Her Commit Oncesi Checklist
 
 ```
 [ ] Kod formatlandi (go fmt)
@@ -323,7 +332,7 @@ var (
 
 ---
 
-## 11. Kullanilacak Araclar
+## 12. Kullanilacak Araclar
 
 ```bash
 go fmt ./...
