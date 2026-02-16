@@ -52,9 +52,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 // runInitFullExample generates a full example config file with all options.
 func runInitFullExample() error {
-	cfg := config.FullExampleConfig()
-
-	if err := config.WriteFullConfigJSON(cfg, fullExampleFile); err != nil {
+	if err := config.WriteFullExampleJSON(fullExampleFile); err != nil {
 		return fmt.Errorf("writing full example config: %w", err)
 	}
 
