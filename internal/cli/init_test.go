@@ -58,7 +58,7 @@ func TestRunInit_WizardCreatesConfig(t *testing.T) {
 	p := &mockPrompter{
 		selectAnswers:  []int{0, 0},                                                            // GitHub, Conventional Changelog
 		confirmAnswers: []bool{true, true, true, true, true},                                   // writeChangelog, commit/tag, push, requireCommits, requireConventional
-		inputAnswers:   []string{"chore(release): release v${version}", "v${version}", "main"}, // commit msg, tag format, branch
+		inputAnswers:   []string{"chore(release): release v${version}", "v${version}"}, // commit msg, tag format
 	}
 
 	if err := runInitWithPrompter(p); err != nil {
@@ -92,7 +92,7 @@ func TestRunInit_GitLabPlatform(t *testing.T) {
 	p := &mockPrompter{
 		selectAnswers:  []int{1, 1},                    // GitLab, Keep a Changelog
 		confirmAnswers: []bool{true, true, true, true}, // writeChangelog, commit/tag, push, requireCommits (requireConventional defaults to true)
-		inputAnswers:   []string{"chore(release): release v${version}", "v${version}", "main"},
+		inputAnswers:   []string{"chore(release): release v${version}", "v${version}"},
 	}
 
 	if err := runInitWithPrompter(p); err != nil {
@@ -121,7 +121,7 @@ func TestRunInit_GitTagOnly_NoChangelog(t *testing.T) {
 	p := &mockPrompter{
 		selectAnswers:  []int{2, 2},          // Git tag only, No changelog
 		confirmAnswers: []bool{false, false}, // commit/tag disabled, push disabled
-		inputAnswers:   []string{"chore(release): release v${version}", "v${version}", "main"},
+		inputAnswers:   []string{"chore(release): release v${version}", "v${version}"},
 	}
 
 	if err := runInitWithPrompter(p); err != nil {
@@ -162,7 +162,7 @@ func TestRunInit_CommitTagEnabled_PushDisabled(t *testing.T) {
 	p := &mockPrompter{
 		selectAnswers:  []int{2, 0},                     // Git tag only, Conventional Changelog
 		confirmAnswers: []bool{true, true, false, true}, // writeChangelog, commit/tag YES, push NO, requireCommits
-		inputAnswers:   []string{"chore(release): release v${version}", "v${version}", "main"},
+		inputAnswers:   []string{"chore(release): release v${version}", "v${version}"},
 	}
 
 	if err := runInitWithPrompter(p); err != nil {
@@ -261,7 +261,7 @@ func TestRunInit_ExistingNativeConfig_Overwrite(t *testing.T) {
 	p := &mockPrompter{
 		confirmAnswers: []bool{true, true, true, true, true, true}, // overwrite, writeChangelog, commit/tag, push, requireCommits, requireConventional
 		selectAnswers:  []int{0, 0},                                // GitHub, Conventional
-		inputAnswers:   []string{"chore(release): release v${version}", "v${version}", "main"},
+		inputAnswers:   []string{"chore(release): release v${version}", "v${version}"},
 	}
 
 	if err := runInitWithPrompter(p); err != nil {
@@ -284,7 +284,7 @@ func TestRunInit_ChangelogEnabled_NoFile(t *testing.T) {
 	p := &mockPrompter{
 		selectAnswers:  []int{0, 0},                                                            // GitHub, Conventional Changelog
 		confirmAnswers: []bool{false, true, true, true, true},                                  // writeChangelog=NO, commit/tag, push, requireCommits, requireConventional
-		inputAnswers:   []string{"chore(release): release v${version}", "v${version}", "main"}, // commit msg, tag format, branch
+		inputAnswers:   []string{"chore(release): release v${version}", "v${version}"}, // commit msg, tag format
 	}
 
 	if err := runInitWithPrompter(p); err != nil {
