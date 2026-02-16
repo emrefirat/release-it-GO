@@ -19,6 +19,10 @@ type Prompter interface {
 
 	// Input asks for free-text input.
 	Input(message string, defaultValue string) (string, error)
+
+	// Select asks the user to choose from a list of string options.
+	// Returns the index of the selected option.
+	Select(question string, options []string, defaultIndex int) (int, error)
 }
 
 // VersionOption represents a version choice in the selection prompt.
@@ -57,6 +61,14 @@ func (p *NonInteractivePrompter) Confirm(message string, defaultYes bool) (bool,
 // Input always returns the default value.
 func (p *NonInteractivePrompter) Input(message string, defaultValue string) (string, error) {
 	return defaultValue, nil
+}
+
+// Select returns the default index.
+func (p *NonInteractivePrompter) Select(question string, options []string, defaultIndex int) (int, error) {
+	if defaultIndex < 0 || defaultIndex >= len(options) {
+		return 0, nil
+	}
+	return defaultIndex, nil
 }
 
 // --- InteractivePrompter ---
@@ -138,6 +150,86 @@ func (p *InteractivePrompter) Input(message string, defaultValue string) (string
 		return defaultValue, nil
 	}
 	return final.value, nil
+}
+
+// Select presents a list of string options to the user.
+func (p *InteractivePrompter) Select(question string, options []string, defaultIndex int) (int, error) {
+	m := genericSelectModel{
+		question: question,
+		options:  options,
+		cursor:   defaultIndex,
+	}
+	if m.cursor < 0 || m.cursor >= len(options) {
+		m.cursor = 0
+	}
+
+	prog := tea.NewProgram(m, tea.WithOutput(os.Stderr))
+	result, err := prog.Run()
+	if err != nil {
+		return defaultIndex, fmt.Errorf("select prompt: %w", err)
+	}
+
+	final := result.(genericSelectModel)
+	if final.cancelled {
+		return -1, fmt.Errorf("selection cancelled")
+	}
+
+	return final.selected, nil
+}
+
+// --- Generic Select Model (bubbletea) ---
+
+type genericSelectModel struct {
+	question  string
+	options   []string
+	cursor    int
+	selected  int
+	cancelled bool
+}
+
+func (m genericSelectModel) Init() tea.Cmd { return nil }
+
+func (m genericSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+c", "q":
+			m.cancelled = true
+			return m, tea.Quit
+		case "up", "k":
+			if m.cursor > 0 {
+				m.cursor--
+			}
+		case "down", "j":
+			if m.cursor < len(m.options)-1 {
+				m.cursor++
+			}
+		case "enter":
+			m.selected = m.cursor
+			return m, tea.Quit
+		}
+	}
+	return m, nil
+}
+
+func (m genericSelectModel) View() string {
+	s := fmt.Sprintf("? %s\n\n", m.question)
+
+	selectedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
+
+	for i, opt := range m.options {
+		cursor := "  "
+		label := opt
+		if i == m.cursor {
+			cursor = "> "
+			label = selectedStyle.Render(opt)
+		}
+		s += fmt.Sprintf("%s%s\n", cursor, label)
+	}
+
+	s += "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Render("↑/↓ to move, enter to select, q to cancel")
+
+	return s
 }
 
 // --- Select Model (bubbletea) ---

@@ -294,3 +294,69 @@ func TestLoadConfigFromBytes_InvalidJSON(t *testing.T) {
 		t.Error("expected error for invalid JSON")
 	}
 }
+
+func TestLoadConfig_NativeConfigPriority(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	defer os.Chdir(origDir)
+	os.Chdir(dir)
+
+	// Create both legacy and native config with different values
+	legacy := `{"git": {"tagName": "legacy-${version}"}}`
+	native := `{"git": {"tagName": "native-${version}"}}`
+
+	if err := os.WriteFile(".release-it.json", []byte(legacy), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(".release-it-go.json", []byte(native), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadConfig("")
+	if err != nil {
+		t.Fatalf("LoadConfig failed: %v", err)
+	}
+
+	// Native config should win
+	if cfg.Git.TagName != "native-${version}" {
+		t.Errorf("expected native config to take priority, got tagName=%s", cfg.Git.TagName)
+	}
+}
+
+func TestLoadConfig_FallsBackToLegacy(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	defer os.Chdir(origDir)
+	os.Chdir(dir)
+
+	// Create only legacy config
+	legacy := `{"git": {"tagName": "legacy-${version}"}}`
+	if err := os.WriteFile(".release-it.json", []byte(legacy), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadConfig("")
+	if err != nil {
+		t.Fatalf("LoadConfig failed: %v", err)
+	}
+
+	if cfg.Git.TagName != "legacy-${version}" {
+		t.Errorf("expected legacy config to be loaded, got tagName=%s", cfg.Git.TagName)
+	}
+}
+
+func TestConfigSearchFiles_NativeFirst(t *testing.T) {
+	// Verify the search order has native files before legacy files
+	nativeFound := false
+	for _, f := range configSearchFiles {
+		if f == ".release-it-go.json" {
+			nativeFound = true
+		}
+		if f == ".release-it.json" && !nativeFound {
+			t.Error(".release-it.json appears before .release-it-go.json in search order")
+		}
+	}
+	if !nativeFound {
+		t.Error(".release-it-go.json not found in configSearchFiles")
+	}
+}

@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/spf13/cobra"
 	"release-it-go/internal/config"
 	applog "release-it-go/internal/log"
 	"release-it-go/internal/runner"
-	"github.com/spf13/cobra"
 )
 
 // Build information, set via ldflags.
@@ -72,6 +72,7 @@ It is a Go reimplementation of release-it without Node.js dependencies.`,
 	// Subcommands
 	rootCmd.AddCommand(newVersionCommand())
 	rootCmd.AddCommand(newCompletionCommand())
+	rootCmd.AddCommand(newInitCommand())
 
 	return rootCmd
 }

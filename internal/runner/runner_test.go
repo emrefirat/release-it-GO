@@ -197,6 +197,10 @@ func (m *mockPrompter) Input(message string, defaultValue string) (string, error
 	return m.inputResult, m.inputErr
 }
 
+func (m *mockPrompter) Select(question string, options []string, defaultIndex int) (int, error) {
+	return defaultIndex, nil
+}
+
 func TestRunner_GenerateChangelog_Disabled(t *testing.T) {
 	cfg := &config.Config{
 		CI: true,
@@ -1141,6 +1145,10 @@ func (m *sequentialMockPrompter) Confirm(message string, defaultYes bool) (bool,
 
 func (m *sequentialMockPrompter) Input(message string, defaultValue string) (string, error) {
 	return m.inputResult, m.inputErr
+}
+
+func (m *sequentialMockPrompter) Select(question string, options []string, defaultIndex int) (int, error) {
+	return defaultIndex, nil
 }
 
 // --- autoDetectIncrement tests ---

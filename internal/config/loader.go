@@ -11,7 +11,12 @@ import (
 )
 
 // configSearchFiles lists config file names in search priority order.
+// Native .release-it-go.* files take priority over legacy .release-it.* files.
 var configSearchFiles = []string{
+	".release-it-go.json",
+	".release-it-go.yaml",
+	".release-it-go.yml",
+	".release-it-go.toml",
 	".release-it.json",
 	".release-it.yaml",
 	".release-it.yml",
