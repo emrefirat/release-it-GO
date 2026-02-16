@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"os"
 
 	"release-it-go/internal/config"
 	"release-it-go/internal/ui"
@@ -17,11 +18,11 @@ func newInitCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Initialize a new release-it-go configuration",
-		Long: `Interactively create a .release-it-go.json configuration file.
+		Long: `Interactively create a .release-it-go.json or .release-it-go.yaml configuration file.
 If a legacy .release-it.json file is found, it can be migrated automatically.
 
-Use --full-example to generate a comprehensive example config file
-showing all available options with their default values.`,
+Use --full-example to generate a comprehensive YAML example config file
+showing all available options with documentation comments.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE:          runInit,
@@ -32,8 +33,8 @@ showing all available options with their default values.`,
 	return cmd
 }
 
-// fullExampleFile is the output filename for --full-example.
-const fullExampleFile = ".release-it-go-full.json"
+// fullExampleFile is the output filename for --full-example (YAML for comment support).
+const fullExampleFile = ".release-it-go-full.yaml"
 
 func runInit(cmd *cobra.Command, args []string) error {
 	if fullExampleFlag {
@@ -50,23 +51,38 @@ func runInit(cmd *cobra.Command, args []string) error {
 	return runInitWithPrompter(prompter)
 }
 
-// runInitFullExample generates a full example config file with all options.
+// runInitFullExample generates a full example config file with all options (YAML).
 func runInitFullExample() error {
-	if err := config.WriteFullExampleJSON(fullExampleFile); err != nil {
+	if err := config.WriteFullExampleYAML(fullExampleFile); err != nil {
 		return fmt.Errorf("writing full example config: %w", err)
 	}
 
 	fmt.Printf("Created %s with all available options.\n", fullExampleFile)
-	fmt.Println("Copy the options you need to .release-it-go.json and customize them.")
+	fmt.Println("Copy the options you need to .release-it-go.yaml and customize them.")
 	return nil
 }
 
 // runInitWithPrompter runs the init wizard with the given prompter (testable).
 func runInitWithPrompter(prompter ui.Prompter) error {
-	// Check for existing native config
-	if config.DetectNativeConfig() {
+	// Format selection (first question)
+	formatIdx, err := prompter.Select("Config format:", []string{
+		"JSON",
+		"YAML",
+	}, 0)
+	if err != nil {
+		return err
+	}
+
+	format := "json"
+	if formatIdx == 1 {
+		format = "yaml"
+	}
+	nativeFile := config.NativeConfigFileForFormat(format)
+
+	// Check for existing native config (any format)
+	if existingFile, found := config.DetectNativeConfigAny(); found {
 		overwrite, err := prompter.Confirm(
-			fmt.Sprintf("%s already exists. Overwrite?", config.NativeConfigFile),
+			fmt.Sprintf("%s already exists. Overwrite?", existingFile),
 			false,
 		)
 		if err != nil {
@@ -76,28 +92,44 @@ func runInitWithPrompter(prompter ui.Prompter) error {
 			fmt.Println("Aborted.")
 			return nil
 		}
+		// If switching format (e.g. JSON→YAML), rename old file to .bak
+		if existingFile != nativeFile {
+			backupPath := existingFile + ".bak"
+			if err := os.Rename(existingFile, backupPath); err != nil {
+				return fmt.Errorf("renaming old config %s → %s: %w", existingFile, backupPath, err)
+			}
+			fmt.Printf("Renamed %s → %s\n", existingFile, backupPath)
+		}
 	}
 
 	// Check for legacy config
 	if legacyPath, found := config.DetectLegacyConfig(); found {
 		migrate, err := prompter.Confirm(
-			fmt.Sprintf("Found %s. Migrate to %s?", legacyPath, config.NativeConfigFile),
+			fmt.Sprintf("Found %s. Migrate to %s?", legacyPath, nativeFile),
 			true,
 		)
 		if err != nil {
 			return err
 		}
 		if migrate {
-			if err := config.MigrateLegacyConfig(legacyPath); err != nil {
+			if err := config.MigrateLegacyConfigTo(legacyPath, format); err != nil {
 				return fmt.Errorf("migration failed: %w", err)
 			}
-			fmt.Printf("Migrated %s → %s (backup: %s.bak)\n", legacyPath, config.NativeConfigFile, legacyPath)
+			fmt.Printf("Migrated %s → %s (backup: %s.bak)\n", legacyPath, nativeFile, legacyPath)
 			return nil
 		}
 	}
 
 	// Run wizard
 	cfg := config.DefaultConfig()
+
+	// Track every field the wizard explicitly configures
+	force := config.ForceFields{
+		"git":       {},
+		"github":    {},
+		"gitlab":    {},
+		"changelog": {},
+	}
 
 	// Platform selection
 	platformIdx, err := prompter.Select("Select platform:", []string{
@@ -112,8 +144,10 @@ func runInitWithPrompter(prompter ui.Prompter) error {
 	switch platformIdx {
 	case 0: // GitHub
 		cfg.GitHub.Release = true
+		force["github"]["release"] = true
 	case 1: // GitLab
 		cfg.GitLab.Release = true
+		force["gitlab"]["release"] = true
 	case 2: // Git tag only
 		// defaults: no release
 	}
@@ -128,13 +162,16 @@ func runInitWithPrompter(prompter ui.Prompter) error {
 		return err
 	}
 
+	force["changelog"]["enabled"] = true
 	switch changelogIdx {
 	case 0: // Conventional Changelog
 		cfg.Changelog.Enabled = true
 		cfg.Changelog.Preset = "angular"
+		force["changelog"]["preset"] = true
 	case 1: // Keep a Changelog
 		cfg.Changelog.Enabled = true
 		cfg.Changelog.KeepAChangelog = true
+		force["changelog"]["keepAChangelog"] = true
 	case 2: // None
 		cfg.Changelog.Enabled = false
 	}
@@ -145,6 +182,7 @@ func runInitWithPrompter(prompter ui.Prompter) error {
 		if err != nil {
 			return err
 		}
+		force["changelog"]["infile"] = true
 		if !writeFile {
 			cfg.Changelog.Infile = ""
 		}
@@ -157,6 +195,8 @@ func runInitWithPrompter(prompter ui.Prompter) error {
 	}
 	cfg.Git.Commit = commitTag
 	cfg.Git.Tag = commitTag
+	force["git"]["commit"] = true
+	force["git"]["tag"] = true
 
 	// Git push (separate from commit/tag)
 	pushEnabled, err := prompter.Confirm("Enable git push?", true)
@@ -164,6 +204,7 @@ func runInitWithPrompter(prompter ui.Prompter) error {
 		return err
 	}
 	cfg.Git.Push = pushEnabled
+	force["git"]["push"] = true
 
 	// When push is disabled, upstream check is irrelevant
 	if !pushEnabled {
@@ -179,6 +220,7 @@ func runInitWithPrompter(prompter ui.Prompter) error {
 		return err
 	}
 	cfg.Git.CommitMessage = commitMsg
+	force["git"]["commitMessage"] = true
 
 	// Tag format
 	tagName, err := prompter.Input("Tag name format", "v${version}")
@@ -186,12 +228,20 @@ func runInitWithPrompter(prompter ui.Prompter) error {
 		return err
 	}
 	cfg.Git.TagName = tagName
+	force["git"]["tagName"] = true
 
-	// Write config
-	if err := config.WriteConfigJSON(cfg, config.NativeConfigFile); err != nil {
-		return fmt.Errorf("writing config: %w", err)
+	// Write config in selected format, including all wizard-configured fields
+	switch format {
+	case "yaml":
+		if err := config.WriteConfigYAMLWith(cfg, nativeFile, force); err != nil {
+			return fmt.Errorf("writing config: %w", err)
+		}
+	default:
+		if err := config.WriteConfigJSONWith(cfg, nativeFile, force); err != nil {
+			return fmt.Errorf("writing config: %w", err)
+		}
 	}
 
-	fmt.Printf("Created %s\n", config.NativeConfigFile)
+	fmt.Printf("Created %s\n", nativeFile)
 	return nil
 }

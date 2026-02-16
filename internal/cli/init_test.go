@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"os"
 	"testing"
 
@@ -56,8 +57,8 @@ func TestRunInit_WizardCreatesConfig(t *testing.T) {
 	os.Chdir(dir)
 
 	p := &mockPrompter{
-		selectAnswers:  []int{0, 0},                                                            // GitHub, Conventional Changelog
-		confirmAnswers: []bool{true, true, true},                                                 // writeChangelog, commit/tag, push
+		selectAnswers:  []int{0, 0, 0},                                                 // JSON, GitHub, Conventional Changelog
+		confirmAnswers: []bool{true, true, true},                                       // writeChangelog, commit/tag, push
 		inputAnswers:   []string{"chore(release): release v${version}", "v${version}"}, // commit msg, tag format
 	}
 
@@ -83,6 +84,67 @@ func TestRunInit_WizardCreatesConfig(t *testing.T) {
 	}
 }
 
+func TestRunInit_WizardWritesExplicitFields(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	defer os.Chdir(origDir)
+	os.Chdir(dir)
+
+	// User picks GitHub + Conventional Changelog + all defaults
+	// Even though commit=true, tag=true, push=true, infile="CHANGELOG.md" are defaults,
+	// they should appear in the config because the wizard explicitly asked about them.
+	p := &mockPrompter{
+		selectAnswers:  []int{0, 0, 0},                                                 // JSON, GitHub, Conventional Changelog
+		confirmAnswers: []bool{true, true, true},                                       // writeChangelog=YES, commit/tag=YES, push=YES
+		inputAnswers:   []string{"chore(release): release v${version}", "v${version}"}, // commit msg, tag format
+	}
+
+	if err := runInitWithPrompter(p); err != nil {
+		t.Fatalf("runInitWithPrompter failed: %v", err)
+	}
+
+	data, err := os.ReadFile(config.NativeConfigFile)
+	if err != nil {
+		t.Fatalf("reading config: %v", err)
+	}
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatalf("parsing JSON: %v", err)
+	}
+
+	// git section must contain wizard-configured fields even if they match defaults
+	var gitMap map[string]interface{}
+	if err := json.Unmarshal(raw["git"], &gitMap); err != nil {
+		t.Fatalf("parsing git section: %v", err)
+	}
+	for _, key := range []string{"commit", "tag", "push", "commitMessage", "tagName"} {
+		if _, ok := gitMap[key]; !ok {
+			t.Errorf("expected git.%s to be explicitly written in config", key)
+		}
+	}
+
+	// changelog section must contain wizard-configured fields
+	var clMap map[string]interface{}
+	if err := json.Unmarshal(raw["changelog"], &clMap); err != nil {
+		t.Fatalf("parsing changelog section: %v", err)
+	}
+	for _, key := range []string{"enabled", "preset", "infile"} {
+		if _, ok := clMap[key]; !ok {
+			t.Errorf("expected changelog.%s to be explicitly written in config", key)
+		}
+	}
+
+	// github section must contain release field
+	var ghMap map[string]interface{}
+	if err := json.Unmarshal(raw["github"], &ghMap); err != nil {
+		t.Fatalf("parsing github section: %v", err)
+	}
+	if _, ok := ghMap["release"]; !ok {
+		t.Error("expected github.release to be explicitly written in config")
+	}
+}
+
 func TestRunInit_GitLabPlatform(t *testing.T) {
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
@@ -90,7 +152,7 @@ func TestRunInit_GitLabPlatform(t *testing.T) {
 	os.Chdir(dir)
 
 	p := &mockPrompter{
-		selectAnswers:  []int{1, 1},                    // GitLab, Keep a Changelog
+		selectAnswers:  []int{0, 1, 1},           // JSON, GitLab, Keep a Changelog
 		confirmAnswers: []bool{true, true, true}, // writeChangelog, commit/tag, push
 		inputAnswers:   []string{"chore(release): release v${version}", "v${version}"},
 	}
@@ -119,7 +181,7 @@ func TestRunInit_GitTagOnly_NoChangelog(t *testing.T) {
 	os.Chdir(dir)
 
 	p := &mockPrompter{
-		selectAnswers:  []int{2, 2},          // Git tag only, No changelog
+		selectAnswers:  []int{0, 2, 2},       // JSON, Git tag only, No changelog
 		confirmAnswers: []bool{false, false}, // commit/tag disabled, push disabled
 		inputAnswers:   []string{"chore(release): release v${version}", "v${version}"},
 	}
@@ -160,7 +222,7 @@ func TestRunInit_CommitTagEnabled_PushDisabled(t *testing.T) {
 	os.Chdir(dir)
 
 	p := &mockPrompter{
-		selectAnswers:  []int{2, 0},                     // Git tag only, Conventional Changelog
+		selectAnswers:  []int{0, 2, 0},            // JSON, Git tag only, Conventional Changelog
 		confirmAnswers: []bool{true, true, false}, // writeChangelog, commit/tag YES, push NO
 		inputAnswers:   []string{"chore(release): release v${version}", "v${version}"},
 	}
@@ -204,6 +266,7 @@ func TestRunInit_MigrateLegacy(t *testing.T) {
 	}
 
 	p := &mockPrompter{
+		selectAnswers:  []int{0},     // JSON format
 		confirmAnswers: []bool{true}, // yes, migrate
 	}
 
@@ -233,6 +296,7 @@ func TestRunInit_ExistingNativeConfig_Abort(t *testing.T) {
 	}
 
 	p := &mockPrompter{
+		selectAnswers:  []int{0},      // JSON format
 		confirmAnswers: []bool{false}, // don't overwrite
 	}
 
@@ -260,7 +324,7 @@ func TestRunInit_ExistingNativeConfig_Overwrite(t *testing.T) {
 
 	p := &mockPrompter{
 		confirmAnswers: []bool{true, true, true, true}, // overwrite, writeChangelog, commit/tag, push
-		selectAnswers:  []int{0, 0},                                // GitHub, Conventional
+		selectAnswers:  []int{0, 0, 0},                 // JSON, GitHub, Conventional
 		inputAnswers:   []string{"chore(release): release v${version}", "v${version}"},
 	}
 
@@ -275,6 +339,50 @@ func TestRunInit_ExistingNativeConfig_Overwrite(t *testing.T) {
 	}
 }
 
+func TestRunInit_FormatSwitch_RenamesOldConfig(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	defer os.Chdir(origDir)
+	os.Chdir(dir)
+
+	// Create existing JSON config
+	if err := os.WriteFile(config.NativeConfigFile, []byte(`{}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	p := &mockPrompter{
+		selectAnswers:  []int{1, 0, 0},                 // YAML, GitHub, Conventional
+		confirmAnswers: []bool{true, true, true, true}, // overwrite, writeChangelog, commit/tag, push
+		inputAnswers:   []string{"chore(release): release v${version}", "v${version}"},
+	}
+
+	if err := runInitWithPrompter(p); err != nil {
+		t.Fatalf("runInitWithPrompter failed: %v", err)
+	}
+
+	// Old JSON should be renamed to .bak
+	if _, err := os.Stat(config.NativeConfigFile); err == nil {
+		t.Error("expected old .release-it-go.json to be renamed, but it still exists")
+	}
+	if _, err := os.Stat(config.NativeConfigFile + ".bak"); err != nil {
+		t.Error("expected .release-it-go.json.bak to exist after format switch")
+	}
+
+	// New YAML should be created
+	if _, err := os.Stat(config.NativeConfigFileYAML); err != nil {
+		t.Fatalf("expected .release-it-go.yaml to be created: %v", err)
+	}
+
+	// Verify YAML is loadable
+	cfg, err := config.LoadConfig(config.NativeConfigFileYAML)
+	if err != nil {
+		t.Fatalf("loading YAML config: %v", err)
+	}
+	if !cfg.GitHub.Release {
+		t.Error("expected github.release=true")
+	}
+}
+
 func TestRunInit_ChangelogEnabled_NoFile(t *testing.T) {
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
@@ -282,8 +390,8 @@ func TestRunInit_ChangelogEnabled_NoFile(t *testing.T) {
 	os.Chdir(dir)
 
 	p := &mockPrompter{
-		selectAnswers:  []int{0, 0},                                                            // GitHub, Conventional Changelog
-		confirmAnswers: []bool{false, true, true},                                                // writeChangelog=NO, commit/tag, push, requireConventional
+		selectAnswers:  []int{0, 0, 0},                                                 // JSON, GitHub, Conventional Changelog
+		confirmAnswers: []bool{false, true, true},                                      // writeChangelog=NO, commit/tag, push
 		inputAnswers:   []string{"chore(release): release v${version}", "v${version}"}, // commit msg, tag format
 	}
 
@@ -314,7 +422,7 @@ func TestRunInit_FullExample(t *testing.T) {
 		t.Fatalf("runInitFullExample failed: %v", err)
 	}
 
-	// Verify file was created
+	// Verify YAML file was created
 	data, err := os.ReadFile(fullExampleFile)
 	if err != nil {
 		t.Fatalf("expected %s to be created: %v", fullExampleFile, err)
@@ -322,19 +430,19 @@ func TestRunInit_FullExample(t *testing.T) {
 
 	content := string(data)
 
-	// Verify key sections are present
+	// Verify key sections are present (YAML format)
 	checks := []string{
-		"\"git\"",
-		"\"github\"",
-		"\"gitlab\"",
-		"\"hooks\"",
-		"\"changelog\"",
-		"\"bumper\"",
-		"\"calver\"",
-		"\"notification\"",
-		"\"commitMessage\"",
-		"\"tagName\"",
-		"\"tokenRef\"",
+		"git:",
+		"github:",
+		"gitlab:",
+		"hooks:",
+		"changelog:",
+		"bumper:",
+		"calver:",
+		"notification:",
+		"commitMessage:",
+		"tagName:",
+		"tokenRef:",
 		"SLACK_WEBHOOK_URL",
 		"TEAMS_WEBHOOK_URL",
 	}
@@ -344,8 +452,13 @@ func TestRunInit_FullExample(t *testing.T) {
 		}
 	}
 
+	// Should contain YAML comments
+	if !contains(content, "# ") {
+		t.Error("expected YAML comments in full example")
+	}
+
 	// Should NOT have runtime flags
-	for _, flag := range []string{"\"ci\"", "\"dry-run\"", "\"verbose\"", "\"preReleaseId\""} {
+	for _, flag := range []string{"ci:", "dry-run:", "verbose:", "preReleaseId:"} {
 		if contains(content, flag) {
 			t.Errorf("full example should not contain runtime flag %s", flag)
 		}
@@ -363,6 +476,46 @@ func stringContains(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+func TestRunInit_YAMLFormat(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	defer os.Chdir(origDir)
+	os.Chdir(dir)
+
+	p := &mockPrompter{
+		selectAnswers:  []int{1, 0, 0},                                                 // YAML, GitHub, Conventional Changelog
+		confirmAnswers: []bool{true, true, true},                                       // writeChangelog, commit/tag, push
+		inputAnswers:   []string{"chore(release): release v${version}", "v${version}"}, // commit msg, tag format
+	}
+
+	if err := runInitWithPrompter(p); err != nil {
+		t.Fatalf("runInitWithPrompter failed: %v", err)
+	}
+
+	// Should create .release-it-go.yaml (not .json)
+	if _, err := os.Stat(config.NativeConfigFileYAML); err != nil {
+		t.Fatalf("expected %s to be created: %v", config.NativeConfigFileYAML, err)
+	}
+
+	// Should NOT create .json
+	if _, err := os.Stat(config.NativeConfigFile); err == nil {
+		t.Error("expected .release-it-go.json NOT to be created when YAML is selected")
+	}
+
+	// Verify the written YAML config can be loaded
+	cfg, err := config.LoadConfig(config.NativeConfigFileYAML)
+	if err != nil {
+		t.Fatalf("loading created YAML config: %v", err)
+	}
+
+	if !cfg.GitHub.Release {
+		t.Error("expected github.release=true")
+	}
+	if cfg.Git.TagName != "v${version}" {
+		t.Errorf("expected git.tagName=v${version}, got %s", cfg.Git.TagName)
+	}
 }
 
 func TestInitCommand_Exists(t *testing.T) {

@@ -5,19 +5,19 @@ package config
 
 // Config is the root configuration struct for release-it-go.
 type Config struct {
-	Git          GitConfig       `json:"git" yaml:"git" toml:"git" mapstructure:"git"`
-	GitHub       GitHubConfig    `json:"github" yaml:"github" toml:"github" mapstructure:"github"`
-	GitLab       GitLabConfig    `json:"gitlab" yaml:"gitlab" toml:"gitlab" mapstructure:"gitlab"`
-	Hooks        HooksConfig     `json:"hooks" yaml:"hooks" toml:"hooks" mapstructure:"hooks"`
-	Changelog    ChangelogConfig `json:"changelog" yaml:"changelog" toml:"changelog" mapstructure:"changelog"`
-	Bumper       BumperConfig    `json:"bumper" yaml:"bumper" toml:"bumper" mapstructure:"bumper"`
+	Git          GitConfig          `json:"git" yaml:"git" toml:"git" mapstructure:"git"`
+	GitHub       GitHubConfig       `json:"github" yaml:"github" toml:"github" mapstructure:"github"`
+	GitLab       GitLabConfig       `json:"gitlab" yaml:"gitlab" toml:"gitlab" mapstructure:"gitlab"`
+	Hooks        HooksConfig        `json:"hooks" yaml:"hooks" toml:"hooks" mapstructure:"hooks"`
+	Changelog    ChangelogConfig    `json:"changelog" yaml:"changelog" toml:"changelog" mapstructure:"changelog"`
+	Bumper       BumperConfig       `json:"bumper" yaml:"bumper" toml:"bumper" mapstructure:"bumper"`
 	CalVer       CalVerConfig       `json:"calver" yaml:"calver" toml:"calver" mapstructure:"calver"`
 	Notification NotificationConfig `json:"notification" yaml:"notification" toml:"notification" mapstructure:"notification"`
-	CI           bool            `json:"ci" yaml:"ci" toml:"ci" mapstructure:"ci"`
-	DryRun       bool            `json:"dry-run" yaml:"dry-run" toml:"dry-run" mapstructure:"dry-run"`
-	Verbose      int             `json:"verbose" yaml:"verbose" toml:"verbose" mapstructure:"verbose"`
-	Increment    string          `json:"increment" yaml:"increment" toml:"increment" mapstructure:"increment"`
-	PreReleaseID string          `json:"preReleaseId" yaml:"preReleaseId" toml:"preReleaseId" mapstructure:"preReleaseId"`
+	CI           bool               `json:"ci" yaml:"ci" toml:"ci" mapstructure:"ci"`
+	DryRun       bool               `json:"dry-run" yaml:"dry-run" toml:"dry-run" mapstructure:"dry-run"`
+	Verbose      int                `json:"verbose" yaml:"verbose" toml:"verbose" mapstructure:"verbose"`
+	Increment    string             `json:"increment" yaml:"increment" toml:"increment" mapstructure:"increment"`
+	PreReleaseID string             `json:"preReleaseId" yaml:"preReleaseId" toml:"preReleaseId" mapstructure:"preReleaseId"`
 }
 
 // GitConfig holds all git-related configuration.
