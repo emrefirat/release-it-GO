@@ -304,6 +304,60 @@ func TestRunInit_ChangelogEnabled_NoFile(t *testing.T) {
 	}
 }
 
+func TestRunInit_FullExample(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	defer os.Chdir(origDir)
+	os.Chdir(dir)
+
+	if err := runInitFullExample(); err != nil {
+		t.Fatalf("runInitFullExample failed: %v", err)
+	}
+
+	// Verify file was created
+	data, err := os.ReadFile(fullExampleFile)
+	if err != nil {
+		t.Fatalf("expected %s to be created: %v", fullExampleFile, err)
+	}
+
+	content := string(data)
+
+	// Verify key sections are present
+	checks := []string{
+		"\"git\"",
+		"\"github\"",
+		"\"gitlab\"",
+		"\"hooks\"",
+		"\"changelog\"",
+		"\"bumper\"",
+		"\"calver\"",
+		"\"notification\"",
+		"\"commitMessage\"",
+		"\"tagName\"",
+		"\"tokenRef\"",
+		"SLACK_WEBHOOK_URL",
+		"TEAMS_WEBHOOK_URL",
+	}
+	for _, check := range checks {
+		if !contains(content, check) {
+			t.Errorf("expected full example to contain %s", check)
+		}
+	}
+}
+
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && stringContains(s, substr)
+}
+
+func stringContains(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
 func TestInitCommand_Exists(t *testing.T) {
 	root := NewRootCommand()
 	for _, cmd := range root.Commands() {
