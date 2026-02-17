@@ -370,6 +370,7 @@
 - [x] BUG: CI spinner cift satir gosteriyor (Start + Stop) (2026-02-16) → `⠋ Initializing...` + `✓ Initializing` tekrarli. Fix: CI Start() artik bir sey yazmiyor, sadece Stop() sonuc satirini yazar.
 - [x] BUG: Init adimi ✗ gosteriyor (basarili olmasina ragmen) (2026-02-16) → GetRepoInfo opsiyonel hata spinner'i erken Stop(false) ile kapatiyor. Fix: Opsiyonel hatalarda spinner kapatilmiyor.
 - [x] BUG: printSummary lipgloss kutu gereksiz ve tekrarli (2026-02-16) → Kullanici geri bildirimi: cerceve gereksiz detay. Fix: Duz, minimal cikti formatina gecildi.
+- [x] BUG: --preRelease ayni ID ile tekrar calistirildiginda versiyon artmiyor (2026-02-16) → `1.6.0-deneme2.0 → 1.6.0-deneme2.0` ayni versiyon uretiliyor, tag zaten var hatasi. Sebep: `prepatch` increment mevcut pre-release'i dusuruyordu sonra ayni .0 ile basliyordu. Fix: Mevcut versiyon ayni pre-release ID'ye sahipse `"prerelease"` increment kullan (sayi arttirir: `.0 → .1`).
 
 ---
 
@@ -394,6 +395,7 @@
 | 2026-02-16 | Claude | Phase 9 tamamlandi: conventional commit linting, --check-commits, --ignore-commit-lint, pipeline entegrasyonu |
 | 2026-02-16 | Claude | Phase 10 tamamlandi: UI/Output iyilestirmesi - ikon sabitleri, FormatBold, Logger.Print(), Verbose dim format, CI spinner ikonlari, banner, printSummary lipgloss box |
 | 2026-02-16 | Claude | fix: UI/Output iyilestirmesi v2 - CI spinner cift satir kaldirma, init ✗ bug fix, "no commits" graceful exit, printSummary kutu kaldirma, spinner mesajlari past-tense |
+| 2026-02-16 | Claude | fix: pre-release ayni ID ile versiyon artmama hatasi (prepatch → prerelease increment) |
 
 ---
 
