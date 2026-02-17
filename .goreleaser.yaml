@@ -5,6 +5,7 @@ project_name: release-it-go
 before:
   hooks:
     - go mod tidy
+    - go vet ./...
     - go test ./...
 
 builds:
@@ -22,7 +23,7 @@ builds:
     ldflags:
       - -s -w
       - -X main.version={{.Version}}
-      - -X main.commit={{.Commit}}
+      - -X main.commit={{.ShortCommit}}
       - -X main.date={{.Date}}
 
 archives:
@@ -33,20 +34,30 @@ archives:
         format: zip
 
 checksum:
-  name_template: 'checksums.txt'
+  name_template: "checksums.txt"
 
 changelog:
+  use: git
   sort: asc
   filters:
     exclude:
-      - '^docs:'
-      - '^test:'
-      - '^chore:'
+      - "^docs:"
+      - "^chore:"
+      - "^test:"
+      - "^ci:"
+
+release:
+  github:
+    owner: emrefirat
+    name: release-it-GO
+  draft: false
+  prerelease: auto
+  name_template: "v{{.Version}}"
 
 nfpms:
   - package_name: release-it-go
-    homepage: "https://github.com/emfi/release-it-go"
-    maintainer: "emfi"
+    homepage: "https://github.com/emrefirat/release-it-GO"
+    maintainer: "emrefirat"
     description: "Release automation tool for Git projects"
     formats:
       - deb
