@@ -92,7 +92,7 @@ func (c *Client) sendOne(wh config.WebhookConfig) error {
 		return fmt.Errorf("HTTP POST: %w", err)
 	}
 	defer resp.Body.Close()
-	io.Copy(io.Discard, resp.Body)
+	_, _ = io.Copy(io.Discard, resp.Body)
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("unexpected status %d from %s webhook", resp.StatusCode, wh.Type)
