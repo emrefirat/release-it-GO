@@ -80,8 +80,9 @@ func (g *Git) checkCleanWorkingDir() error {
 }
 
 // checkUpstream verifies the current branch has an upstream tracking branch.
+// Skipped when push is disabled since upstream is irrelevant without push.
 func (g *Git) checkUpstream() error {
-	if !g.config.RequireUpstream {
+	if !g.config.RequireUpstream || !g.config.Push {
 		return nil
 	}
 

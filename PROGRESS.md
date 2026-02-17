@@ -496,6 +496,7 @@
 - [x] BUG: printSummary lipgloss kutu gereksiz ve tekrarli (2026-02-16) → Kullanici geri bildirimi: cerceve gereksiz detay. Fix: Duz, minimal cikti formatina gecildi.
 - [x] BUG: --preRelease ayni ID ile tekrar calistirildiginda versiyon artmiyor (2026-02-16) → `1.6.0-deneme2.0 → 1.6.0-deneme2.0` ayni versiyon uretiliyor, tag zaten var hatasi. Sebep: `prepatch` increment mevcut pre-release'i dusuruyordu sonra ayni .0 ile basliyordu. Fix: Mevcut versiyon ayni pre-release ID'ye sahipse `"prerelease"` increment kullan (sayi arttirir: `.0 → .1`).
 - [x] BUG: --check-commits gecersiz commit type'lari kabul ediyor (2026-02-16) → `fic: deneme commit` gibi gecersiz type'lar conventional commit olarak geciyordu. Sebep: regex `\w+` herhangi bir kelimeyi type olarak kabul ediyordu. Fix: `allowedTypes` map eklendi (Angular preset: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert), type dogrulamasi yapiliyor. Gecersiz type icin "unknown type: fic" sebebi doner. --verbose ile kontrol edilen commitlerin listesi gosteriliyor.
+- [x] BUG: `push: false` olmasina ragmen "no upstream configured" hatasi (2026-02-18) → `checkUpstream()` sadece `requireUpstream` flag'ine bakiyordu, `push` durumunu kontrol etmiyordu. Elle yazilan config'lerde `push: false` + `requireUpstream` belirtilmemis ise default `true` ile upstream kontrolu calisip hata veriyordu. Init wizard bu durumu `requireUpstream = false` set ederek maskeliyordu ama asil kontrol fonksiyonu eksikti. Fix: `checkUpstream()` icine `!g.config.Push` kontrolu eklendi, push kapaliyken upstream kontrolu atlanir. Test eklendi.
 
 ---
 
@@ -539,6 +540,7 @@
 | 2026-02-17 | Claude | fix: TTY yoksa (Docker -it olmadan) otomatik CI moduna gecis (go-isatty) |
 | 2026-02-18 | Claude | feat: CI/CD pipeline eklendi, golangci-lint hatalari giderildi, kod kalitesi testleri eklendi |
 | 2026-02-18 | Claude | refactor: init wizard soru sirasi iyilestirildi - format sorusu sona tasinarak UX iyilestirildi |
+| 2026-02-18 | Claude | fix: push false iken upstream hatasi - checkUpstream push durumunu kontrol etmiyordu |
 
 ---
 
