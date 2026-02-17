@@ -155,6 +155,13 @@ func runInitWithPrompter(prompter ui.Prompter) error {
 	}
 	cfg.Git.TagName = tagName
 
+	// Require conventional commits
+	requireConventional, err := prompter.Confirm("Require conventional commits?", true)
+	if err != nil {
+		return err
+	}
+	cfg.Git.RequireConventionalCommits = requireConventional
+
 	// requireBranch
 	requireBranch, err := prompter.Input("Required branch (empty to skip)", "main")
 	if err != nil {

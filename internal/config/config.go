@@ -21,26 +21,27 @@ type Config struct {
 
 // GitConfig holds all git-related configuration.
 type GitConfig struct {
-	Commit                  bool     `json:"commit" yaml:"commit" toml:"commit" mapstructure:"commit"`
-	CommitMessage           string   `json:"commitMessage" yaml:"commitMessage" toml:"commitMessage" mapstructure:"commitMessage"`
-	CommitArgs              []string `json:"commitArgs" yaml:"commitArgs" toml:"commitArgs" mapstructure:"commitArgs"`
-	Tag                     bool     `json:"tag" yaml:"tag" toml:"tag" mapstructure:"tag"`
-	TagName                 string   `json:"tagName" yaml:"tagName" toml:"tagName" mapstructure:"tagName"`
-	TagMatch                string   `json:"tagMatch" yaml:"tagMatch" toml:"tagMatch" mapstructure:"tagMatch"`
-	TagExclude              string   `json:"tagExclude" yaml:"tagExclude" toml:"tagExclude" mapstructure:"tagExclude"`
-	TagAnnotation           string   `json:"tagAnnotation" yaml:"tagAnnotation" toml:"tagAnnotation" mapstructure:"tagAnnotation"`
-	TagArgs                 []string `json:"tagArgs" yaml:"tagArgs" toml:"tagArgs" mapstructure:"tagArgs"`
-	Push                    bool     `json:"push" yaml:"push" toml:"push" mapstructure:"push"`
-	PushArgs                []string `json:"pushArgs" yaml:"pushArgs" toml:"pushArgs" mapstructure:"pushArgs"`
-	PushRepo                string   `json:"pushRepo" yaml:"pushRepo" toml:"pushRepo" mapstructure:"pushRepo"`
-	RequireBranch           string   `json:"requireBranch" yaml:"requireBranch" toml:"requireBranch" mapstructure:"requireBranch"`
-	RequireCleanWorkingDir  bool     `json:"requireCleanWorkingDir" yaml:"requireCleanWorkingDir" toml:"requireCleanWorkingDir" mapstructure:"requireCleanWorkingDir"`
-	RequireUpstream         bool     `json:"requireUpstream" yaml:"requireUpstream" toml:"requireUpstream" mapstructure:"requireUpstream"`
-	RequireCommits          bool     `json:"requireCommits" yaml:"requireCommits" toml:"requireCommits" mapstructure:"requireCommits"`
-	Changelog               string   `json:"changelog" yaml:"changelog" toml:"changelog" mapstructure:"changelog"`
-	GetLatestTagFromAllRefs bool     `json:"getLatestTagFromAllRefs" yaml:"getLatestTagFromAllRefs" toml:"getLatestTagFromAllRefs" mapstructure:"getLatestTagFromAllRefs"`
-	CommitsPath             string   `json:"commitsPath" yaml:"commitsPath" toml:"commitsPath" mapstructure:"commitsPath"`
-	AddUntrackedFiles       bool     `json:"addUntrackedFiles" yaml:"addUntrackedFiles" toml:"addUntrackedFiles" mapstructure:"addUntrackedFiles"`
+	Commit                     bool     `json:"commit" yaml:"commit" toml:"commit" mapstructure:"commit"`
+	CommitMessage              string   `json:"commitMessage" yaml:"commitMessage" toml:"commitMessage" mapstructure:"commitMessage"`
+	CommitArgs                 []string `json:"commitArgs" yaml:"commitArgs" toml:"commitArgs" mapstructure:"commitArgs"`
+	Tag                        bool     `json:"tag" yaml:"tag" toml:"tag" mapstructure:"tag"`
+	TagName                    string   `json:"tagName" yaml:"tagName" toml:"tagName" mapstructure:"tagName"`
+	TagMatch                   string   `json:"tagMatch" yaml:"tagMatch" toml:"tagMatch" mapstructure:"tagMatch"`
+	TagExclude                 string   `json:"tagExclude" yaml:"tagExclude" toml:"tagExclude" mapstructure:"tagExclude"`
+	TagAnnotation              string   `json:"tagAnnotation" yaml:"tagAnnotation" toml:"tagAnnotation" mapstructure:"tagAnnotation"`
+	TagArgs                    []string `json:"tagArgs" yaml:"tagArgs" toml:"tagArgs" mapstructure:"tagArgs"`
+	Push                       bool     `json:"push" yaml:"push" toml:"push" mapstructure:"push"`
+	PushArgs                   []string `json:"pushArgs" yaml:"pushArgs" toml:"pushArgs" mapstructure:"pushArgs"`
+	PushRepo                   string   `json:"pushRepo" yaml:"pushRepo" toml:"pushRepo" mapstructure:"pushRepo"`
+	RequireBranch              string   `json:"requireBranch" yaml:"requireBranch" toml:"requireBranch" mapstructure:"requireBranch"`
+	RequireCleanWorkingDir     bool     `json:"requireCleanWorkingDir" yaml:"requireCleanWorkingDir" toml:"requireCleanWorkingDir" mapstructure:"requireCleanWorkingDir"`
+	RequireUpstream            bool     `json:"requireUpstream" yaml:"requireUpstream" toml:"requireUpstream" mapstructure:"requireUpstream"`
+	RequireCommits             bool     `json:"requireCommits" yaml:"requireCommits" toml:"requireCommits" mapstructure:"requireCommits"`
+	Changelog                  string   `json:"changelog" yaml:"changelog" toml:"changelog" mapstructure:"changelog"`
+	GetLatestTagFromAllRefs    bool     `json:"getLatestTagFromAllRefs" yaml:"getLatestTagFromAllRefs" toml:"getLatestTagFromAllRefs" mapstructure:"getLatestTagFromAllRefs"`
+	CommitsPath                string   `json:"commitsPath" yaml:"commitsPath" toml:"commitsPath" mapstructure:"commitsPath"`
+	AddUntrackedFiles          bool     `json:"addUntrackedFiles" yaml:"addUntrackedFiles" toml:"addUntrackedFiles" mapstructure:"addUntrackedFiles"`
+	RequireConventionalCommits bool     `json:"requireConventionalCommits" yaml:"requireConventionalCommits" toml:"requireConventionalCommits" mapstructure:"requireConventionalCommits"`
 }
 
 // GitHubConfig holds GitHub release configuration.
