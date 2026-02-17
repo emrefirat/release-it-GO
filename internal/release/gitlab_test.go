@@ -121,7 +121,7 @@ func TestGitLabClient_CreateRelease(t *testing.T) {
 		}
 
 		var req gitlabCreateReleaseRequest
-		json.NewDecoder(r.Body).Decode(&req)
+		_ = json.NewDecoder(r.Body).Decode(&req)
 
 		resp := gitlabCreateReleaseResponse{
 			TagName:     req.TagName,
@@ -130,7 +130,7 @@ func TestGitLabClient_CreateRelease(t *testing.T) {
 		resp.Links.Self = "https://gitlab.com/testgroup/testproject/-/releases/" + req.TagName
 
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer server.Close()
 
@@ -161,9 +161,9 @@ func TestGitLabClient_CreateRelease(t *testing.T) {
 func TestGitLabClient_CreateRelease_WithMilestones(t *testing.T) {
 	var receivedReq gitlabCreateReleaseRequest
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewDecoder(r.Body).Decode(&receivedReq)
+		_ = json.NewDecoder(r.Body).Decode(&receivedReq)
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(gitlabCreateReleaseResponse{TagName: "v1.0.0"})
+		_ = json.NewEncoder(w).Encode(gitlabCreateReleaseResponse{TagName: "v1.0.0"})
 	}))
 	defer server.Close()
 
@@ -289,7 +289,7 @@ func TestGitLabClient_UploadAssets_Success(t *testing.T) {
 		if r.Method == "POST" && strings.Contains(r.URL.Path, "/assets/links") {
 			linkCalled = true
 			var req gitlabReleaseLinkRequest
-			json.NewDecoder(r.Body).Decode(&req)
+			_ = json.NewDecoder(r.Body).Decode(&req)
 			if req.Name == "" || req.URL == "" {
 				w.WriteHeader(http.StatusBadRequest)
 				return
