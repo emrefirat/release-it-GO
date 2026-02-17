@@ -140,7 +140,7 @@ func (c *GitHubClient) CreateRelease(opts ReleaseOptions) (*ReleaseResult, error
 	if err != nil {
 		return nil, fmt.Errorf("creating release: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated {
 		return nil, c.handleErrorResponse(resp, "creating release")
@@ -187,7 +187,7 @@ func (c *GitHubClient) uploadSingleAsset(releaseID string, assetPath string) err
 	if err != nil {
 		return fmt.Errorf("asset file not found: %s", assetPath)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	stat, err := f.Stat()
 	if err != nil {
@@ -212,7 +212,7 @@ func (c *GitHubClient) uploadSingleAsset(releaseID string, assetPath string) err
 	if err != nil {
 		return fmt.Errorf("uploading asset %s: %w", filename, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated {
 		return c.handleErrorResponse(resp, fmt.Sprintf("uploading asset %s", filename))
@@ -243,7 +243,7 @@ func (c *GitHubClient) PostComment(target CommentTarget, message string) error {
 	if err != nil {
 		return fmt.Errorf("posting comment: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated {
 		return c.handleErrorResponse(resp, "posting comment")
@@ -273,7 +273,7 @@ func (c *GitHubClient) ValidateToken() error {
 	if err != nil {
 		return fmt.Errorf("validating GitHub token: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusUnauthorized {
 		return fmt.Errorf("GitHub token is invalid (HTTP 401)")
