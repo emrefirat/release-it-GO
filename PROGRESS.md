@@ -17,10 +17,12 @@
 | 6 | Advanced Features | Tamamlandi | 100% |
 | 7 | Testing, CI/CD, Documentation | Tamamlandi | 100% |
 | 8 | Init Command & Dual Config | Tamamlandi | 100% |
+| 9 | Conventional Commit Linting | Tamamlandi | 100% |
+| 10 | UI/Output Iyilestirmesi | Tamamlandi | 100% |
 
 **Son Guncelleme:** 2026-02-16
 **Aktif Gelistirici:** Claude
-**Mevcut Versiyon:** dev (Phase 7 + Post-release iyilestirmeler tamamlandi - production-ready)
+**Mevcut Versiyon:** dev (Phase 10 UI/Output iyilestirmesi tamamlandi - production-ready)
 
 ---
 
@@ -296,12 +298,78 @@
 
 ---
 
+## Faz 9: Conventional Commit Linting
+
+**Durum:** Tamamlandi
+**PRD:** `docs/phase_9.md`
+
+### Yapilacaklar
+
+- [x] `git/changelog.go` - CommitInfo struct + GetCommitsWithHashSinceTag()
+- [x] `changelog/lint.go` - LintInput, LintResult, LintCommits() fonksiyonu
+- [x] `config/config.go` - RequireConventionalCommits alani
+- [x] `runner/runner.go` - checkCommitLint() pipeline adimi + RunCheckCommits() modu
+- [x] `cli/root.go` - --check-commits + --ignore-commit-lint flag'leri
+- [x] `cli/init.go` - Wizard'a "Require conventional commits?" sorusu
+- [x] `changelog/lint_test.go` - LintCommits testleri (8 test)
+- [x] `git/changelog_test.go` - GetCommitsWithHashSinceTag testleri (3 test)
+
+### Notlar
+
+- Circular dependency onleme: lint fonksiyonu `changelog` paketinde, `git.CommitInfo` yerine kendi `LintInput` struct'ini kullaniyor
+- Runner zaten hem `git` hem `changelog` import ettigi icin donusum runner'da yapiliyor
+- Merge commit (`Merge `) ve revert commit (`Revert `) otomatik gecis alir
+- commitPattern regex (parser.go'daki) dogrudan yeniden kullanildi
+- Pipeline sirasi: init → prerequisites → commitlint → version → ...
+- `--check-commits`: bagimsiz lint modu, exit code 1 ile hata donusu
+- `--ignore-commit-lint`: RequireConventionalCommits override eder
+- Tum testler race detection ile basarili
+
+---
+
+## Faz 10: UI/Output Iyilestirmesi
+
+**Durum:** Tamamlandi
+
+### Yapilacaklar
+
+- [x] `ui/colors.go` - 14 Unicode ikon sabiti (IconSuccess, IconFail, IconVersion, IconTag, IconPush, IconRelease, IconChangelog, IconCommit, IconLint, IconSkip, IconLink, IconRocket, IconDryRun, IconWarning)
+- [x] `ui/colors.go` - FormatBold() fonksiyonu
+- [x] `log/logger.go` - Print() metodu (slog formatsiz dogrudan cikti)
+- [x] `log/logger.go` - Verbose() format degisikligi (slog → `↳` indented dim format)
+- [x] `ui/spinner.go` - CI Start() ciktisi (`-` → `⠋` spinner frame)
+- [x] `ui/spinner.go` - CI Stop() ciktisi (`OK`/`FAIL` → renkli `✓`/`✗` ikonlari)
+- [x] `runner/runner.go` - printBanner() (🚀 release-it-go / 🧪 dry-run banner)
+- [x] `runner/runner.go` - Versiyon mesaji (Info → Print + 📦 ikon)
+- [x] `runner/runner.go` - Skip mesajlari (Info → Print + ⏭️ ikon)
+- [x] `runner/runner.go` - printSummary() lipgloss border box ile yeniden tasarim
+- [x] `log/logger_test.go` - Print, Verbose format testleri (4 yeni test)
+- [x] Tum testler gecti (`go test ./... -race`)
+- [x] `go vet` ve `go fmt` temiz
+
+### Notlar
+
+- Ikonlar Unicode karakter, ANSI kodu degil. `NO_COLOR` sadece lipgloss renklerini kapatir, ikonlar her durumda gorunur
+- Logger.Print(): slog formatlamasi olmadan dogrudan stderr'e yazar, kullanici dostu mesajlar icin
+- Logger.Verbose(): `    ↳ mesaj` formatinda, indented ve dim renkte (verbose >= 1)
+- Logger.Debug(): Mevcut slog formati korundu (degisiklik yok)
+- CI spinner: `⠋` frame ile baslama, renkli `✓`/`✗` ile bitme
+- printSummary: lipgloss RoundedBorder ile kutu, ikonlu satirlar, duration bilgisi
+- printBanner: Run(), RunOnlyVersion(), RunNoIncrement() basina eklendi
+- 5 dosya etkilendi: ui/colors.go, log/logger.go, ui/spinner.go, runner/runner.go, log/logger_test.go
+
+---
+
 ## Bugs
 
 - [x] BUG: Ilk release'de changelog "exit status 128" hatasi (2026-02-16) → `LatestVersion=0.0.0` iken `v0.0.0` tag'i araniyordu ama repo'da boyle bir tag yok. `latestVersionToTag()` helper fonksiyonu eklendi: `0.0.0` veya bos string icin bos doner, bu sayede `GetCommitsSinceTag("")` tum commitleri alir. 3 yer etkilendi: `RunChangelogOnly`, `generateChangelog`, `autoDetectIncrement`.
 - [x] BUG: Init wizard commit/tag/push'u tek soru olarak soruyordu (2026-02-16) → Kullanici commit+tag isteyip push istemeyince ikilem yasiyordu. Sorular ayrildi: "Enable git commit and tag?" + "Enable git push?" olarak iki ayri prompt yapildi. Push kapaliyken `requireUpstream` otomatik false.
 - [x] BUG: CHANGELOG.md olusturulduktan sonra commit'e dahil edilmiyordu (2026-02-16) → `Stage()` default'ta `git add . --update` ile sadece tracked dosyalari ekliyor. Yeni olusturulan CHANGELOG.md untracked oldugu icin atlaniyordu. Fix: `StageFile()` metodu eklendi, `generateChangelog()` sonunda CHANGELOG.md explicit olarak `git add` ile stage'leniyor.
 - [x] BUG: Commit yokken bile release cikiyordu, bos CHANGELOG entry'leri olusuyordu (2026-02-16) → `git.requireCommits` default'u `false` idi, commit olmadan ard arda release atilabiliyordu. Fix: default `true` yapildi. Init wizard'a "Require new commits before release?" sorusu eklendi. Artik son tag'den beri commit yoksa `no commits since latest tag` hatasi verir.
+- [x] BUG: "no commits since latest tag" error yerine graceful exit olmali (2026-02-16) → Kullanici commit yoksa hata yerine bilgi mesaji gosterip temiz cikis yapmali. Fix: prerequisites'te error yerine logger.Print + return nil.
+- [x] BUG: CI spinner cift satir gosteriyor (Start + Stop) (2026-02-16) → `⠋ Initializing...` + `✓ Initializing` tekrarli. Fix: CI Start() artik bir sey yazmiyor, sadece Stop() sonuc satirini yazar.
+- [x] BUG: Init adimi ✗ gosteriyor (basarili olmasina ragmen) (2026-02-16) → GetRepoInfo opsiyonel hata spinner'i erken Stop(false) ile kapatiyor. Fix: Opsiyonel hatalarda spinner kapatilmiyor.
+- [x] BUG: printSummary lipgloss kutu gereksiz ve tekrarli (2026-02-16) → Kullanici geri bildirimi: cerceve gereksiz detay. Fix: Duz, minimal cikti formatina gecildi.
 
 ---
 
@@ -323,6 +391,9 @@
 | 2026-02-16 | Claude | Gercek ortam testleri: GitLab CI pipeline (main + sub-branch prerelease) basarili |
 | 2026-02-16 | Claude | Phase 8 tamamlandi: init command, dual config support, legacy migration, smart config writer |
 | 2026-02-16 | Claude | fix: ilk release changelog hatasi (0.0.0 tag bulunamama), init wizard commit/tag/push ayirma |
+| 2026-02-16 | Claude | Phase 9 tamamlandi: conventional commit linting, --check-commits, --ignore-commit-lint, pipeline entegrasyonu |
+| 2026-02-16 | Claude | Phase 10 tamamlandi: UI/Output iyilestirmesi - ikon sabitleri, FormatBold, Logger.Print(), Verbose dim format, CI spinner ikonlari, banner, printSummary lipgloss box |
+| 2026-02-16 | Claude | fix: UI/Output iyilestirmesi v2 - CI spinner cift satir kaldirma, init ✗ bug fix, "no commits" graceful exit, printSummary kutu kaldirma, spinner mesajlari past-tense |
 
 ---
 

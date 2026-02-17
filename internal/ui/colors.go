@@ -6,6 +6,24 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// Icon constants for user-friendly output.
+const (
+	IconSuccess   = "✓"
+	IconFail      = "✗"
+	IconVersion   = "📦"
+	IconTag       = "🏷️ "
+	IconPush      = "🚀"
+	IconRelease   = "🎉"
+	IconChangelog = "📝"
+	IconCommit    = "📌"
+	IconLint      = "🔍"
+	IconSkip      = "⏭️ "
+	IconLink      = "🔗"
+	IconRocket    = "🚀"
+	IconDryRun    = "🧪"
+	IconWarning   = "⚠️ "
+)
+
 var (
 	// StyleSuccess renders text in green.
 	StyleSuccess = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
@@ -65,6 +83,14 @@ func FormatDim(msg string) string {
 		return msg
 	}
 	return StyleDim.Render(msg)
+}
+
+// FormatBold formats a message with bold styling.
+func FormatBold(msg string) string {
+	if !ColorsEnabled() {
+		return msg
+	}
+	return StyleBold.Render(msg)
 }
 
 // FormatDryRun formats a dry-run message with dim styling.

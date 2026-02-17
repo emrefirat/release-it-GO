@@ -35,9 +35,8 @@ func (s *Spinner) Start(message string) {
 	s.active = true
 	s.done = make(chan struct{})
 
-	// In CI mode, just print the message without animation
+	// In CI mode, don't print start message; only Stop() prints the result line
 	if s.isCI {
-		fmt.Fprintf(os.Stderr, "- %s...\n", message)
 		return
 	}
 
@@ -75,9 +74,9 @@ func (s *Spinner) Stop(success bool) {
 
 	if s.isCI {
 		if success {
-			fmt.Fprintf(os.Stderr, "  OK %s\n", s.message)
+			fmt.Fprintf(os.Stderr, "  %s %s\n", FormatSuccess(IconSuccess), s.message)
 		} else {
-			fmt.Fprintf(os.Stderr, "  FAIL %s\n", s.message)
+			fmt.Fprintf(os.Stderr, "  %s %s\n", FormatError(IconFail), s.message)
 		}
 		return
 	}

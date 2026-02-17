@@ -30,6 +30,7 @@ type ReleaseContext struct {
 	BranchName    string
 	IsDryRun      bool
 	IsCI          bool
+	noCommits     bool
 
 	// Template variables for hooks and config templates
 	Vars map[string]string
