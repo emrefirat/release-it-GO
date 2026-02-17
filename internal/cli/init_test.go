@@ -57,7 +57,7 @@ func TestRunInit_WizardCreatesConfig(t *testing.T) {
 	_ = os.Chdir(dir)
 
 	p := &mockPrompter{
-		selectAnswers:  []int{0, 0, 0},                                                 // JSON, GitHub, Conventional Changelog
+		selectAnswers:  []int{0, 0},                                                    // GitHub, JSON
 		confirmAnswers: []bool{true, true, true},                                       // writeChangelog, commit/tag, push
 		inputAnswers:   []string{"chore(release): release v${version}", "v${version}"}, // commit msg, tag format
 	}
@@ -90,11 +90,11 @@ func TestRunInit_WizardWritesExplicitFields(t *testing.T) {
 	defer func() { _ = os.Chdir(origDir) }()
 	_ = os.Chdir(dir)
 
-	// User picks GitHub + Conventional Changelog + all defaults
-	// Even though commit=true, tag=true, push=true, infile="CHANGELOG.md" are defaults,
+	// User picks GitHub + all defaults
+	// Even though commit=true, tag=true, push=true are defaults,
 	// they should appear in the config because the wizard explicitly asked about them.
 	p := &mockPrompter{
-		selectAnswers:  []int{0, 0, 0},                                                 // JSON, GitHub, Conventional Changelog
+		selectAnswers:  []int{0, 0},                                                    // GitHub, JSON
 		confirmAnswers: []bool{true, true, true},                                       // writeChangelog=YES, commit/tag=YES, push=YES
 		inputAnswers:   []string{"chore(release): release v${version}", "v${version}"}, // commit msg, tag format
 	}
@@ -152,7 +152,7 @@ func TestRunInit_GitLabPlatform(t *testing.T) {
 	_ = os.Chdir(dir)
 
 	p := &mockPrompter{
-		selectAnswers:  []int{0, 1, 1},           // JSON, GitLab, Keep a Changelog
+		selectAnswers:  []int{1, 0},              // GitLab, JSON
 		confirmAnswers: []bool{true, true, true}, // writeChangelog, commit/tag, push
 		inputAnswers:   []string{"chore(release): release v${version}", "v${version}"},
 	}
@@ -169,8 +169,11 @@ func TestRunInit_GitLabPlatform(t *testing.T) {
 	if !cfg.GitLab.Release {
 		t.Error("expected gitlab.release=true")
 	}
-	if !cfg.Changelog.KeepAChangelog {
-		t.Error("expected changelog.keepAChangelog=true")
+	if !cfg.Changelog.Enabled {
+		t.Error("expected changelog.enabled=true")
+	}
+	if cfg.Changelog.Preset != "angular" {
+		t.Errorf("expected changelog.preset=angular, got %s", cfg.Changelog.Preset)
 	}
 }
 
@@ -181,8 +184,8 @@ func TestRunInit_GitTagOnly_NoChangelog(t *testing.T) {
 	_ = os.Chdir(dir)
 
 	p := &mockPrompter{
-		selectAnswers:  []int{0, 2, 2},       // JSON, Git tag only, No changelog
-		confirmAnswers: []bool{false, false}, // commit/tag disabled, push disabled
+		selectAnswers:  []int{2, 0},                // Git tag only, JSON
+		confirmAnswers: []bool{true, false, false}, // writeChangelog, commit/tag disabled, push disabled
 		inputAnswers:   []string{"chore(release): release v${version}", "v${version}"},
 	}
 
@@ -201,8 +204,8 @@ func TestRunInit_GitTagOnly_NoChangelog(t *testing.T) {
 	if cfg.GitLab.Release {
 		t.Error("expected gitlab.release=false")
 	}
-	if cfg.Changelog.Enabled {
-		t.Error("expected changelog.enabled=false")
+	if !cfg.Changelog.Enabled {
+		t.Error("expected changelog.enabled=true (default conventional)")
 	}
 	if cfg.Git.Commit {
 		t.Error("expected git.commit=false")
@@ -222,7 +225,7 @@ func TestRunInit_CommitTagEnabled_PushDisabled(t *testing.T) {
 	_ = os.Chdir(dir)
 
 	p := &mockPrompter{
-		selectAnswers:  []int{0, 2, 0},            // JSON, Git tag only, Conventional Changelog
+		selectAnswers:  []int{2, 0},               // Git tag only, JSON
 		confirmAnswers: []bool{true, true, false}, // writeChangelog, commit/tag YES, push NO
 		inputAnswers:   []string{"chore(release): release v${version}", "v${version}"},
 	}
@@ -266,8 +269,8 @@ func TestRunInit_MigrateLegacy(t *testing.T) {
 	}
 
 	p := &mockPrompter{
-		selectAnswers:  []int{0},     // JSON format
 		confirmAnswers: []bool{true}, // yes, migrate
+		selectAnswers:  []int{0},     // JSON format (asked after migration decision)
 	}
 
 	if err := runInitWithPrompter(p); err != nil {
@@ -296,8 +299,7 @@ func TestRunInit_ExistingNativeConfig_Abort(t *testing.T) {
 	}
 
 	p := &mockPrompter{
-		selectAnswers:  []int{0},      // JSON format
-		confirmAnswers: []bool{false}, // don't overwrite
+		confirmAnswers: []bool{false}, // don't overwrite (no select questions asked)
 	}
 
 	if err := runInitWithPrompter(p); err != nil {
@@ -324,7 +326,7 @@ func TestRunInit_ExistingNativeConfig_Overwrite(t *testing.T) {
 
 	p := &mockPrompter{
 		confirmAnswers: []bool{true, true, true, true}, // overwrite, writeChangelog, commit/tag, push
-		selectAnswers:  []int{0, 0, 0},                 // JSON, GitHub, Conventional
+		selectAnswers:  []int{0, 0},                  // GitHub, JSON
 		inputAnswers:   []string{"chore(release): release v${version}", "v${version}"},
 	}
 
@@ -351,7 +353,7 @@ func TestRunInit_FormatSwitch_RenamesOldConfig(t *testing.T) {
 	}
 
 	p := &mockPrompter{
-		selectAnswers:  []int{1, 0, 0},                 // YAML, GitHub, Conventional
+		selectAnswers:  []int{0, 1},                     // GitHub, YAML
 		confirmAnswers: []bool{true, true, true, true}, // overwrite, writeChangelog, commit/tag, push
 		inputAnswers:   []string{"chore(release): release v${version}", "v${version}"},
 	}
@@ -383,15 +385,15 @@ func TestRunInit_FormatSwitch_RenamesOldConfig(t *testing.T) {
 	}
 }
 
-func TestRunInit_ChangelogEnabled_NoFile(t *testing.T) {
+func TestRunInit_ChangelogDefaultConventional(t *testing.T) {
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
 	defer func() { _ = os.Chdir(origDir) }()
 	_ = os.Chdir(dir)
 
 	p := &mockPrompter{
-		selectAnswers:  []int{0, 0, 0},                                                 // JSON, GitHub, Conventional Changelog
-		confirmAnswers: []bool{false, true, true},                                      // writeChangelog=NO, commit/tag, push
+		selectAnswers:  []int{0, 0},                                                    // GitHub, JSON
+		confirmAnswers: []bool{true, true, true},                                       // writeChangelog, commit/tag, push
 		inputAnswers:   []string{"chore(release): release v${version}", "v${version}"}, // commit msg, tag format
 	}
 
@@ -407,8 +409,8 @@ func TestRunInit_ChangelogEnabled_NoFile(t *testing.T) {
 	if !cfg.Changelog.Enabled {
 		t.Error("expected changelog.enabled=true")
 	}
-	if cfg.Changelog.Infile != "" {
-		t.Errorf("expected changelog.infile to be empty, got %q", cfg.Changelog.Infile)
+	if cfg.Changelog.Preset != "angular" {
+		t.Errorf("expected changelog.preset=angular, got %s", cfg.Changelog.Preset)
 	}
 }
 
@@ -485,7 +487,7 @@ func TestRunInit_YAMLFormat(t *testing.T) {
 	_ = os.Chdir(dir)
 
 	p := &mockPrompter{
-		selectAnswers:  []int{1, 0, 0},                                                 // YAML, GitHub, Conventional Changelog
+		selectAnswers:  []int{0, 1},                                                    // GitHub, YAML
 		confirmAnswers: []bool{true, true, true},                                       // writeChangelog, commit/tag, push
 		inputAnswers:   []string{"chore(release): release v${version}", "v${version}"}, // commit msg, tag format
 	}
