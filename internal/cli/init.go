@@ -64,23 +64,10 @@ func runInitFullExample() error {
 
 // runInitWithPrompter runs the init wizard with the given prompter (testable).
 func runInitWithPrompter(prompter ui.Prompter) error {
-	// Format selection (first question)
-	formatIdx, err := prompter.Select("Config format:", []string{
-		"JSON",
-		"YAML",
-	}, 0)
-	if err != nil {
-		return err
-	}
-
-	format := "json"
-	if formatIdx == 1 {
-		format = "yaml"
-	}
-	nativeFile := config.NativeConfigFileForFormat(format)
-
-	// Check for existing native config (any format)
-	if existingFile, found := config.DetectNativeConfigAny(); found {
+	// Check for existing native config (format-independent)
+	var existingFile string
+	if ef, found := config.DetectNativeConfigAny(); found {
+		existingFile = ef
 		overwrite, err := prompter.Confirm(
 			fmt.Sprintf("%s already exists. Overwrite?", existingFile),
 			false,
@@ -92,31 +79,19 @@ func runInitWithPrompter(prompter ui.Prompter) error {
 			fmt.Println("Aborted.")
 			return nil
 		}
-		// If switching format (e.g. JSON→YAML), rename old file to .bak
-		if existingFile != nativeFile {
-			backupPath := existingFile + ".bak"
-			if err := os.Rename(existingFile, backupPath); err != nil {
-				return fmt.Errorf("renaming old config %s → %s: %w", existingFile, backupPath, err)
-			}
-			fmt.Printf("Renamed %s → %s\n", existingFile, backupPath)
-		}
 	}
 
-	// Check for legacy config
+	// Check for legacy config (format-independent — if migration accepted, ask format and return)
 	if legacyPath, found := config.DetectLegacyConfig(); found {
 		migrate, err := prompter.Confirm(
-			fmt.Sprintf("Found %s. Migrate to %s?", legacyPath, nativeFile),
+			fmt.Sprintf("Found %s. Migrate to native format?", legacyPath),
 			true,
 		)
 		if err != nil {
 			return err
 		}
 		if migrate {
-			if err := config.MigrateLegacyConfigTo(legacyPath, format); err != nil {
-				return fmt.Errorf("migration failed: %w", err)
-			}
-			fmt.Printf("Migrated %s → %s (backup: %s.bak)\n", legacyPath, nativeFile, legacyPath)
-			return nil
+			return runMigrationWithFormat(prompter, legacyPath)
 		}
 	}
 
@@ -152,40 +127,20 @@ func runInitWithPrompter(prompter ui.Prompter) error {
 		// defaults: no release
 	}
 
-	// Changelog format
-	changelogIdx, err := prompter.Select("Changelog format:", []string{
-		"Conventional Changelog",
-		"Keep a Changelog",
-		"None",
-	}, 0)
+	// Changelog: default Conventional Changelog (angular preset)
+	cfg.Changelog.Enabled = true
+	cfg.Changelog.Preset = "angular"
+	force["changelog"]["enabled"] = true
+	force["changelog"]["preset"] = true
+
+	// Ask whether to write CHANGELOG.md file
+	writeFile, err := prompter.Confirm("Write CHANGELOG.md file?", true)
 	if err != nil {
 		return err
 	}
-
-	force["changelog"]["enabled"] = true
-	switch changelogIdx {
-	case 0: // Conventional Changelog
-		cfg.Changelog.Enabled = true
-		cfg.Changelog.Preset = "angular"
-		force["changelog"]["preset"] = true
-	case 1: // Keep a Changelog
-		cfg.Changelog.Enabled = true
-		cfg.Changelog.KeepAChangelog = true
-		force["changelog"]["keepAChangelog"] = true
-	case 2: // None
-		cfg.Changelog.Enabled = false
-	}
-
-	// If changelog is enabled, ask whether to write CHANGELOG.md file
-	if cfg.Changelog.Enabled {
-		writeFile, err := prompter.Confirm("Write CHANGELOG.md file?", true)
-		if err != nil {
-			return err
-		}
-		force["changelog"]["infile"] = true
-		if !writeFile {
-			cfg.Changelog.Infile = ""
-		}
+	force["changelog"]["infile"] = true
+	if !writeFile {
+		cfg.Changelog.Infile = ""
 	}
 
 	// Git commit and tag
@@ -230,6 +185,30 @@ func runInitWithPrompter(prompter ui.Prompter) error {
 	cfg.Git.TagName = tagName
 	force["git"]["tagName"] = true
 
+	// Format selection (last question before writing)
+	formatIdx, err := prompter.Select("Config format:", []string{
+		"JSON",
+		"YAML",
+	}, 0)
+	if err != nil {
+		return err
+	}
+
+	format := "json"
+	if formatIdx == 1 {
+		format = "yaml"
+	}
+	nativeFile := config.NativeConfigFileForFormat(format)
+
+	// If switching format (e.g. JSON→YAML), rename old file to .bak
+	if existingFile != "" && existingFile != nativeFile {
+		backupPath := existingFile + ".bak"
+		if err := os.Rename(existingFile, backupPath); err != nil {
+			return fmt.Errorf("renaming old config %s → %s: %w", existingFile, backupPath, err)
+		}
+		fmt.Printf("Renamed %s → %s\n", existingFile, backupPath)
+	}
+
 	// Write config in selected format, including all wizard-configured fields
 	switch format {
 	case "yaml":
@@ -243,5 +222,28 @@ func runInitWithPrompter(prompter ui.Prompter) error {
 	}
 
 	fmt.Printf("Created %s\n", nativeFile)
+	return nil
+}
+
+// runMigrationWithFormat asks for format and performs legacy config migration.
+func runMigrationWithFormat(prompter ui.Prompter, legacyPath string) error {
+	formatIdx, err := prompter.Select("Config format:", []string{
+		"JSON",
+		"YAML",
+	}, 0)
+	if err != nil {
+		return err
+	}
+
+	format := "json"
+	if formatIdx == 1 {
+		format = "yaml"
+	}
+	nativeFile := config.NativeConfigFileForFormat(format)
+
+	if err := config.MigrateLegacyConfigTo(legacyPath, format); err != nil {
+		return fmt.Errorf("migration failed: %w", err)
+	}
+	fmt.Printf("Migrated %s → %s (backup: %s.bak)\n", legacyPath, nativeFile, legacyPath)
 	return nil
 }

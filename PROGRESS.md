@@ -24,7 +24,7 @@
 | 13 | Webhook Notification (Slack + Teams) | Tamamlandi | 100% |
 | 14 | YAML Config Yazma + Init Format Secimi | Tamamlandi | 100% |
 
-**Son Guncelleme:** 2026-02-17
+**Son Guncelleme:** 2026-02-18
 **Aktif Gelistirici:** Claude
 **Mevcut Versiyon:** dev (Phase 14 YAML config yazma + init format secimi tamamlandi - production-ready)
 
@@ -537,6 +537,8 @@
 | 2026-02-17 | Claude | feat: ForceFields ile wizard-configured alanlarin explicit config'e yazimi (default olsa bile) |
 | 2026-02-17 | Claude | fix: format degisiminde (JSON→YAML) eski config .bak olarak yedekleniyor, cift config onlendi |
 | 2026-02-17 | Claude | fix: TTY yoksa (Docker -it olmadan) otomatik CI moduna gecis (go-isatty) |
+| 2026-02-18 | Claude | feat: CI/CD pipeline eklendi, golangci-lint hatalari giderildi, kod kalitesi testleri eklendi |
+| 2026-02-18 | Claude | refactor: init wizard soru sirasi iyilestirildi - format sorusu sona tasinarak UX iyilestirildi |
 
 ---
 
