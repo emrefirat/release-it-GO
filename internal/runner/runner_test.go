@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"release-it-go/internal/changelog"
 	"release-it-go/internal/config"
 	"release-it-go/internal/git"
 	"release-it-go/internal/ui"
@@ -2943,6 +2944,444 @@ func TestRunner_SendNotification_NonFatal(t *testing.T) {
 	err := runner.sendNotification()
 	if err != nil {
 		t.Errorf("notification errors should be non-fatal, got: %v", err)
+	}
+}
+
+// --- checkPrerequisites: no commits path ---
+
+func TestRunner_CheckPrerequisites_NoCommits(t *testing.T) {
+	cfg := &config.Config{
+		CI: true,
+		Git: config.GitConfig{
+			TagName:        "v${version}",
+			RequireCommits: true,
+		},
+	}
+
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{
+		"git rev-parse --is-inside-work-tree": {output: "true", err: nil},
+		"git rev-parse --abbrev-ref HEAD":     {output: "main", err: nil},
+		"git status --porcelain":              {output: "", err: nil},
+		"git config user.name":                {output: "Test", err: nil},
+		"git config user.email":               {output: "test@example.com", err: nil},
+		"git describe --tags --abbrev=0":      {output: "v1.0.0", err: nil},
+		"git log v1.0.0..HEAD --oneline":      {output: "", err: fmt.Errorf("no commits since latest tag")},
+	})
+
+	err := runner.checkPrerequisites()
+	if err != nil {
+		t.Fatalf("expected no error for no-commits (soft), got: %v", err)
+	}
+	if !runner.ctx.noCommits {
+		t.Error("expected noCommits to be set to true")
+	}
+}
+
+func TestRunner_CheckPrerequisites_TokenCheckFails(t *testing.T) {
+	cfg := &config.Config{
+		CI: true,
+		Git: config.GitConfig{
+			TagName: "v${version}",
+		},
+		GitHub: config.GitHubConfig{
+			Release: true,
+		},
+	}
+
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{
+		"git rev-parse --is-inside-work-tree": {output: "true", err: nil},
+		"git rev-parse --abbrev-ref HEAD":     {output: "main", err: nil},
+		"git status --porcelain":              {output: "", err: nil},
+	})
+
+	// Ensure GITHUB_TOKEN is not set
+	_ = os.Unsetenv("GITHUB_TOKEN")
+
+	err := runner.checkPrerequisites()
+	if err == nil {
+		t.Fatal("expected error when GitHub release enabled but no token")
+	}
+	if !strings.Contains(err.Error(), "GITHUB_TOKEN") {
+		t.Errorf("expected GITHUB_TOKEN error, got: %v", err)
+	}
+}
+
+// --- formatLintError tests ---
+
+func TestFormatLintError_SingleFailure(t *testing.T) {
+	failed := []changelog.LintResult{
+		{Hash: "abc1234", Subject: "bad commit message", Reason: "missing type prefix"},
+	}
+
+	err := formatLintError(failed, 5)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	msg := err.Error()
+	if !strings.Contains(msg, "Commit lint failed") {
+		t.Errorf("expected 'Commit lint failed' in error, got: %s", msg)
+	}
+	if !strings.Contains(msg, "abc1234") {
+		t.Errorf("expected hash in error, got: %s", msg)
+	}
+	if !strings.Contains(msg, "bad commit message") {
+		t.Errorf("expected subject in error, got: %s", msg)
+	}
+	if !strings.Contains(msg, "missing type prefix") {
+		t.Errorf("expected reason in error, got: %s", msg)
+	}
+	if !strings.Contains(msg, "1 of 5") {
+		t.Errorf("expected '1 of 5' in error, got: %s", msg)
+	}
+	if !strings.Contains(msg, "--ignore-commit-lint") {
+		t.Errorf("expected bypass hint in error, got: %s", msg)
+	}
+}
+
+func TestFormatLintError_MultipleFailures(t *testing.T) {
+	failed := []changelog.LintResult{
+		{Hash: "abc1234", Subject: "bad one", Reason: "missing type"},
+		{Hash: "def5678", Subject: "bad two", Reason: "empty subject"},
+	}
+
+	err := formatLintError(failed, 10)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	msg := err.Error()
+	if !strings.Contains(msg, "2 of 10") {
+		t.Errorf("expected '2 of 10' in error, got: %s", msg)
+	}
+	if !strings.Contains(msg, "abc1234") || !strings.Contains(msg, "def5678") {
+		t.Errorf("expected both hashes in error, got: %s", msg)
+	}
+}
+
+// --- checkCommitLint tests ---
+
+func TestRunner_CheckCommitLint_Disabled(t *testing.T) {
+	cfg := &config.Config{
+		CI: true,
+		Git: config.GitConfig{
+			RequireConventionalCommits: false,
+		},
+	}
+
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{})
+
+	err := runner.checkCommitLint()
+	if err != nil {
+		t.Fatalf("expected no error when disabled, got: %v", err)
+	}
+}
+
+func TestRunner_CheckCommitLint_NoCommits(t *testing.T) {
+	cfg := &config.Config{
+		CI: true,
+		Git: config.GitConfig{
+			RequireConventionalCommits: true,
+			TagName:                    "v${version}",
+		},
+	}
+
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{
+		"git describe --tags --abbrev=0": {
+			output: "v1.0.0",
+			err:    nil,
+		},
+		"git log v1.0.0..HEAD --pretty=format:%h||%s": {
+			output: "",
+			err:    nil,
+		},
+	})
+
+	runner.ctx.LatestVersion = "1.0.0"
+
+	err := runner.checkCommitLint()
+	if err != nil {
+		t.Fatalf("expected no error for no commits, got: %v", err)
+	}
+}
+
+func TestRunner_CheckCommitLint_AllConventional(t *testing.T) {
+	cfg := &config.Config{
+		CI: true,
+		Git: config.GitConfig{
+			RequireConventionalCommits: true,
+			TagName:                    "v${version}",
+		},
+	}
+
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{
+		"git log v1.0.0..HEAD --pretty=format:%h||%s": {
+			output: "abc1234||feat: add new feature\ndef5678||fix: fix a bug",
+			err:    nil,
+		},
+	})
+
+	runner.ctx.LatestVersion = "1.0.0"
+
+	err := runner.checkCommitLint()
+	if err != nil {
+		t.Fatalf("expected no error for conventional commits, got: %v", err)
+	}
+}
+
+func TestRunner_CheckCommitLint_FailsOnNonConventional(t *testing.T) {
+	cfg := &config.Config{
+		CI: true,
+		Git: config.GitConfig{
+			RequireConventionalCommits: true,
+			TagName:                    "v${version}",
+		},
+	}
+
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{
+		"git log v1.0.0..HEAD --pretty=format:%h||%s": {
+			output: "abc1234||feat: add feature\ndef5678||bad commit message",
+			err:    nil,
+		},
+	})
+
+	runner.ctx.LatestVersion = "1.0.0"
+
+	err := runner.checkCommitLint()
+	if err == nil {
+		t.Fatal("expected error for non-conventional commit")
+	}
+	if !strings.Contains(err.Error(), "Commit lint failed") {
+		t.Errorf("expected lint error message, got: %v", err)
+	}
+}
+
+func TestRunner_CheckCommitLint_GitError(t *testing.T) {
+	cfg := &config.Config{
+		CI: true,
+		Git: config.GitConfig{
+			RequireConventionalCommits: true,
+			TagName:                    "v${version}",
+		},
+	}
+
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{
+		"git log v1.0.0..HEAD --pretty=format:%h||%s": {
+			output: "",
+			err:    fmt.Errorf("git error"),
+		},
+	})
+
+	runner.ctx.LatestVersion = "1.0.0"
+
+	err := runner.checkCommitLint()
+	if err == nil {
+		t.Fatal("expected error on git failure")
+	}
+	if !strings.Contains(err.Error(), "getting commits for lint") {
+		t.Errorf("expected wrapped git error, got: %v", err)
+	}
+}
+
+func TestRunner_CheckCommitLint_NoLatestVersion_UsesGetLatestTag(t *testing.T) {
+	cfg := &config.Config{
+		CI: true,
+		Git: config.GitConfig{
+			RequireConventionalCommits: true,
+			TagName:                    "v${version}",
+		},
+	}
+
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{
+		"git describe --tags --abbrev=0": {
+			output: "v0.5.0",
+			err:    nil,
+		},
+		"git log v0.5.0..HEAD --pretty=format:%h||%s": {
+			output: "abc1234||feat: something",
+			err:    nil,
+		},
+	})
+
+	// LatestVersion is empty, so it should call GetLatestTag
+	runner.ctx.LatestVersion = ""
+
+	err := runner.checkCommitLint()
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+}
+
+// --- RunCheckCommits tests ---
+
+func TestRunner_RunCheckCommits_NoCommits(t *testing.T) {
+	cfg := &config.Config{
+		CI: true,
+		Git: config.GitConfig{
+			TagName: "v${version}",
+		},
+	}
+
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{
+		"git describe --tags --abbrev=0": {
+			output: "v1.0.0",
+			err:    nil,
+		},
+		"git log v1.0.0..HEAD --pretty=format:%h||%s": {
+			output: "",
+			err:    nil,
+		},
+		"git remote get-url origin": {
+			output: "https://github.com/user/repo.git",
+			err:    nil,
+		},
+		"git rev-parse --abbrev-ref HEAD": {
+			output: "main",
+			err:    nil,
+		},
+	})
+
+	err := runner.RunCheckCommits()
+	if err != nil {
+		t.Fatalf("expected no error for no commits, got: %v", err)
+	}
+}
+
+func TestRunner_RunCheckCommits_AllPass(t *testing.T) {
+	cfg := &config.Config{
+		CI: true,
+		Git: config.GitConfig{
+			TagName: "v${version}",
+		},
+	}
+
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{
+		"git describe --tags --abbrev=0": {
+			output: "v1.0.0",
+			err:    nil,
+		},
+		"git log v1.0.0..HEAD --pretty=format:%h||%s": {
+			output: "abc1234||feat: new feature\ndef5678||fix: bug fix",
+			err:    nil,
+		},
+		"git remote get-url origin": {
+			output: "https://github.com/user/repo.git",
+			err:    nil,
+		},
+		"git rev-parse --abbrev-ref HEAD": {
+			output: "main",
+			err:    nil,
+		},
+	})
+
+	err := runner.RunCheckCommits()
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+}
+
+func TestRunner_RunCheckCommits_WithFailures(t *testing.T) {
+	cfg := &config.Config{
+		CI: true,
+		Git: config.GitConfig{
+			TagName: "v${version}",
+		},
+	}
+
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{
+		"git describe --tags --abbrev=0": {
+			output: "v1.0.0",
+			err:    nil,
+		},
+		"git log v1.0.0..HEAD --pretty=format:%h||%s": {
+			output: "abc1234||feat: good commit\ndef5678||this is bad",
+			err:    nil,
+		},
+		"git remote get-url origin": {
+			output: "https://github.com/user/repo.git",
+			err:    nil,
+		},
+		"git rev-parse --abbrev-ref HEAD": {
+			output: "main",
+			err:    nil,
+		},
+	})
+
+	err := runner.RunCheckCommits()
+	if err == nil {
+		t.Fatal("expected error for non-conventional commits")
+	}
+	if !strings.Contains(err.Error(), "Commit lint failed") {
+		t.Errorf("expected lint error, got: %v", err)
+	}
+}
+
+func TestRunner_RunCheckCommits_NoTags(t *testing.T) {
+	cfg := &config.Config{
+		CI: true,
+		Git: config.GitConfig{
+			TagName: "v${version}",
+		},
+	}
+
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{
+		"git describe --tags --abbrev=0": {
+			output: "",
+			err:    fmt.Errorf("no tags"),
+		},
+		"git log --pretty=format:%h||%s": {
+			output: "abc1234||feat: initial commit",
+			err:    nil,
+		},
+		"git remote get-url origin": {
+			output: "https://github.com/user/repo.git",
+			err:    nil,
+		},
+		"git rev-parse --abbrev-ref HEAD": {
+			output: "main",
+			err:    nil,
+		},
+	})
+
+	err := runner.RunCheckCommits()
+	if err != nil {
+		t.Fatalf("expected no error when no tags, got: %v", err)
 	}
 }
 
