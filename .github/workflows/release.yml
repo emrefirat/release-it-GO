@@ -1,16 +1,27 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
+    inputs:
+      increment:
+        description: "Version increment (leave empty for auto-detect from commits)"
+        required: false
+        type: choice
+        options:
+          - ""
+          - patch
+          - minor
+          - major
 
 permissions:
   contents: write
 
 jobs:
-  release:
+  tag:
+    name: Create release tag
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -18,11 +29,33 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version-file: go.mod
 
-      - uses: goreleaser/goreleaser-action@v6
-        with:
-          version: '~> v2'
-          args: release --clean
+      - name: Build release-it-go
+        run: go build -o ./bin/release-it-go ./cmd/release-it-go
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create tag with release-it-go
+        id: release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INCREMENT: ${{ inputs.increment }}
+        run: |
+          ARGS="--ci --no-github.release"
+          if [ -n "$INCREMENT" ]; then
+            ARGS="$ARGS -i $INCREMENT"
+          fi
+          ./bin/release-it-go $ARGS
+          TAG=$(git describe --tags --abbrev=0)
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Created tag: $TAG"
+
+      - name: Push tag
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          git push origin "$TAG"
