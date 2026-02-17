@@ -111,12 +111,14 @@ func TestCheckUpstream(t *testing.T) {
 	tests := []struct {
 		name    string
 		enabled bool
+		push    bool
 		hasErr  bool
 		wantErr bool
 	}{
-		{"disabled", false, true, false},
-		{"upstream exists", true, false, false},
-		{"no upstream", true, true, true},
+		{"disabled", false, true, true, false},
+		{"upstream exists", true, true, false, false},
+		{"no upstream", true, true, true, true},
+		{"push disabled skips check", true, false, true, false},
 	}
 
 	for _, tt := range tests {
@@ -131,7 +133,7 @@ func TestCheckUpstream(t *testing.T) {
 				return "origin/main", nil
 			}
 
-			cfg := &config.GitConfig{RequireUpstream: tt.enabled}
+			cfg := &config.GitConfig{RequireUpstream: tt.enabled, Push: tt.push}
 			g := newTestGitWithConfig(cfg, false)
 			err := g.checkUpstream()
 
