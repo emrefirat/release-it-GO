@@ -14,6 +14,7 @@ func DefaultConfig() *Config {
 			PushRepo:               "origin",
 			RequireCleanWorkingDir: true,
 			RequireUpstream:        true,
+			RequireCommits:         true,
 			Changelog:              `git log --pretty=format:"* %s (%h)" ${latestTag}...HEAD`,
 		},
 		GitHub: GitHubConfig{

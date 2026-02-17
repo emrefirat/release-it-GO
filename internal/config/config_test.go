@@ -23,7 +23,7 @@ func TestDefaultConfig_GitDefaults(t *testing.T) {
 		{"git.pushRepo", cfg.Git.PushRepo, "origin"},
 		{"git.requireCleanWorkingDir", cfg.Git.RequireCleanWorkingDir, true},
 		{"git.requireUpstream", cfg.Git.RequireUpstream, true},
-		{"git.requireCommits", cfg.Git.RequireCommits, false},
+		{"git.requireCommits", cfg.Git.RequireCommits, true},
 	}
 
 	for _, tt := range tests {

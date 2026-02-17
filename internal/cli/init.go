@@ -131,6 +131,13 @@ func runInitWithPrompter(prompter ui.Prompter) error {
 		cfg.Git.RequireUpstream = false
 	}
 
+	// Require commits before release
+	requireCommits, err := prompter.Confirm("Require new commits before release?", true)
+	if err != nil {
+		return err
+	}
+	cfg.Git.RequireCommits = requireCommits
+
 	// Commit message template
 	commitMsg, err := prompter.Input(
 		"Commit message template",
