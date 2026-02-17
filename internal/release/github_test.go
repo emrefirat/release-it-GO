@@ -53,10 +53,10 @@ func TestGitHubClient_ValidateToken(t *testing.T) {
 		auth := r.Header.Get("Authorization")
 		if auth == "token valid-token" {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"login":"testuser"}`))
+			_, _ = w.Write([]byte(`{"login":"testuser"}`))
 		} else {
 			w.WriteHeader(http.StatusUnauthorized)
-			w.Write([]byte(`{"message":"Bad credentials"}`))
+			_, _ = w.Write([]byte(`{"message":"Bad credentials"}`))
 		}
 	}))
 	defer server.Close()
@@ -137,7 +137,7 @@ func TestGitHubClient_CreateRelease(t *testing.T) {
 		}
 
 		var req githubCreateReleaseRequest
-		json.NewDecoder(r.Body).Decode(&req)
+		_ = json.NewDecoder(r.Body).Decode(&req)
 
 		resp := githubCreateReleaseResponse{
 			ID:        42,
@@ -146,7 +146,7 @@ func TestGitHubClient_CreateRelease(t *testing.T) {
 		}
 
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer server.Close()
 
@@ -209,7 +209,7 @@ func TestGitHubClient_CreateRelease_DryRun(t *testing.T) {
 func TestGitHubClient_CreateRelease_Error(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnprocessableEntity)
-		w.Write([]byte(`{"message":"Validation Failed"}`))
+		_, _ = w.Write([]byte(`{"message":"Validation Failed"}`))
 	}))
 	defer server.Close()
 
@@ -233,7 +233,7 @@ func TestGitHubClient_PostComment(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedPath = r.URL.Path
 		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte(`{"id":1}`))
+		_, _ = w.Write([]byte(`{"id":1}`))
 	}))
 	defer server.Close()
 
@@ -329,7 +329,7 @@ func TestGitHubClient_HandleErrorResponse(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(tt.statusCode)
-				w.Write([]byte(tt.body))
+				_, _ = w.Write([]byte(tt.body))
 			}))
 			defer server.Close()
 
@@ -338,7 +338,7 @@ func TestGitHubClient_HandleErrorResponse(t *testing.T) {
 
 			resp, _ := c.doRequest("GET", server.URL+"/test", nil)
 			err := c.handleErrorResponse(resp, "test")
-			resp.Body.Close()
+			_ = resp.Body.Close()
 
 			if err == nil {
 				t.Fatal("expected error")
@@ -371,8 +371,8 @@ func TestTruncate(t *testing.T) {
 }
 
 func TestNewGitHubClient(t *testing.T) {
-	os.Setenv("TEST_GH_TOKEN", "test-token-123")
-	defer os.Unsetenv("TEST_GH_TOKEN")
+	_ = os.Setenv("TEST_GH_TOKEN", "test-token-123")
+	defer func() { _ = os.Unsetenv("TEST_GH_TOKEN") }()
 
 	cfg := &config.GitHubConfig{
 		TokenRef: "TEST_GH_TOKEN",
@@ -392,7 +392,7 @@ func TestNewGitHubClient(t *testing.T) {
 }
 
 func TestNewGitHubClient_MissingToken(t *testing.T) {
-	os.Unsetenv("MISSING_TOKEN")
+	_ = os.Unsetenv("MISSING_TOKEN")
 
 	cfg := &config.GitHubConfig{
 		TokenRef: "MISSING_TOKEN",
@@ -409,14 +409,14 @@ func TestGitHubClient_UploadAssets_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedContentType = r.Header.Get("Content-Type")
 		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte(`{"id":1,"name":"test.zip"}`))
+		_, _ = w.Write([]byte(`{"id":1,"name":"test.zip"}`))
 	}))
 	defer server.Close()
 
 	// Create a temp file to upload
 	tmpDir := t.TempDir()
 	testFile := tmpDir + "/test.zip"
-	os.WriteFile(testFile, []byte("fake zip content"), 0644)
+	_ = os.WriteFile(testFile, []byte("fake zip content"), 0644)
 
 	c := &GitHubClient{
 		config:   &config.GitHubConfig{},
@@ -439,9 +439,9 @@ func TestGitHubClient_UploadAssets_Success(t *testing.T) {
 func TestGitHubClient_CreateRelease_WithAllOptions(t *testing.T) {
 	var receivedReq githubCreateReleaseRequest
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewDecoder(r.Body).Decode(&receivedReq)
+		_ = json.NewDecoder(r.Body).Decode(&receivedReq)
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(githubCreateReleaseResponse{ID: 1, HTMLURL: "https://example.com"})
+		_ = json.NewEncoder(w).Encode(githubCreateReleaseResponse{ID: 1, HTMLURL: "https://example.com"})
 	}))
 	defer server.Close()
 

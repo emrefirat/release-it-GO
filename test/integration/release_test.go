@@ -34,8 +34,8 @@ func TestIntegration_FullReleasePipeline(t *testing.T) {
 
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	os.Chdir(dir)
-	defer os.Chdir(origDir)
+	_ = os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v1.0.0")
@@ -74,8 +74,8 @@ func TestIntegration_PatchBump(t *testing.T) {
 
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	os.Chdir(dir)
-	defer os.Chdir(origDir)
+	_ = os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v2.3.1")
@@ -102,8 +102,8 @@ func TestIntegration_MajorBump(t *testing.T) {
 
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	os.Chdir(dir)
-	defer os.Chdir(origDir)
+	_ = os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v1.0.0")
@@ -130,8 +130,8 @@ func TestIntegration_DryRun(t *testing.T) {
 
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	os.Chdir(dir)
-	defer os.Chdir(origDir)
+	_ = os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v1.0.0")
@@ -160,8 +160,8 @@ func TestIntegration_NoExistingTags(t *testing.T) {
 
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	os.Chdir(dir)
-	defer os.Chdir(origDir)
+	_ = os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
 
 	initGitRepo(t, dir)
 	createCommits(t, dir, []string{
@@ -191,8 +191,8 @@ func TestIntegration_ChangelogOnly(t *testing.T) {
 
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	os.Chdir(dir)
-	defer os.Chdir(origDir)
+	_ = os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v1.0.0")
@@ -221,8 +221,8 @@ func TestIntegration_ReleaseVersionOnly(t *testing.T) {
 
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	os.Chdir(dir)
-	defer os.Chdir(origDir)
+	_ = os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v3.2.1")
@@ -250,8 +250,8 @@ func TestIntegration_DisableCommitAndTag(t *testing.T) {
 
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	os.Chdir(dir)
-	defer os.Chdir(origDir)
+	_ = os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v1.0.0")
@@ -281,8 +281,8 @@ func TestIntegration_ConventionalCommitAutoIncrement(t *testing.T) {
 
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	os.Chdir(dir)
-	defer os.Chdir(origDir)
+	_ = os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v1.0.0")
@@ -311,8 +311,8 @@ func TestIntegration_BreakingChangeAutoMajor(t *testing.T) {
 
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	os.Chdir(dir)
-	defer os.Chdir(origDir)
+	_ = os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v1.0.0")
@@ -340,8 +340,8 @@ func TestIntegration_BumperFileUpdate(t *testing.T) {
 
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	os.Chdir(dir)
-	defer os.Chdir(origDir)
+	_ = os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
 
 	// Create package.json with version
 	pkgJSON := filepath.Join(dir, "package.json")
@@ -391,8 +391,8 @@ func TestIntegration_KeepAChangelog(t *testing.T) {
 
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	os.Chdir(dir)
-	defer os.Chdir(origDir)
+	_ = os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v1.0.0")
@@ -423,8 +423,8 @@ func TestIntegration_HookExecution(t *testing.T) {
 
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	os.Chdir(dir)
-	defer os.Chdir(origDir)
+	_ = os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
 
 	markerFile := filepath.Join(dir, "hook_executed.txt")
 
@@ -457,8 +457,8 @@ func TestIntegration_HookFailure(t *testing.T) {
 
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	os.Chdir(dir)
-	defer os.Chdir(origDir)
+	_ = os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v1.0.0")
@@ -487,8 +487,8 @@ func TestIntegration_ConfigFromJSON(t *testing.T) {
 
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	os.Chdir(dir)
-	defer os.Chdir(origDir)
+	_ = os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
 
 	configContent := `{
 		"git": {
@@ -533,8 +533,8 @@ func TestIntegration_ConfigFromYAML(t *testing.T) {
 
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	os.Chdir(dir)
-	defer os.Chdir(origDir)
+	_ = os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
 
 	configContent := `git:
   commit: true
@@ -577,8 +577,8 @@ func TestIntegration_NoIncrement(t *testing.T) {
 
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	os.Chdir(dir)
-	defer os.Chdir(origDir)
+	_ = os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v1.5.0")
@@ -607,8 +607,8 @@ func TestIntegration_SequentialReleases(t *testing.T) {
 
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	os.Chdir(dir)
-	defer os.Chdir(origDir)
+	_ = os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v1.0.0")

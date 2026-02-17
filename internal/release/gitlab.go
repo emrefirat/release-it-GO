@@ -148,7 +148,7 @@ func (c *GitLabClient) CreateRelease(opts ReleaseOptions) (*ReleaseResult, error
 	if err != nil {
 		return nil, fmt.Errorf("creating release: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated {
 		return nil, c.handleErrorResponse(resp, "creating release")
@@ -194,7 +194,7 @@ func (c *GitLabClient) uploadToGenericPackage(tagName string, assetPath string) 
 	if err != nil {
 		return "", fmt.Errorf("asset file not found: %s", assetPath)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	filename := filepath.Base(assetPath)
 	packageName := c.repoInfo.Repository
@@ -215,7 +215,7 @@ func (c *GitLabClient) uploadToGenericPackage(tagName string, assetPath string) 
 	if err != nil {
 		return "", fmt.Errorf("uploading to generic package: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated {
 		return "", c.handleErrorResponse(resp, "uploading to generic package")
@@ -245,7 +245,7 @@ func (c *GitLabClient) createReleaseLink(tagName string, name string, assetURL s
 	if err != nil {
 		return fmt.Errorf("creating release link: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated {
 		return c.handleErrorResponse(resp, "creating release link")
@@ -282,7 +282,7 @@ func (c *GitLabClient) PostComment(target CommentTarget, message string) error {
 	if err != nil {
 		return fmt.Errorf("posting comment: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated {
 		return c.handleErrorResponse(resp, "posting comment")
@@ -312,7 +312,7 @@ func (c *GitLabClient) ValidateToken() error {
 	if err != nil {
 		return fmt.Errorf("validating GitLab token: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusUnauthorized {
 		return fmt.Errorf("GitLab token is invalid (HTTP 401)")

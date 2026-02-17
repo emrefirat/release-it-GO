@@ -31,7 +31,9 @@ func TestApplyPluginCompat_ConventionalChangelog(t *testing.T) {
 			}
 		}
 	}`
-	os.WriteFile(configPath, []byte(content), 0644)
+	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	cfg, err := LoadConfig(configPath)
 	if err != nil {
@@ -77,7 +79,9 @@ func TestApplyPluginCompat_KeepAChangelog(t *testing.T) {
 			}
 		}
 	}`
-	os.WriteFile(configPath, []byte(content), 0644)
+	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	cfg, err := LoadConfig(configPath)
 	if err != nil {
@@ -103,7 +107,9 @@ func TestApplyPluginCompat_NoPlugins(t *testing.T) {
 			"tagName": "v${version}"
 		}
 	}`
-	os.WriteFile(configPath, []byte(content), 0644)
+	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	cfg, err := LoadConfig(configPath)
 	if err != nil {
@@ -166,7 +172,9 @@ func TestApplyPluginCompat_OldNpmFormat(t *testing.T) {
 		"hooks": {},
 		"plugins": {}
 	}`
-	os.WriteFile(configPath, []byte(content), 0644)
+	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	cfg, err := LoadConfig(configPath)
 	if err != nil {
@@ -199,7 +207,9 @@ func TestApplyPluginCompat_RequireBranchArray(t *testing.T) {
 			"requireBranch": ["main", "master"]
 		}
 	}`
-	os.WriteFile(configPath, []byte(content), 0644)
+	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	cfg, err := LoadConfig(configPath)
 	if err != nil {
@@ -217,7 +227,9 @@ func TestApplyPluginCompat_YAMLIgnored(t *testing.T) {
 	content := `git:
   tagName: "v${version}"
 `
-	os.WriteFile(configPath, []byte(content), 0644)
+	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	cfg, err := LoadConfig(configPath)
 	if err != nil {
