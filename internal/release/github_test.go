@@ -338,7 +338,7 @@ func TestGitHubClient_HandleErrorResponse(t *testing.T) {
 
 			resp, _ := c.doRequest("GET", server.URL+"/test", nil)
 			err := c.handleErrorResponse(resp, "test")
-			resp.Body.Close()
+			_ = resp.Body.Close()
 
 			if err == nil {
 				t.Fatal("expected error")
@@ -371,8 +371,8 @@ func TestTruncate(t *testing.T) {
 }
 
 func TestNewGitHubClient(t *testing.T) {
-	os.Setenv("TEST_GH_TOKEN", "test-token-123")
-	defer os.Unsetenv("TEST_GH_TOKEN")
+	_ = os.Setenv("TEST_GH_TOKEN", "test-token-123")
+	defer func() { _ = os.Unsetenv("TEST_GH_TOKEN") }()
 
 	cfg := &config.GitHubConfig{
 		TokenRef: "TEST_GH_TOKEN",
@@ -392,7 +392,7 @@ func TestNewGitHubClient(t *testing.T) {
 }
 
 func TestNewGitHubClient_MissingToken(t *testing.T) {
-	os.Unsetenv("MISSING_TOKEN")
+	_ = os.Unsetenv("MISSING_TOKEN")
 
 	cfg := &config.GitHubConfig{
 		TokenRef: "MISSING_TOKEN",
@@ -416,7 +416,7 @@ func TestGitHubClient_UploadAssets_Success(t *testing.T) {
 	// Create a temp file to upload
 	tmpDir := t.TempDir()
 	testFile := tmpDir + "/test.zip"
-	os.WriteFile(testFile, []byte("fake zip content"), 0644)
+	_ = os.WriteFile(testFile, []byte("fake zip content"), 0644)
 
 	c := &GitHubClient{
 		config:   &config.GitHubConfig{},

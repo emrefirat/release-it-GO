@@ -12,7 +12,7 @@ import (
 func TestWriteVersionToFile_JSON(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "package.json")
-	os.WriteFile(file, []byte(`{"name": "test", "version": "1.0.0"}`), 0644)
+	_ = os.WriteFile(file, []byte(`{"name": "test", "version": "1.0.0"}`), 0644)
 
 	err := WriteVersionToFile(config.BumperFile{File: file, Path: "version"}, "2.0.0")
 	if err != nil {
@@ -32,7 +32,7 @@ func TestWriteVersionToFile_JSON(t *testing.T) {
 func TestWriteVersionToFile_JSON_Nested(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "config.json")
-	os.WriteFile(file, []byte(`{"tool": {"version": "1.0.0"}}`), 0644)
+	_ = os.WriteFile(file, []byte(`{"tool": {"version": "1.0.0"}}`), 0644)
 
 	err := WriteVersionToFile(config.BumperFile{File: file, Path: "tool.version"}, "3.0.0")
 	if err != nil {
@@ -48,7 +48,7 @@ func TestWriteVersionToFile_JSON_Nested(t *testing.T) {
 func TestWriteVersionToFile_YAML(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "chart.yaml")
-	os.WriteFile(file, []byte("name: myapp\nversion: 1.0.0\n"), 0644)
+	_ = os.WriteFile(file, []byte("name: myapp\nversion: 1.0.0\n"), 0644)
 
 	err := WriteVersionToFile(config.BumperFile{File: file, Path: "version"}, "2.0.0")
 	if err != nil {
@@ -69,7 +69,7 @@ func TestWriteVersionToFile_TOML(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "pyproject.toml")
 	content := "[tool]\n[tool.poetry]\nversion = \"1.0.0\"\nname = \"myapp\"\n"
-	os.WriteFile(file, []byte(content), 0644)
+	_ = os.WriteFile(file, []byte(content), 0644)
 
 	err := WriteVersionToFile(config.BumperFile{File: file, Path: "tool.poetry.version"}, "2.0.0")
 	if err != nil {
@@ -87,7 +87,7 @@ func TestWriteVersionToFile_INI(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "setup.cfg")
 	content := "[metadata]\nname = mypackage\nversion = 1.0.0\n"
-	os.WriteFile(file, []byte(content), 0644)
+	_ = os.WriteFile(file, []byte(content), 0644)
 
 	err := WriteVersionToFile(config.BumperFile{File: file, Path: "[metadata].version"}, "2.0.0")
 	if err != nil {
@@ -107,7 +107,7 @@ func TestWriteVersionToFile_INI(t *testing.T) {
 func TestWriteVersionToFile_Text(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "VERSION")
-	os.WriteFile(file, []byte("1.0.0\n"), 0644)
+	_ = os.WriteFile(file, []byte("1.0.0\n"), 0644)
 
 	err := WriteVersionToFile(config.BumperFile{File: file}, "2.0.0")
 	if err != nil {
@@ -123,7 +123,7 @@ func TestWriteVersionToFile_Text(t *testing.T) {
 func TestWriteVersionToFile_ConsumeWholeFile(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "VERSION")
-	os.WriteFile(file, []byte("old content\n"), 0644)
+	_ = os.WriteFile(file, []byte("old content\n"), 0644)
 
 	err := WriteVersionToFile(config.BumperFile{File: file, ConsumeWholeFile: true}, "3.0.0")
 	if err != nil {
@@ -155,7 +155,7 @@ func TestWriteVersionToFile_INI_MissingKey(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "setup.cfg")
 	content := "[metadata]\nname = mypackage\n"
-	os.WriteFile(file, []byte(content), 0644)
+	_ = os.WriteFile(file, []byte(content), 0644)
 
 	err := WriteVersionToFile(config.BumperFile{File: file, Path: "[metadata].version"}, "2.0.0")
 	if err == nil {
@@ -166,7 +166,7 @@ func TestWriteVersionToFile_INI_MissingKey(t *testing.T) {
 func TestWriteVersionToFile_JSON_MissingPath(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "package.json")
-	os.WriteFile(file, []byte(`{"name": "test"}`), 0644)
+	_ = os.WriteFile(file, []byte(`{"name": "test"}`), 0644)
 
 	err := WriteVersionToFile(config.BumperFile{File: file, Path: "missing.deep.path"}, "2.0.0")
 	if err == nil {

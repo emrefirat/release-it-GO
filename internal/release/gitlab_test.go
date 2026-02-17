@@ -52,7 +52,7 @@ func TestGitLabClient_ValidateToken(t *testing.T) {
 		token := r.Header.Get("Private-Token")
 		if token == "valid-token" {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"username":"testuser"}`))
+			_, _ = w.Write([]byte(`{"username":"testuser"}`))
 		} else {
 			w.WriteHeader(http.StatusUnauthorized)
 		}
@@ -227,7 +227,7 @@ func TestGitLabClient_PostComment(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				receivedPath = r.URL.Path
 				w.WriteHeader(http.StatusCreated)
-				w.Write([]byte(`{"id":1}`))
+				_, _ = w.Write([]byte(`{"id":1}`))
 			}))
 			defer server.Close()
 
@@ -283,7 +283,7 @@ func TestGitLabClient_UploadAssets_Success(t *testing.T) {
 				return
 			}
 			w.WriteHeader(http.StatusCreated)
-			w.Write([]byte(`{"message":"201 Created"}`))
+			_, _ = w.Write([]byte(`{"message":"201 Created"}`))
 			return
 		}
 		if r.Method == "POST" && strings.Contains(r.URL.Path, "/assets/links") {
@@ -295,7 +295,7 @@ func TestGitLabClient_UploadAssets_Success(t *testing.T) {
 				return
 			}
 			w.WriteHeader(http.StatusCreated)
-			w.Write([]byte(`{"id":1}`))
+			_, _ = w.Write([]byte(`{"id":1}`))
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -305,7 +305,7 @@ func TestGitLabClient_UploadAssets_Success(t *testing.T) {
 	// Create a temp file to upload
 	tmpDir := t.TempDir()
 	testFile := tmpDir + "/app.zip"
-	os.WriteFile(testFile, []byte("fake zip content"), 0644)
+	_ = os.WriteFile(testFile, []byte("fake zip content"), 0644)
 
 	c := &GitLabClient{
 		config:    &config.GitLabConfig{},
@@ -352,13 +352,13 @@ func TestGitLabClient_UploadAssets_FileNotFound(t *testing.T) {
 func TestGitLabClient_UploadAssets_UploadFailure(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(`{"error":"internal error"}`))
+		_, _ = w.Write([]byte(`{"error":"internal error"}`))
 	}))
 	defer server.Close()
 
 	tmpDir := t.TempDir()
 	testFile := tmpDir + "/app.zip"
-	os.WriteFile(testFile, []byte("content"), 0644)
+	_ = os.WriteFile(testFile, []byte("content"), 0644)
 
 	c := &GitLabClient{
 		config:    &config.GitLabConfig{},
@@ -423,8 +423,8 @@ func TestGitLabClient_SetAuthHeader(t *testing.T) {
 }
 
 func TestNewGitLabClient(t *testing.T) {
-	os.Setenv("TEST_GL_TOKEN", "gitlab-token-123")
-	defer os.Unsetenv("TEST_GL_TOKEN")
+	_ = os.Setenv("TEST_GL_TOKEN", "gitlab-token-123")
+	defer func() { _ = os.Unsetenv("TEST_GL_TOKEN") }()
 
 	cfg := &config.GitLabConfig{
 		TokenRef: "TEST_GL_TOKEN",
@@ -463,7 +463,7 @@ func TestGitLabClient_HandleErrorResponse(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(tt.statusCode)
-				w.Write([]byte("error body"))
+				_, _ = w.Write([]byte("error body"))
 			}))
 			defer server.Close()
 
@@ -473,7 +473,7 @@ func TestGitLabClient_HandleErrorResponse(t *testing.T) {
 
 			resp, _ := c.doRequest("GET", server.URL+"/test", nil)
 			err := c.handleErrorResponse(resp, "test")
-			resp.Body.Close()
+			_ = resp.Body.Close()
 
 			if err == nil {
 				t.Fatal("expected error")
@@ -488,7 +488,7 @@ func TestGitLabClient_HandleErrorResponse(t *testing.T) {
 func TestGitLabClient_CreateRelease_Error(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnprocessableEntity)
-		w.Write([]byte(`{"message":"422 Unprocessable"}`))
+		_, _ = w.Write([]byte(`{"message":"422 Unprocessable"}`))
 	}))
 	defer server.Close()
 
@@ -511,7 +511,7 @@ func TestGitLabClient_CreateRelease_Error(t *testing.T) {
 func TestGitLabClient_PostComment_Error(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
-		w.Write([]byte(`{"message":"forbidden"}`))
+		_, _ = w.Write([]byte(`{"message":"forbidden"}`))
 	}))
 	defer server.Close()
 
@@ -532,7 +532,7 @@ func TestGitLabClient_PostComment_Error(t *testing.T) {
 }
 
 func TestNewGitLabClient_MissingToken(t *testing.T) {
-	os.Unsetenv("MISSING_GL_TOKEN")
+	_ = os.Unsetenv("MISSING_GL_TOKEN")
 
 	cfg := &config.GitLabConfig{
 		TokenRef: "MISSING_GL_TOKEN",

@@ -414,9 +414,9 @@ func formatLintError(failed []changelog.LintResult, total int) error {
 	var b strings.Builder
 	b.WriteString("Commit lint failed:\n")
 	for _, f := range failed {
-		b.WriteString(fmt.Sprintf("  %-10s %-40s ← %s\n", f.Hash, f.Subject, f.Reason))
+		fmt.Fprintf(&b, "  %-10s %-40s ← %s\n", f.Hash, f.Subject, f.Reason)
 	}
-	b.WriteString(fmt.Sprintf("\n  %d of %d commits are not conventional.\n", len(failed), total))
+	fmt.Fprintf(&b, "\n  %d of %d commits are not conventional.\n", len(failed), total)
 	b.WriteString("  Use --ignore-commit-lint to bypass.\n")
 	return fmt.Errorf("%s", b.String())
 }

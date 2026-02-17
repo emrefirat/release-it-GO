@@ -61,14 +61,14 @@ func (l *Logger) Info(msg string, args ...any) {
 // Always visible. Use for banner, version info, skip messages, etc.
 func (l *Logger) Print(msg string, args ...any) {
 	formatted := fmt.Sprintf(msg, args...)
-	fmt.Fprintln(l.output, formatted)
+	_, _ = fmt.Fprintln(l.output, formatted)
 }
 
 // Verbose logs a message visible only with -V flag (verbose >= 1).
 // Outputs in indented dim format: "    ↳ message"
 func (l *Logger) Verbose(msg string, args ...any) {
 	if l.verbose >= VerboseLevel {
-		fmt.Fprintf(l.output, "    ↳ %s\n", fmt.Sprintf(msg, args...))
+		_, _ = fmt.Fprintf(l.output, "    ↳ %s\n", fmt.Sprintf(msg, args...))
 	}
 }
 
