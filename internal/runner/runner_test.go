@@ -385,7 +385,7 @@ func TestRunner_BumpFiles_NoOut(t *testing.T) {
 func TestRunner_BumpFiles_DryRun(t *testing.T) {
 	dir := t.TempDir()
 	file := dir + "/VERSION"
-	os.WriteFile(file, []byte("1.0.0\n"), 0644)
+	_ = os.WriteFile(file, []byte("1.0.0\n"), 0644)
 
 	cfg := &config.Config{
 		CI:     true,
@@ -415,7 +415,7 @@ func TestRunner_BumpFiles_DryRun(t *testing.T) {
 func TestRunner_BumpFiles_Success(t *testing.T) {
 	dir := t.TempDir()
 	file := dir + "/VERSION"
-	os.WriteFile(file, []byte("1.0.0\n"), 0644)
+	_ = os.WriteFile(file, []byte("1.0.0\n"), 0644)
 
 	cfg := &config.Config{
 		CI: true,
@@ -1950,8 +1950,8 @@ func TestRunner_BumpFiles_MultipleFiles(t *testing.T) {
 	dir := t.TempDir()
 	file1 := dir + "/VERSION"
 	file2 := dir + "/VERSION2"
-	os.WriteFile(file1, []byte("1.0.0\n"), 0644)
-	os.WriteFile(file2, []byte("1.0.0\n"), 0644)
+	_ = os.WriteFile(file1, []byte("1.0.0\n"), 0644)
+	_ = os.WriteFile(file2, []byte("1.0.0\n"), 0644)
 
 	cfg := &config.Config{
 		CI: true,
@@ -2574,7 +2574,7 @@ func TestRunner_RunNoIncrement_NoTags(t *testing.T) {
 func TestRunner_DetermineVersion_WithBumperInput(t *testing.T) {
 	dir := t.TempDir()
 	versionFile := dir + "/VERSION"
-	os.WriteFile(versionFile, []byte("5.0.0\n"), 0644)
+	_ = os.WriteFile(versionFile, []byte("5.0.0\n"), 0644)
 
 	cfg := &config.Config{
 		CI:        true,

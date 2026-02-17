@@ -22,9 +22,9 @@ func RenderConventional(commits []*Commit, version string, prevVersion string, r
 		compareURL := fmt.Sprintf("https://%s/%s/%s/compare/%s...%s",
 			repoInfo.Host, repoInfo.Owner, repoInfo.Repository,
 			prevVersion, version)
-		sb.WriteString(fmt.Sprintf("## [%s](%s) (%s)\n", version, compareURL, date))
+		fmt.Fprintf(&sb, "## [%s](%s) (%s)\n", version, compareURL, date)
 	} else {
-		sb.WriteString(fmt.Sprintf("## %s (%s)\n", version, date))
+		fmt.Fprintf(&sb, "## %s (%s)\n", version, date)
 	}
 
 	// Group commits by section
@@ -38,7 +38,7 @@ func RenderConventional(commits []*Commit, version string, prevVersion string, r
 			continue
 		}
 
-		sb.WriteString(fmt.Sprintf("\n### %s\n\n", sectionName))
+		fmt.Fprintf(&sb, "\n### %s\n\n", sectionName)
 		for _, c := range sectionCommits {
 			sb.WriteString(formatConventionalEntry(c, repoInfo))
 		}
@@ -51,9 +51,9 @@ func RenderConventional(commits []*Commit, version string, prevVersion string, r
 		for _, c := range breakingCommits {
 			msg := c.BreakingMessage
 			if c.Scope != "" {
-				sb.WriteString(fmt.Sprintf("* **%s:** %s\n", c.Scope, msg))
+				fmt.Fprintf(&sb, "* **%s:** %s\n", c.Scope, msg)
 			} else {
-				sb.WriteString(fmt.Sprintf("* %s\n", msg))
+				fmt.Fprintf(&sb, "* %s\n", msg)
 			}
 		}
 	}

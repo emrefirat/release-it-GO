@@ -46,7 +46,7 @@ func TestBumper_ReadVersion_NoIn(t *testing.T) {
 func TestBumper_ReadVersion_JSON(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "package.json")
-	os.WriteFile(file, []byte(`{"version": "1.2.3"}`), 0644)
+	_ = os.WriteFile(file, []byte(`{"version": "1.2.3"}`), 0644)
 
 	cfg := &config.BumperConfig{
 		Enabled: true,
@@ -67,7 +67,7 @@ func TestBumper_ReadVersion_JSON(t *testing.T) {
 func TestBumper_WriteVersion_DryRun(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "version.txt")
-	os.WriteFile(file, []byte("1.0.0\n"), 0644)
+	_ = os.WriteFile(file, []byte("1.0.0\n"), 0644)
 
 	cfg := &config.BumperConfig{
 		Enabled: true,
@@ -93,7 +93,7 @@ func TestBumper_WriteVersion_DryRun(t *testing.T) {
 func TestBumper_WriteVersion_Text(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "VERSION")
-	os.WriteFile(file, []byte("1.0.0\n"), 0644)
+	_ = os.WriteFile(file, []byte("1.0.0\n"), 0644)
 
 	cfg := &config.BumperConfig{
 		Enabled: true,
@@ -119,8 +119,8 @@ func TestBumper_WriteVersion_MultipleFiles(t *testing.T) {
 	dir := t.TempDir()
 	file1 := filepath.Join(dir, "VERSION")
 	file2 := filepath.Join(dir, "version.txt")
-	os.WriteFile(file1, []byte("1.0.0\n"), 0644)
-	os.WriteFile(file2, []byte("1.0.0\n"), 0644)
+	_ = os.WriteFile(file1, []byte("1.0.0\n"), 0644)
+	_ = os.WriteFile(file2, []byte("1.0.0\n"), 0644)
 
 	cfg := &config.BumperConfig{
 		Enabled: true,
@@ -151,8 +151,8 @@ func TestBumper_WriteVersion_Glob(t *testing.T) {
 	dir := t.TempDir()
 	file1 := filepath.Join(dir, "a.txt")
 	file2 := filepath.Join(dir, "b.txt")
-	os.WriteFile(file1, []byte("1.0.0\n"), 0644)
-	os.WriteFile(file2, []byte("1.0.0\n"), 0644)
+	_ = os.WriteFile(file1, []byte("1.0.0\n"), 0644)
+	_ = os.WriteFile(file2, []byte("1.0.0\n"), 0644)
 
 	cfg := &config.BumperConfig{
 		Enabled: true,
@@ -181,7 +181,7 @@ func TestBumper_WriteVersion_Glob(t *testing.T) {
 func TestBumper_WriteVersion_Prefix(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "VERSION")
-	os.WriteFile(file, []byte("^1.0.0\n"), 0644)
+	_ = os.WriteFile(file, []byte("^1.0.0\n"), 0644)
 
 	cfg := &config.BumperConfig{
 		Enabled: true,
