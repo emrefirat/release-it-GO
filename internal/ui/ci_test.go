@@ -10,7 +10,7 @@ import (
 func TestIsCI_NoEnvVars(t *testing.T) {
 	// Clear all CI env vars
 	for _, env := range ciEnvVars {
-		os.Unsetenv(env)
+		_ = os.Unsetenv(env)
 	}
 
 	result := IsCI()
@@ -41,11 +41,11 @@ func TestIsCI_WithCIVar(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Clear all CI env vars first
 			for _, env := range ciEnvVars {
-				os.Unsetenv(env)
+				_ = os.Unsetenv(env)
 			}
 
-			os.Setenv(tt.envVar, "true")
-			defer os.Unsetenv(tt.envVar)
+			_ = os.Setenv(tt.envVar, "true")
+			defer func() { _ = os.Unsetenv(tt.envVar) }()
 
 			if !IsCI() {
 				t.Errorf("expected IsCI() to return true when %s is set", tt.envVar)
@@ -56,7 +56,7 @@ func TestIsCI_WithCIVar(t *testing.T) {
 
 func TestDetectCIProvider_NoProvider(t *testing.T) {
 	for env := range ciProviders {
-		os.Unsetenv(env)
+		_ = os.Unsetenv(env)
 	}
 
 	provider := DetectCIProvider()
@@ -84,11 +84,11 @@ func TestDetectCIProvider_WithProvider(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			for env := range ciProviders {
-				os.Unsetenv(env)
+				_ = os.Unsetenv(env)
 			}
 
-			os.Setenv(tt.envVar, "true")
-			defer os.Unsetenv(tt.envVar)
+			_ = os.Setenv(tt.envVar, "true")
+			defer func() { _ = os.Unsetenv(tt.envVar) }()
 
 			provider := DetectCIProvider()
 			if provider != tt.expected {
