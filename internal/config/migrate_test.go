@@ -9,8 +9,8 @@ import (
 func TestDetectLegacyConfig_Found(t *testing.T) {
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	defer os.Chdir(origDir)
-	os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+	_ = os.Chdir(dir)
 
 	if err := os.WriteFile(LegacyConfigFile, []byte(`{}`), 0644); err != nil {
 		t.Fatal(err)
@@ -28,8 +28,8 @@ func TestDetectLegacyConfig_Found(t *testing.T) {
 func TestDetectLegacyConfig_NotFound(t *testing.T) {
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	defer os.Chdir(origDir)
-	os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+	_ = os.Chdir(dir)
 
 	_, found := DetectLegacyConfig()
 	if found {
@@ -40,8 +40,8 @@ func TestDetectLegacyConfig_NotFound(t *testing.T) {
 func TestDetectNativeConfig_Found(t *testing.T) {
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	defer os.Chdir(origDir)
-	os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+	_ = os.Chdir(dir)
 
 	if err := os.WriteFile(NativeConfigFile, []byte(`{}`), 0644); err != nil {
 		t.Fatal(err)
@@ -55,8 +55,8 @@ func TestDetectNativeConfig_Found(t *testing.T) {
 func TestDetectNativeConfig_NotFound(t *testing.T) {
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	defer os.Chdir(origDir)
-	os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+	_ = os.Chdir(dir)
 
 	if DetectNativeConfig() {
 		t.Error("expected native config not to be found")
@@ -66,8 +66,8 @@ func TestDetectNativeConfig_NotFound(t *testing.T) {
 func TestMigrateLegacyConfig_Basic(t *testing.T) {
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	defer os.Chdir(origDir)
-	os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+	_ = os.Chdir(dir)
 
 	// Create legacy config with npm-specific fields
 	legacyContent := `{
@@ -135,8 +135,8 @@ func TestMigrateLegacyConfig_Basic(t *testing.T) {
 func TestMigrateLegacyConfig_NonexistentFile(t *testing.T) {
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	defer os.Chdir(origDir)
-	os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+	_ = os.Chdir(dir)
 
 	err := MigrateLegacyConfig("nonexistent.json")
 	if err == nil {
@@ -147,8 +147,8 @@ func TestMigrateLegacyConfig_NonexistentFile(t *testing.T) {
 func TestMigrateLegacyConfig_InvalidJSON(t *testing.T) {
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	defer os.Chdir(origDir)
-	os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+	_ = os.Chdir(dir)
 
 	if err := os.WriteFile(LegacyConfigFile, []byte("{invalid"), 0644); err != nil {
 		t.Fatal(err)

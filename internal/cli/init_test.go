@@ -53,8 +53,8 @@ func (m *mockPrompter) Select(question string, options []string, defaultIndex in
 func TestRunInit_WizardCreatesConfig(t *testing.T) {
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	defer os.Chdir(origDir)
-	os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+	_ = os.Chdir(dir)
 
 	p := &mockPrompter{
 		selectAnswers:  []int{0, 0, 0},                                                 // JSON, GitHub, Conventional Changelog
@@ -87,8 +87,8 @@ func TestRunInit_WizardCreatesConfig(t *testing.T) {
 func TestRunInit_WizardWritesExplicitFields(t *testing.T) {
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	defer os.Chdir(origDir)
-	os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+	_ = os.Chdir(dir)
 
 	// User picks GitHub + Conventional Changelog + all defaults
 	// Even though commit=true, tag=true, push=true, infile="CHANGELOG.md" are defaults,
@@ -148,8 +148,8 @@ func TestRunInit_WizardWritesExplicitFields(t *testing.T) {
 func TestRunInit_GitLabPlatform(t *testing.T) {
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	defer os.Chdir(origDir)
-	os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+	_ = os.Chdir(dir)
 
 	p := &mockPrompter{
 		selectAnswers:  []int{0, 1, 1},           // JSON, GitLab, Keep a Changelog
@@ -177,8 +177,8 @@ func TestRunInit_GitLabPlatform(t *testing.T) {
 func TestRunInit_GitTagOnly_NoChangelog(t *testing.T) {
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	defer os.Chdir(origDir)
-	os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+	_ = os.Chdir(dir)
 
 	p := &mockPrompter{
 		selectAnswers:  []int{0, 2, 2},       // JSON, Git tag only, No changelog
@@ -218,8 +218,8 @@ func TestRunInit_GitTagOnly_NoChangelog(t *testing.T) {
 func TestRunInit_CommitTagEnabled_PushDisabled(t *testing.T) {
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	defer os.Chdir(origDir)
-	os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+	_ = os.Chdir(dir)
 
 	p := &mockPrompter{
 		selectAnswers:  []int{0, 2, 0},            // JSON, Git tag only, Conventional Changelog
@@ -256,8 +256,8 @@ func TestRunInit_CommitTagEnabled_PushDisabled(t *testing.T) {
 func TestRunInit_MigrateLegacy(t *testing.T) {
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	defer os.Chdir(origDir)
-	os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+	_ = os.Chdir(dir)
 
 	// Create legacy config
 	legacy := `{"github": {"release": true}, "git": {"tagName": "v${version}"}}`
@@ -287,8 +287,8 @@ func TestRunInit_MigrateLegacy(t *testing.T) {
 func TestRunInit_ExistingNativeConfig_Abort(t *testing.T) {
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	defer os.Chdir(origDir)
-	os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+	_ = os.Chdir(dir)
 
 	// Create existing native config
 	if err := os.WriteFile(config.NativeConfigFile, []byte(`{}`), 0644); err != nil {
@@ -314,8 +314,8 @@ func TestRunInit_ExistingNativeConfig_Abort(t *testing.T) {
 func TestRunInit_ExistingNativeConfig_Overwrite(t *testing.T) {
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	defer os.Chdir(origDir)
-	os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+	_ = os.Chdir(dir)
 
 	// Create existing native config
 	if err := os.WriteFile(config.NativeConfigFile, []byte(`{}`), 0644); err != nil {
@@ -342,8 +342,8 @@ func TestRunInit_ExistingNativeConfig_Overwrite(t *testing.T) {
 func TestRunInit_FormatSwitch_RenamesOldConfig(t *testing.T) {
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	defer os.Chdir(origDir)
-	os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+	_ = os.Chdir(dir)
 
 	// Create existing JSON config
 	if err := os.WriteFile(config.NativeConfigFile, []byte(`{}`), 0644); err != nil {
@@ -386,8 +386,8 @@ func TestRunInit_FormatSwitch_RenamesOldConfig(t *testing.T) {
 func TestRunInit_ChangelogEnabled_NoFile(t *testing.T) {
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	defer os.Chdir(origDir)
-	os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+	_ = os.Chdir(dir)
 
 	p := &mockPrompter{
 		selectAnswers:  []int{0, 0, 0},                                                 // JSON, GitHub, Conventional Changelog
@@ -415,8 +415,8 @@ func TestRunInit_ChangelogEnabled_NoFile(t *testing.T) {
 func TestRunInit_FullExample(t *testing.T) {
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	defer os.Chdir(origDir)
-	os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+	_ = os.Chdir(dir)
 
 	if err := runInitFullExample(); err != nil {
 		t.Fatalf("runInitFullExample failed: %v", err)
@@ -481,8 +481,8 @@ func stringContains(s, substr string) bool {
 func TestRunInit_YAMLFormat(t *testing.T) {
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	defer os.Chdir(origDir)
-	os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+	_ = os.Chdir(dir)
 
 	p := &mockPrompter{
 		selectAnswers:  []int{1, 0, 0},                                                 // YAML, GitHub, Conventional Changelog

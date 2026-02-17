@@ -11,7 +11,7 @@ func TestResolveAssets(t *testing.T) {
 
 	// Create test files
 	for _, name := range []string{"app.zip", "app.tar.gz", "readme.md"} {
-		os.WriteFile(filepath.Join(tmpDir, name), []byte("test"), 0644)
+		_ = os.WriteFile(filepath.Join(tmpDir, name), []byte("test"), 0644)
 	}
 
 	t.Run("glob match", func(t *testing.T) {

@@ -1,10 +1,7 @@
 package integration
 
 import (
-	"encoding/json"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -107,89 +104,3 @@ func writeFile(t *testing.T, path string, content string) {
 	}
 }
 
-// mockGitHubServer creates a mock GitHub API server that records requests.
-func mockGitHubServer(t *testing.T) (*httptest.Server, *requestRecorder) {
-	t.Helper()
-	recorder := &requestRecorder{}
-
-	mux := http.NewServeMux()
-
-	// Create release endpoint
-	mux.HandleFunc("/repos/", func(w http.ResponseWriter, r *http.Request) {
-		recorder.record(r)
-
-		if strings.HasSuffix(r.URL.Path, "/releases") && r.Method == "POST" {
-			w.WriteHeader(http.StatusCreated)
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"id":         1,
-				"html_url":   "https://github.com/test/repo/releases/v1.0.0",
-				"upload_url": "https://uploads.github.com/repos/test/repo/releases/1/assets{?name,label}",
-			})
-			return
-		}
-
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]interface{}{})
-	})
-
-	server := httptest.NewServer(mux)
-	return server, recorder
-}
-
-// mockGitLabServer creates a mock GitLab API server.
-func mockGitLabServer(t *testing.T) (*httptest.Server, *requestRecorder) {
-	t.Helper()
-	recorder := &requestRecorder{}
-
-	mux := http.NewServeMux()
-
-	// Create release endpoint
-	mux.HandleFunc("/api/v4/projects/", func(w http.ResponseWriter, r *http.Request) {
-		recorder.record(r)
-
-		if strings.Contains(r.URL.Path, "/releases") && r.Method == "POST" {
-			w.WriteHeader(http.StatusCreated)
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"tag_name": "v1.0.0",
-				"_links": map[string]interface{}{
-					"self": "https://gitlab.com/test/repo/-/releases/v1.0.0",
-				},
-			})
-			return
-		}
-
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]interface{}{})
-	})
-
-	server := httptest.NewServer(mux)
-	return server, recorder
-}
-
-// requestRecorder records HTTP requests for later inspection.
-type requestRecorder struct {
-	requests []recordedRequest
-}
-
-type recordedRequest struct {
-	Method string
-	Path   string
-	Body   string
-}
-
-func (r *requestRecorder) record(req *http.Request) {
-	rec := recordedRequest{
-		Method: req.Method,
-		Path:   req.URL.Path,
-	}
-	r.requests = append(r.requests, rec)
-}
-
-func (r *requestRecorder) hasRequest(method, pathContains string) bool {
-	for _, req := range r.requests {
-		if req.Method == method && strings.Contains(req.Path, pathContains) {
-			return true
-		}
-	}
-	return false
-}

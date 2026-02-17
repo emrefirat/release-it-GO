@@ -48,10 +48,10 @@ func TestGetToken(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.tokenRef != "" {
 				if tt.envValue != "" {
-					os.Setenv(tt.tokenRef, tt.envValue)
-					defer os.Unsetenv(tt.tokenRef)
+					_ = os.Setenv(tt.tokenRef, tt.envValue)
+					defer func() { _ = os.Unsetenv(tt.tokenRef) }()
 				} else {
-					os.Unsetenv(tt.tokenRef)
+					_ = os.Unsetenv(tt.tokenRef)
 				}
 			}
 

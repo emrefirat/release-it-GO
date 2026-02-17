@@ -9,20 +9,6 @@ import (
 	applog "release-it-go/internal/log"
 )
 
-// mockExecutor creates a command executor that returns predefined responses.
-func mockExecutor(responses map[string]struct {
-	output string
-	err    error
-}) func(string, ...string) (string, error) {
-	return func(name string, args ...string) (string, error) {
-		key := name + " " + strings.Join(args, " ")
-		if resp, ok := responses[key]; ok {
-			return resp.output, resp.err
-		}
-		return "", fmt.Errorf("unexpected command: %s", key)
-	}
-}
-
 // newTestGit creates a Git instance for testing with default config.
 func newTestGit(dryRun bool) *Git {
 	cfg := config.DefaultConfig()

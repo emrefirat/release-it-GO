@@ -15,7 +15,7 @@ func RenderKeepAChangelog(commits []*Commit, version string, date string) string
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("## [%s] - %s\n", version, date))
+	fmt.Fprintf(&sb, "## [%s] - %s\n", version, date)
 
 	// Group commits by keep-a-changelog sections
 	sections := groupBySection(commits, commitTypeKeepAChangelog)
@@ -28,7 +28,7 @@ func RenderKeepAChangelog(commits []*Commit, version string, date string) string
 			continue
 		}
 
-		sb.WriteString(fmt.Sprintf("\n### %s\n\n", sectionName))
+		fmt.Fprintf(&sb, "\n### %s\n\n", sectionName)
 
 		// Sort by description
 		sort.Slice(sectionCommits, func(i, j int) bool {
@@ -37,9 +37,9 @@ func RenderKeepAChangelog(commits []*Commit, version string, date string) string
 
 		for _, c := range sectionCommits {
 			if c.Scope != "" {
-				sb.WriteString(fmt.Sprintf("- %s (%s)\n", c.Description, c.Scope))
+				fmt.Fprintf(&sb, "- %s (%s)\n", c.Description, c.Scope)
 			} else {
-				sb.WriteString(fmt.Sprintf("- %s\n", c.Description))
+				fmt.Fprintf(&sb, "- %s\n", c.Description)
 			}
 		}
 	}

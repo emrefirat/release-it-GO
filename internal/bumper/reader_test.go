@@ -11,7 +11,7 @@ import (
 func TestReadVersionFromFile_JSON(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "package.json")
-	os.WriteFile(file, []byte(`{"version": "1.2.3"}`), 0644)
+	_ = os.WriteFile(file, []byte(`{"version": "1.2.3"}`), 0644)
 
 	v, err := ReadVersionFromFile(config.BumperFile{File: file, Path: "version"})
 	if err != nil {
@@ -25,7 +25,7 @@ func TestReadVersionFromFile_JSON(t *testing.T) {
 func TestReadVersionFromFile_JSON_Nested(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "config.json")
-	os.WriteFile(file, []byte(`{"tool": {"poetry": {"version": "2.0.0"}}}`), 0644)
+	_ = os.WriteFile(file, []byte(`{"tool": {"poetry": {"version": "2.0.0"}}}`), 0644)
 
 	v, err := ReadVersionFromFile(config.BumperFile{File: file, Path: "tool.poetry.version"})
 	if err != nil {
@@ -39,7 +39,7 @@ func TestReadVersionFromFile_JSON_Nested(t *testing.T) {
 func TestReadVersionFromFile_YAML(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "chart.yaml")
-	os.WriteFile(file, []byte("version: 3.1.0\nname: myapp\n"), 0644)
+	_ = os.WriteFile(file, []byte("version: 3.1.0\nname: myapp\n"), 0644)
 
 	v, err := ReadVersionFromFile(config.BumperFile{File: file, Path: "version"})
 	if err != nil {
@@ -54,7 +54,7 @@ func TestReadVersionFromFile_TOML(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "pyproject.toml")
 	content := "[tool]\n[tool.poetry]\nversion = \"4.5.6\"\n"
-	os.WriteFile(file, []byte(content), 0644)
+	_ = os.WriteFile(file, []byte(content), 0644)
 
 	v, err := ReadVersionFromFile(config.BumperFile{File: file, Path: "tool.poetry.version"})
 	if err != nil {
@@ -69,7 +69,7 @@ func TestReadVersionFromFile_INI(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "setup.cfg")
 	content := "[metadata]\nname = mypackage\nversion = 1.0.0\n"
-	os.WriteFile(file, []byte(content), 0644)
+	_ = os.WriteFile(file, []byte(content), 0644)
 
 	v, err := ReadVersionFromFile(config.BumperFile{File: file, Path: "[metadata].version"})
 	if err != nil {
@@ -84,7 +84,7 @@ func TestReadVersionFromFile_INI_NoSection(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "config.ini")
 	content := "version = 2.0.0\nname = test\n"
-	os.WriteFile(file, []byte(content), 0644)
+	_ = os.WriteFile(file, []byte(content), 0644)
 
 	v, err := ReadVersionFromFile(config.BumperFile{File: file, Path: "version"})
 	if err != nil {
@@ -98,7 +98,7 @@ func TestReadVersionFromFile_INI_NoSection(t *testing.T) {
 func TestReadVersionFromFile_Text(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "VERSION")
-	os.WriteFile(file, []byte("5.0.0\n"), 0644)
+	_ = os.WriteFile(file, []byte("5.0.0\n"), 0644)
 
 	v, err := ReadVersionFromFile(config.BumperFile{File: file})
 	if err != nil {
@@ -112,7 +112,7 @@ func TestReadVersionFromFile_Text(t *testing.T) {
 func TestReadVersionFromFile_ExplicitType(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "custom.dat")
-	os.WriteFile(file, []byte(`{"version": "9.9.9"}`), 0644)
+	_ = os.WriteFile(file, []byte(`{"version": "9.9.9"}`), 0644)
 
 	v, err := ReadVersionFromFile(config.BumperFile{File: file, Path: "version", Type: "json"})
 	if err != nil {
@@ -133,7 +133,7 @@ func TestReadVersionFromFile_FileNotFound(t *testing.T) {
 func TestReadVersionFromFile_InvalidJSON(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "bad.json")
-	os.WriteFile(file, []byte(`{invalid json}`), 0644)
+	_ = os.WriteFile(file, []byte(`{invalid json}`), 0644)
 
 	_, err := ReadVersionFromFile(config.BumperFile{File: file, Path: "version"})
 	if err == nil {
@@ -144,7 +144,7 @@ func TestReadVersionFromFile_InvalidJSON(t *testing.T) {
 func TestReadVersionFromFile_MissingKey(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "package.json")
-	os.WriteFile(file, []byte(`{"name": "test"}`), 0644)
+	_ = os.WriteFile(file, []byte(`{"name": "test"}`), 0644)
 
 	_, err := ReadVersionFromFile(config.BumperFile{File: file, Path: "version"})
 	if err == nil {
