@@ -1,5 +1,18 @@
 # Kod Kalitesi Kurallari
 
+## Context7 ile Dokumantasyon Kontrolu
+
+Kod yazarken veya kutuphane/API kullanirken **Context7 MCP aracini kullan**:
+
+1. Oncelikle `resolve-library-id` ile kutuphane ID'sini bul
+2. Ardindan `query-docs` ile guncel dokumantasyonu sorgula
+3. Tahmine dayali kod yazma — her zaman guncel API'yi dogrula
+
+Ozellikle su durumlarda Context7 kullan:
+- Yeni dependency eklerken (semver, cobra, viper, bubbletea, lipgloss)
+- Mevcut dependency'nin API'sini kullanirken emin degilsen
+- Bilmedigin bir Go stdlib paketi kullanirken
+
 ## Naming Conventions
 
 | Tur | Format | Ornek |
