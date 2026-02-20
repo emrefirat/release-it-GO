@@ -448,6 +448,18 @@ func (r *Runner) determineVersion() error {
 		latestTag = bumperVersion
 	}
 
+	// Branch-aware pre-release: resolve base tag from merged tags only
+	preReleaseID := r.ctx.Config.PreReleaseID
+	if preReleaseID != "" {
+		resolved, resolveErr := r.resolvePreReleaseBaseTag(preReleaseID)
+		if resolveErr != nil {
+			r.ctx.Logger.Verbose("Could not resolve branch-aware pre-release tag: %v", resolveErr)
+		} else if resolved != "" {
+			latestTag = resolved
+			r.ctx.Logger.Verbose("Branch-aware pre-release base tag: %s", resolved)
+		}
+	}
+
 	latestVersion := latestTag
 	parsed, parseErr := version.ParseVersion(latestTag)
 	if parseErr == nil {
@@ -542,6 +554,64 @@ func (r *Runner) determineSemVer(latestVersion string) error {
 	r.ctx.TagName = renderTagName(r.ctx.Config.Git.TagName, newVersionStr)
 	r.ctx.Logger.Print("  %s Version: %s → %s", ui.IconVersion, latestVersion, newVersionStr)
 	return nil
+}
+
+// resolvePreReleaseBaseTag determines the correct base tag for pre-release versioning
+// by looking only at tags merged into the current HEAD. This prevents cross-branch
+// tag pollution (e.g., beta tags from another branch affecting the "deneme" series).
+//
+// Algorithm:
+//  1. Find the latest pre-release tag merged into HEAD with matching preReleaseID
+//  2. Find the latest stable (non-pre-release) tag merged into HEAD
+//  3. If pre-release tag exists and its base version >= stable → continue series
+//  4. Otherwise → return stable tag (or "") to start a new series
+func (r *Runner) resolvePreReleaseBaseTag(preReleaseID string) (string, error) {
+	preTag, err := r.ctx.Git.GetLatestPreReleaseTagMerged(preReleaseID)
+	if err != nil {
+		return "", fmt.Errorf("getting merged pre-release tag: %w", err)
+	}
+
+	stableTag, err := r.ctx.Git.GetLatestStableTagMerged()
+	if err != nil {
+		return "", fmt.Errorf("getting merged stable tag: %w", err)
+	}
+
+	// No pre-release tag found for this ID → new series from stable or default
+	if preTag == "" {
+		return stableTag, nil
+	}
+
+	// Pre-release tag found, check if it's still valid
+	// (its base version should be >= the latest stable version)
+	if stableTag == "" {
+		// No stable tag, pre-release tag is the base
+		return preTag, nil
+	}
+
+	parsedPre, err := version.ParseVersion(preTag)
+	if err != nil {
+		return stableTag, nil
+	}
+
+	parsedStable, err := version.ParseVersion(stableTag)
+	if err != nil {
+		return preTag, nil
+	}
+
+	// Compare base versions: strip pre-release from pre-release tag
+	preBase := fmt.Sprintf("%d.%d.%d", parsedPre.Major(), parsedPre.Minor(), parsedPre.Patch())
+	preBaseParsed, err := version.ParseVersion(preBase)
+	if err != nil {
+		return stableTag, nil
+	}
+
+	// If pre-release base >= stable → continue series
+	if preBaseParsed.Compare(parsedStable) >= 0 {
+		return preTag, nil
+	}
+
+	// Pre-release base < stable → new series
+	return stableTag, nil
 }
 
 // bumpFiles writes the new version to configured bumper output files.

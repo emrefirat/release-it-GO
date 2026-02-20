@@ -600,6 +600,150 @@ func TestIntegration_NoIncrement(t *testing.T) {
 	assertTagNotExists(t, dir, "v1.5.1")
 }
 
+func TestIntegration_PreRelease_BranchAware_ContinueSeries(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	_ = os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+
+	// Setup: main branch with v1.2.4
+	initGitRepo(t, dir)
+	createTag(t, dir, "v1.2.4")
+
+	// Create deneme branch and start pre-release series
+	runGit(t, dir, "checkout", "-b", "deneme")
+	createCommits(t, dir, []string{"feat: deneme feature 1"})
+	createTag(t, dir, "v1.2.5-deneme.0")
+
+	// Add another commit - this should continue the series
+	createCommits(t, dir, []string{"feat: deneme feature 2"})
+
+	cfg := newTestConfig(dir)
+	cfg.PreReleaseID = "deneme"
+	cfg.Increment = "patch"
+
+	r := runner.NewRunner(cfg)
+	err := r.Run()
+	if err != nil {
+		t.Fatalf("Run() failed: %v", err)
+	}
+
+	// Should continue series: v1.2.5-deneme.0 → v1.2.5-deneme.1
+	assertTagExists(t, dir, "v1.2.5-deneme.1")
+}
+
+func TestIntegration_PreRelease_BranchAware_NewSeries(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	_ = os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+
+	// Setup: main branch with v1.2.4, then advance to v2.0.0
+	initGitRepo(t, dir)
+	createTag(t, dir, "v1.2.4")
+	createCommits(t, dir, []string{"feat!: breaking change"})
+	createTag(t, dir, "v2.0.0")
+
+	// Create new deneme branch from v2.0.0
+	// (old deneme tags like v1.2.5-deneme.0 are NOT reachable from this branch)
+	runGit(t, dir, "checkout", "-b", "deneme")
+	createCommits(t, dir, []string{"feat: new deneme feature"})
+
+	cfg := newTestConfig(dir)
+	cfg.PreReleaseID = "deneme"
+	cfg.Increment = "patch"
+
+	r := runner.NewRunner(cfg)
+	err := r.Run()
+	if err != nil {
+		t.Fatalf("Run() failed: %v", err)
+	}
+
+	// Should start new series from v2.0.0: v2.0.1-deneme.0
+	assertTagExists(t, dir, "v2.0.1-deneme.0")
+}
+
+func TestIntegration_PreRelease_BranchAware_MasterAdvanced(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	_ = os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+
+	// Setup: main branch with v1.2.4
+	initGitRepo(t, dir)
+	defaultBranch := strings.TrimSpace(runGit(t, dir, "rev-parse", "--abbrev-ref", "HEAD"))
+	createTag(t, dir, "v1.2.4")
+
+	// Create deneme branch and start pre-release series
+	runGit(t, dir, "checkout", "-b", "deneme")
+	createCommits(t, dir, []string{"feat: deneme feature"})
+	createTag(t, dir, "v1.2.5-deneme.0")
+
+	// Go back to default branch and advance it (deneme branch doesn't see these)
+	runGit(t, dir, "checkout", defaultBranch)
+	createCommits(t, dir, []string{"feat: main feature"})
+	createTag(t, dir, "v1.3.0")
+	createCommits(t, dir, []string{"feat!: breaking"})
+	createTag(t, dir, "v2.0.0")
+
+	// Back to deneme - default branch advanced but deneme.0 is still reachable
+	runGit(t, dir, "checkout", "deneme")
+	createCommits(t, dir, []string{"feat: another deneme feature"})
+
+	cfg := newTestConfig(dir)
+	cfg.PreReleaseID = "deneme"
+	cfg.Increment = "patch"
+
+	r := runner.NewRunner(cfg)
+	err := r.Run()
+	if err != nil {
+		t.Fatalf("Run() failed: %v", err)
+	}
+
+	// deneme.0 is reachable, base(1.2.5) >= stable(1.2.4) → continue series
+	assertTagExists(t, dir, "v1.2.5-deneme.1")
+}
+
+func TestIntegration_PreRelease_NoFlag_BehaviorUnchanged(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	_ = os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+
+	initGitRepo(t, dir)
+	createTag(t, dir, "v1.0.0")
+	createCommits(t, dir, []string{"feat: new feature"})
+
+	cfg := newTestConfig(dir)
+	cfg.Increment = "minor"
+	// No PreReleaseID set - standard behavior
+
+	r := runner.NewRunner(cfg)
+	err := r.Run()
+	if err != nil {
+		t.Fatalf("Run() failed: %v", err)
+	}
+
+	// Standard behavior: 1.0.0 → 1.1.0
+	assertTagExists(t, dir, "v1.1.0")
+}
+
 func TestIntegration_SequentialReleases(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
