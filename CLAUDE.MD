@@ -82,13 +82,21 @@ commandExecutor = func(name string, args ...string) (string, error) {
 | `Dockerfile` | Multi-stage build, non-root user, static binary |
 | `.github/workflows/` | CI (matrix test), build (GoReleaser), release (self-hosting) |
 
+## Zorunlu Uygulamalar
+
+1. **Context7 kullan**: Kod yazarken veya kutuphane kullanirken `resolve-library-id` + `query-docs` ile guncel dokumantasyonu kontrol et. Tahmine dayali kod yazma.
+2. **PROGRESS.md guncelle**: Her gelistirme oturumu sonunda yapilanlari, tamamlanan maddeleri ve bug'lari `PROGRESS.md`'ye yaz. Yeni faz eklenirse `docs/phase_N.md` de olustur.
+3. **Guvenlik taramasi yap**: Commit oncesi `make check` (govulncheck dahil) calistir. Guvenlik acigi suphesi varsa `gosec ./...` ile statik analiz yap.
+4. **Commit oncesi checklist**: `make check` = fmt + vet + lint + vuln + test + build. Basarisiz olursa commit atma.
+
 ## Kurallar
 
 Detayli kurallar `.claude/rules/` altinda modular dosyalarda:
 - `git-workflow.md` — Commit, branch, conventional commits
 - `testing.md` — Test zorunluluklari ve pattern'ler
 - `code-quality.md` — Go best practices, naming, error handling
-- `security.md` — Guvenlik kurallari
+- `security.md` — Guvenlik kurallari, gosec, govulncheck
 - `progress-tracking.md` — PROGRESS.md ve bug takibi
+- `best-practices.md` — Go best practices, dependency, concurrency, pipeline, Docker
 
 **Bu kurallar zorunludur.**

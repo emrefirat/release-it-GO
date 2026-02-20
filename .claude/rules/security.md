@@ -13,8 +13,29 @@
 
 - Input validation uygula
 - Token'lar icin environment variable kullan (`tokenRef` pattern)
-- Dependency'leri guncel tut (`make vuln` ile govulncheck)
+- Dependency'leri guncel tut
 - HTTPS URL'lerde credential stripping uygula
+
+## Guvenlik Araclari
+
+Commit oncesi `make check` calistirilmali (govulncheck dahil). Ek olarak:
+
+```bash
+# Dependency vulnerability taramasi (Makefile'da `make vuln`)
+govulncheck ./...
+
+# Statik guvenlik analizi - guvenlik suphesi veya yeni ozellik eklendiginde calistir
+gosec ./...
+
+# Genel statik analiz (Makefile'da `make lint`)
+golangci-lint run
+```
+
+### Ne Zaman gosec Kullanilmali
+- Yeni HTTP client, dosya islemleri veya exec.Command kullanan kod eklendiginde
+- External input isleme mantigi degistiginde
+- Review sirasinda guvenlik endisesi olustugunda
+- Release oncesi son kontrol olarak
 
 ## Projede Kullanilan Guvenlik Paternleri
 
@@ -30,6 +51,9 @@ Token'lar asla config'e yazilmaz. `tokenRef` ile env var adi belirtilir:
 
 ### Webhook URL Guvenligi
 Webhook URL'leri `urlRef` ile env var uzerinden alinir, config'e direkt yazilmaz.
+
+### Command Execution Guvenligi
+Git komutlari `exec.Command("git", args...)` ile calistirilir. Shell uzerinden (`sh -c`) gecilmez, bu command injection riskini onler.
 
 ### Docker Guvenligi
 - Non-root user (`releaser:1000`)
