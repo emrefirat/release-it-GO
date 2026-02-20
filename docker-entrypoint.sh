@@ -1,7 +1,14 @@
 #!/bin/sh
 set -e
 
-# Require git identity environment variables
+# Skip git identity check for info-only commands
+case "$1" in
+    version|help|completion|--help|-h|--version)
+        exec /usr/local/bin/release-it-go "$@"
+        ;;
+esac
+
+# Require git identity environment variables for release operations
 if [ -z "$GIT_USER_NAME" ]; then
     echo "ERROR: GIT_USER_NAME environment variable is required." >&2
     echo "  Usage: docker run -e GIT_USER_NAME=\"Your Name\" -e GIT_USER_EMAIL=\"you@example.com\" ..." >&2
