@@ -23,8 +23,9 @@
 | 12 | Docker Pre-flight Kontrolleri | Tamamlandi | 100% |
 | 13 | Webhook Notification (Slack + Teams) | Tamamlandi | 100% |
 | 14 | YAML Config Yazma + Init Format Secimi | Tamamlandi | 100% |
+| 15 | Branch-Aware Pre-Release Version Detection | Tamamlandi | 100% |
 
-**Son Guncelleme:** 2026-02-18
+**Son Guncelleme:** 2026-02-20
 **Aktif Gelistirici:** Claude
 **Mevcut Versiyon:** dev (Phase 14 YAML config yazma + init format secimi tamamlandi - production-ready)
 
@@ -484,6 +485,35 @@
 
 ---
 
+## Faz 15: Branch-Aware Pre-Release Version Detection
+
+**Durum:** Tamamlandi
+
+### Yapilacaklar
+
+- [x] `internal/git/tag.go` - GetLatestPreReleaseTagMerged() metodu (--merged HEAD ile branch-scoped pre-release tag arama)
+- [x] `internal/git/tag.go` - GetLatestStableTagMerged() metodu (--merged HEAD ile branch-scoped stable tag arama)
+- [x] `internal/runner/runner.go` - resolvePreReleaseBaseTag() metodu (seri devam/yeni seri karari)
+- [x] `internal/runner/runner.go` - determineVersion() guncellendi (preReleaseID varsa branch-aware cozumleme)
+- [x] `internal/git/tag_test.go` - GetLatestPreReleaseTagMerged unit testleri (8 test)
+- [x] `internal/git/tag_test.go` - GetLatestStableTagMerged unit testleri (8 test)
+- [x] `test/integration/release_test.go` - PreRelease_BranchAware_ContinueSeries (seri devam testi)
+- [x] `test/integration/release_test.go` - PreRelease_BranchAware_NewSeries (yeni seri testi)
+- [x] `test/integration/release_test.go` - PreRelease_BranchAware_MasterAdvanced (master ilerlemis, seri devam testi)
+- [x] `test/integration/release_test.go` - PreRelease_NoFlag_BehaviorUnchanged (standart davranis korunma testi)
+
+### Notlar
+
+- Sorun: `--preRelease="deneme"` ile farkli branch'lerde calisirken, diger branch'lerdeki tag'ler (v2.0.0-beta.0 gibi) en son tag olarak bulunuyordu ve seriler kiriliyordu
+- Cozum: `git tag -l --merged HEAD --sort=-v:refname` ile sadece mevcut branch'ten erisilebilir tag'lere bakilir
+- Algoritma: Pre-release tag bulundu VE base version >= stable → seri devam, aksi halde yeni seri baslat
+- 3 senaryo destekleniyor: uzun yasayan branch (seri devam), silinen/yeniden acilan branch (yeni seri), master ilerlemis ama branch izole (seri devam)
+- PreReleaseID bos ise (standart release) mevcut davranis degismiyor
+- TagMatch/TagExclude filtreleri yeni metodlarda da uygulanir
+- 16 unit test + 4 integration test eklendi, tum testler race detection ile basarili
+
+---
+
 ## Bugs
 
 - [x] BUG: Ilk release'de changelog "exit status 128" hatasi (2026-02-16) → `LatestVersion=0.0.0` iken `v0.0.0` tag'i araniyordu ama repo'da boyle bir tag yok. `latestVersionToTag()` helper fonksiyonu eklendi: `0.0.0` veya bos string icin bos doner, bu sayede `GetCommitsSinceTag("")` tum commitleri alir. 3 yer etkilendi: `RunChangelogOnly`, `generateChangelog`, `autoDetectIncrement`.
@@ -541,6 +571,7 @@
 | 2026-02-18 | Claude | feat: CI/CD pipeline eklendi, golangci-lint hatalari giderildi, kod kalitesi testleri eklendi |
 | 2026-02-18 | Claude | refactor: init wizard soru sirasi iyilestirildi - format sorusu sona tasinarak UX iyilestirildi |
 | 2026-02-18 | Claude | fix: push false iken upstream hatasi - checkUpstream push durumunu kontrol etmiyordu |
+| 2026-02-20 | Claude | Phase 15 tamamlandi: Branch-aware pre-release version detection - GetLatestPreReleaseTagMerged, GetLatestStableTagMerged, resolvePreReleaseBaseTag, 16 unit test + 4 integration test |
 
 ---
 

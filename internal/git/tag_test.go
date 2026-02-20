@@ -258,6 +258,183 @@ func TestTagExists(t *testing.T) {
 	}
 }
 
+func TestGetLatestPreReleaseTagMerged(t *testing.T) {
+	tests := []struct {
+		name         string
+		preReleaseID string
+		gitOutput    string
+		gitErr       error
+		tagMatch     string
+		tagExclude   string
+		wantTag      string
+		wantErr      bool
+	}{
+		{
+			name:         "finds matching pre-release tag",
+			preReleaseID: "deneme",
+			gitOutput:    "v1.2.5-deneme.1\nv1.2.5-deneme.0\nv1.2.4",
+			wantTag:      "v1.2.5-deneme.1",
+		},
+		{
+			name:         "skips non-matching pre-release IDs",
+			preReleaseID: "deneme",
+			gitOutput:    "v2.0.0-beta.0\nv1.2.4",
+			wantTag:      "",
+		},
+		{
+			name:         "does not match partial ID (beta vs beta2)",
+			preReleaseID: "beta",
+			gitOutput:    "v1.0.0-beta2.0\nv1.0.0",
+			wantTag:      "",
+		},
+		{
+			name:         "empty preReleaseID returns empty",
+			preReleaseID: "",
+			gitOutput:    "v1.0.0-beta.0",
+			wantTag:      "",
+		},
+		{
+			name:         "no tags returns empty",
+			preReleaseID: "deneme",
+			gitOutput:    "",
+			wantTag:      "",
+		},
+		{
+			name:         "respects TagMatch filter",
+			preReleaseID: "deneme",
+			gitOutput:    "release-1.0.0-deneme.0\nv1.0.0-deneme.0",
+			tagMatch:     "v*",
+			wantTag:      "v1.0.0-deneme.0",
+		},
+		{
+			name:         "respects TagExclude filter",
+			preReleaseID: "deneme",
+			gitOutput:    "v1.0.0-deneme.1\nv1.0.0-deneme.0",
+			tagExclude:   "*deneme.1*",
+			wantTag:      "v1.0.0-deneme.0",
+		},
+		{
+			name:         "git error returns error",
+			preReleaseID: "deneme",
+			gitErr:       fmt.Errorf("git failed"),
+			wantErr:      true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			original := commandExecutor
+			defer func() { commandExecutor = original }()
+
+			commandExecutor = func(name string, args ...string) (string, error) {
+				if tt.gitErr != nil {
+					return "", tt.gitErr
+				}
+				return tt.gitOutput, nil
+			}
+
+			cfg := &config.GitConfig{
+				TagMatch:   tt.tagMatch,
+				TagExclude: tt.tagExclude,
+			}
+			g := newTestGitWithConfig(cfg, false)
+
+			got, err := g.GetLatestPreReleaseTagMerged(tt.preReleaseID)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.wantTag {
+				t.Errorf("got = %q, want %q", got, tt.wantTag)
+			}
+		})
+	}
+}
+
+func TestGetLatestStableTagMerged(t *testing.T) {
+	tests := []struct {
+		name       string
+		gitOutput  string
+		gitErr     error
+		tagMatch   string
+		tagExclude string
+		wantTag    string
+		wantErr    bool
+	}{
+		{
+			name:      "finds stable tag skipping pre-release",
+			gitOutput: "v2.0.0-beta.0\nv1.5.0\nv1.0.0",
+			wantTag:   "v1.5.0",
+		},
+		{
+			name:      "all pre-release returns empty",
+			gitOutput: "v2.0.0-beta.0\nv1.0.0-alpha.1",
+			wantTag:   "",
+		},
+		{
+			name:      "first tag is stable",
+			gitOutput: "v3.0.0\nv2.0.0\nv1.0.0",
+			wantTag:   "v3.0.0",
+		},
+		{
+			name:      "no tags returns empty",
+			gitOutput: "",
+			wantTag:   "",
+		},
+		{
+			name:      "respects TagMatch filter",
+			gitOutput: "release-2.0.0\nv1.5.0\nv1.0.0",
+			tagMatch:  "v*",
+			wantTag:   "v1.5.0",
+		},
+		{
+			name:       "respects TagExclude filter",
+			gitOutput:  "v2.0.0\nv1.5.0",
+			tagExclude: "v2*",
+			wantTag:    "v1.5.0",
+		},
+		{
+			name:    "git error returns error",
+			gitErr:  fmt.Errorf("git failed"),
+			wantErr: true,
+		},
+		{
+			name:      "invalid version tags are skipped",
+			gitOutput: "not-a-version\nv1.0.0",
+			wantTag:   "v1.0.0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			original := commandExecutor
+			defer func() { commandExecutor = original }()
+
+			commandExecutor = func(name string, args ...string) (string, error) {
+				if tt.gitErr != nil {
+					return "", tt.gitErr
+				}
+				return tt.gitOutput, nil
+			}
+
+			cfg := &config.GitConfig{
+				TagMatch:   tt.tagMatch,
+				TagExclude: tt.tagExclude,
+			}
+			g := newTestGitWithConfig(cfg, false)
+
+			got, err := g.GetLatestStableTagMerged()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.wantTag {
+				t.Errorf("got = %q, want %q", got, tt.wantTag)
+			}
+		})
+	}
+}
+
 func TestMatchGlob(t *testing.T) {
 	tests := []struct {
 		name    string

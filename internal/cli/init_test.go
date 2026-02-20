@@ -326,7 +326,7 @@ func TestRunInit_ExistingNativeConfig_Overwrite(t *testing.T) {
 
 	p := &mockPrompter{
 		confirmAnswers: []bool{true, true, true, true}, // overwrite, writeChangelog, commit/tag, push
-		selectAnswers:  []int{0, 0},                  // GitHub, JSON
+		selectAnswers:  []int{0, 0},                    // GitHub, JSON
 		inputAnswers:   []string{"chore(release): release v${version}", "v${version}"},
 	}
 
@@ -353,7 +353,7 @@ func TestRunInit_FormatSwitch_RenamesOldConfig(t *testing.T) {
 	}
 
 	p := &mockPrompter{
-		selectAnswers:  []int{0, 1},                     // GitHub, YAML
+		selectAnswers:  []int{0, 1},                    // GitHub, YAML
 		confirmAnswers: []bool{true, true, true, true}, // overwrite, writeChangelog, commit/tag, push
 		inputAnswers:   []string{"chore(release): release v${version}", "v${version}"},
 	}
