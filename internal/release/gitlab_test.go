@@ -52,9 +52,6 @@ func TestGitLabClient_ValidateToken(t *testing.T) {
 		}
 
 		token := r.Header.Get("Private-Token")
-		if token == "" {
-			token = r.Header.Get("Job-Token")
-		}
 		if token == "valid-token" {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"id":1,"name":"testproject"}`))
@@ -108,33 +105,6 @@ func TestGitLabClient_ValidateToken(t *testing.T) {
 		err := c.ValidateToken()
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
-		}
-	})
-
-	t.Run("valid CI_JOB_TOKEN uses Job-Token header", func(t *testing.T) {
-		original := os.Getenv("CI_JOB_TOKEN")
-		_ = os.Setenv("CI_JOB_TOKEN", "valid-token")
-		defer func() {
-			if original != "" {
-				_ = os.Setenv("CI_JOB_TOKEN", original)
-			} else {
-				_ = os.Unsetenv("CI_JOB_TOKEN")
-			}
-		}()
-
-		c := &GitLabClient{
-			config:    &config.GitLabConfig{},
-			repoInfo:  testGitLabRepoInfo(),
-			logger:    applog.NewLogger(0, false),
-			client:    server.Client(),
-			baseURL:   server.URL,
-			token:     "valid-token", // matches CI_JOB_TOKEN
-			projectID: "testgroup%2Ftestproject",
-		}
-
-		err := c.ValidateToken()
-		if err != nil {
-			t.Errorf("unexpected error with CI_JOB_TOKEN: %v", err)
 		}
 	})
 }
@@ -426,113 +396,32 @@ func TestGitLabClient_UploadAssets_DryRun(t *testing.T) {
 }
 
 func TestGitLabClient_SetAuthHeader(t *testing.T) {
-	t.Run("default uses Private-Token", func(t *testing.T) {
-		// Ensure CI_JOB_TOKEN is not set for this test
-		original := os.Getenv("CI_JOB_TOKEN")
-		_ = os.Unsetenv("CI_JOB_TOKEN")
-		defer func() {
-			if original != "" {
-				_ = os.Setenv("CI_JOB_TOKEN", original)
+	tests := []struct {
+		name        string
+		tokenHeader string
+		wantHeader  string
+	}{
+		{"default", "", "Private-Token"},
+		{"custom", "Authorization", "Authorization"},
+		{"job token", "JOB-TOKEN", "JOB-TOKEN"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &GitLabClient{
+				config: &config.GitLabConfig{TokenHeader: tt.tokenHeader},
+				token:  "test-token",
 			}
-		}()
 
-		c := &GitLabClient{
-			config: &config.GitLabConfig{},
-			token:  "personal-token",
-		}
-		req, _ := http.NewRequest("GET", "https://example.com", nil)
-		c.setAuthHeader(req)
+			req, _ := http.NewRequest("GET", "https://example.com", nil)
+			c.setAuthHeader(req)
 
-		if got := req.Header.Get("Private-Token"); got != "personal-token" {
-			t.Errorf("Private-Token = %q, want 'personal-token'", got)
-		}
-	})
-
-	t.Run("custom header from config", func(t *testing.T) {
-		c := &GitLabClient{
-			config: &config.GitLabConfig{TokenHeader: "Authorization"},
-			token:  "Bearer xyz",
-		}
-		req, _ := http.NewRequest("GET", "https://example.com", nil)
-		c.setAuthHeader(req)
-
-		if got := req.Header.Get("Authorization"); got != "Bearer xyz" {
-			t.Errorf("Authorization = %q, want 'Bearer xyz'", got)
-		}
-	})
-
-	t.Run("auto-detect CI_JOB_TOKEN uses Job-Token", func(t *testing.T) {
-		original := os.Getenv("CI_JOB_TOKEN")
-		_ = os.Setenv("CI_JOB_TOKEN", "ci-job-token-abc")
-		defer func() {
-			if original != "" {
-				_ = os.Setenv("CI_JOB_TOKEN", original)
-			} else {
-				_ = os.Unsetenv("CI_JOB_TOKEN")
+			got := req.Header.Get(tt.wantHeader)
+			if got != "test-token" {
+				t.Errorf("header %q = %q, want 'test-token'", tt.wantHeader, got)
 			}
-		}()
-
-		c := &GitLabClient{
-			config: &config.GitLabConfig{},
-			token:  "ci-job-token-abc", // matches CI_JOB_TOKEN
-		}
-		req, _ := http.NewRequest("GET", "https://example.com", nil)
-		c.setAuthHeader(req)
-
-		if got := req.Header.Get("Job-Token"); got != "ci-job-token-abc" {
-			t.Errorf("Job-Token = %q, want 'ci-job-token-abc'", got)
-		}
-		// Private-Token should NOT be set
-		if got := req.Header.Get("Private-Token"); got != "" {
-			t.Errorf("Private-Token should be empty, got %q", got)
-		}
-	})
-
-	t.Run("CI_JOB_TOKEN set but token differs uses Private-Token", func(t *testing.T) {
-		original := os.Getenv("CI_JOB_TOKEN")
-		_ = os.Setenv("CI_JOB_TOKEN", "ci-job-token-abc")
-		defer func() {
-			if original != "" {
-				_ = os.Setenv("CI_JOB_TOKEN", original)
-			} else {
-				_ = os.Unsetenv("CI_JOB_TOKEN")
-			}
-		}()
-
-		c := &GitLabClient{
-			config: &config.GitLabConfig{},
-			token:  "different-personal-token", // does NOT match CI_JOB_TOKEN
-		}
-		req, _ := http.NewRequest("GET", "https://example.com", nil)
-		c.setAuthHeader(req)
-
-		if got := req.Header.Get("Private-Token"); got != "different-personal-token" {
-			t.Errorf("Private-Token = %q, want 'different-personal-token'", got)
-		}
-	})
-
-	t.Run("custom header overrides CI_JOB_TOKEN detection", func(t *testing.T) {
-		original := os.Getenv("CI_JOB_TOKEN")
-		_ = os.Setenv("CI_JOB_TOKEN", "ci-job-token-abc")
-		defer func() {
-			if original != "" {
-				_ = os.Setenv("CI_JOB_TOKEN", original)
-			} else {
-				_ = os.Unsetenv("CI_JOB_TOKEN")
-			}
-		}()
-
-		c := &GitLabClient{
-			config: &config.GitLabConfig{TokenHeader: "CUSTOM-HEADER"},
-			token:  "ci-job-token-abc",
-		}
-		req, _ := http.NewRequest("GET", "https://example.com", nil)
-		c.setAuthHeader(req)
-
-		if got := req.Header.Get("CUSTOM-HEADER"); got != "ci-job-token-abc" {
-			t.Errorf("CUSTOM-HEADER = %q, want 'ci-job-token-abc'", got)
-		}
-	})
+		})
+	}
 }
 
 func TestNewGitLabClient(t *testing.T) {
