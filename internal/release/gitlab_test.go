@@ -411,6 +411,7 @@ func TestGitLabClient_SetAuthHeader(t *testing.T) {
 			c := &GitLabClient{
 				config: &config.GitLabConfig{TokenHeader: tt.tokenHeader},
 				token:  "test-token",
+				logger: applog.NewLogger(0, false),
 			}
 
 			req, _ := http.NewRequest("GET", "https://example.com", nil)

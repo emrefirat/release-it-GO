@@ -303,6 +303,8 @@ func (c *GitLabClient) ValidateToken() error {
 	}
 
 	endpoint := fmt.Sprintf("%s/projects/%s", c.baseURL, c.projectID)
+	c.logger.Debug("validate token: GET %s", endpoint)
+	c.logger.Debug("token length: %d, tokenHeader config: %q", len(c.token), c.config.TokenHeader)
 
 	if c.dryRun {
 		c.logger.DryRun("GET %s (validate token)", endpoint)
@@ -351,6 +353,7 @@ func (c *GitLabClient) setAuthHeader(req *http.Request) {
 	if header == "" {
 		header = "Private-Token"
 	}
+	c.logger.Debug("auth header: %s (tokenHeader config=%q)", header, c.config.TokenHeader)
 	req.Header.Set(header, c.token)
 }
 
