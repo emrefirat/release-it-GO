@@ -44,7 +44,9 @@ func TestResolveGitLabBaseURL(t *testing.T) {
 
 func TestGitLabClient_ValidateToken(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/user" {
+		// ValidateToken uses /projects/:id to support CI_JOB_TOKEN.
+		// httptest decodes %2F to / so match with strings.HasPrefix.
+		if !strings.HasPrefix(r.URL.Path, "/projects/") {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
@@ -52,7 +54,7 @@ func TestGitLabClient_ValidateToken(t *testing.T) {
 		token := r.Header.Get("Private-Token")
 		if token == "valid-token" {
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"username":"testuser"}`))
+			_, _ = w.Write([]byte(`{"id":1,"name":"testproject"}`))
 		} else {
 			w.WriteHeader(http.StatusUnauthorized)
 		}
