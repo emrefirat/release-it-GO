@@ -291,8 +291,7 @@ func (c *GitLabClient) PostComment(target CommentTarget, message string) error {
 	return nil
 }
 
-// ValidateToken checks if the GitLab token is valid by querying the project endpoint.
-// Uses /projects/:id instead of /user because CI_JOB_TOKEN does not support /user.
+// ValidateToken checks if the GitLab token is valid.
 func (c *GitLabClient) ValidateToken() error {
 	if c.config.SkipChecks {
 		return nil
@@ -302,9 +301,7 @@ func (c *GitLabClient) ValidateToken() error {
 		return fmt.Errorf("GitLab token is not set")
 	}
 
-	endpoint := fmt.Sprintf("%s/projects/%s", c.baseURL, c.projectID)
-	c.logger.Debug("validate token: GET %s", endpoint)
-	c.logger.Debug("token length: %d, tokenHeader config: %q", len(c.token), c.config.TokenHeader)
+	endpoint := fmt.Sprintf("%s/user", c.baseURL)
 
 	if c.dryRun {
 		c.logger.DryRun("GET %s (validate token)", endpoint)
@@ -319,10 +316,6 @@ func (c *GitLabClient) ValidateToken() error {
 
 	if resp.StatusCode == http.StatusUnauthorized {
 		return fmt.Errorf("GitLab token is invalid (HTTP 401)")
-	}
-
-	if resp.StatusCode == http.StatusNotFound {
-		return fmt.Errorf("GitLab project not found or token lacks access (HTTP 404)")
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -353,7 +346,6 @@ func (c *GitLabClient) setAuthHeader(req *http.Request) {
 	if header == "" {
 		header = "Private-Token"
 	}
-	c.logger.Debug("auth header: %s (tokenHeader config=%q)", header, c.config.TokenHeader)
 	req.Header.Set(header, c.token)
 }
 
