@@ -346,12 +346,22 @@ func (c *GitLabClient) doRequest(method, reqURL string, body io.Reader) (*http.R
 }
 
 // setAuthHeader sets the authentication header based on config.
+// Auto-detects CI_JOB_TOKEN and uses Job-Token header accordingly.
 func (c *GitLabClient) setAuthHeader(req *http.Request) {
 	header := c.config.TokenHeader
 	if header == "" {
-		header = "Private-Token"
+		if c.isJobToken() {
+			header = "Job-Token"
+		} else {
+			header = "Private-Token"
+		}
 	}
 	req.Header.Set(header, c.token)
+}
+
+// isJobToken detects if the current token is a GitLab CI job token.
+func (c *GitLabClient) isJobToken() bool {
+	return os.Getenv("CI_JOB_TOKEN") != "" && c.token == os.Getenv("CI_JOB_TOKEN")
 }
 
 // handleErrorResponse creates a descriptive error from an HTTP response.
