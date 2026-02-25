@@ -94,7 +94,7 @@ func (r *Runner) RunChangelogOnly() error {
 		return err
 	}
 
-	latestTag := latestVersionToTag(r.ctx.LatestVersion)
+	latestTag := latestVersionToTag(r.ctx.LatestVersion, r.ctx.Config.Git.TagName)
 
 	commits, err := r.ctx.Git.GetCommitsSinceTag(latestTag)
 	if err != nil {
@@ -326,7 +326,7 @@ func (r *Runner) checkCommitLint() error {
 
 	r.ctx.Spinner.Start("Commit conventions checked")
 
-	latestTag := latestVersionToTag(r.ctx.LatestVersion)
+	latestTag := latestVersionToTag(r.ctx.LatestVersion, r.ctx.Config.Git.TagName)
 	if r.ctx.LatestVersion == "" {
 		// Try to get latest tag for lint check before version is determined
 		tag, err := r.ctx.Git.GetLatestTag()
@@ -634,7 +634,7 @@ func (r *Runner) bumpFiles() error {
 
 // autoDetectIncrement uses conventional commits to determine the bump type.
 func (r *Runner) autoDetectIncrement() string {
-	latestTag := latestVersionToTag(r.ctx.LatestVersion)
+	latestTag := latestVersionToTag(r.ctx.LatestVersion, r.ctx.Config.Git.TagName)
 
 	commits, err := r.ctx.Git.GetCommitsSinceTag(latestTag)
 	if err != nil || len(commits) == 0 {
@@ -688,7 +688,7 @@ func (r *Runner) generateChangelog() error {
 
 	r.ctx.Spinner.Start("Changelog generated")
 
-	latestTag := latestVersionToTag(r.ctx.LatestVersion)
+	latestTag := latestVersionToTag(r.ctx.LatestVersion, r.ctx.Config.Git.TagName)
 
 	commits, err := r.ctx.Git.GetCommitsSinceTag(latestTag)
 	if err != nil {
@@ -1005,14 +1005,17 @@ func hasPrefix(s, prefix string) bool {
 }
 
 // latestVersionToTag converts LatestVersion to a git tag for commit range queries.
+// Uses the tagName template from config to build the correct tag name.
 // Returns empty string for initial release (0.0.0) since no tag exists yet,
 // which causes GetCommitsSinceTag to return all commits.
-func latestVersionToTag(latestVersion string) string {
+func latestVersionToTag(latestVersion string, tagNameTemplate string) string {
 	if latestVersion == "" || latestVersion == "0.0.0" {
 		return ""
 	}
-	if !hasPrefix(latestVersion, "v") {
-		return "v" + latestVersion
+	// Strip "v" prefix from version before applying template to avoid "vv" duplication
+	cleanVersion := strings.TrimPrefix(latestVersion, "v")
+	if tagNameTemplate != "" {
+		return renderTagName(tagNameTemplate, cleanVersion)
 	}
-	return latestVersion
+	return cleanVersion
 }

@@ -625,8 +625,8 @@ func TestRunner_GenerateChangelog_Enabled_NoPrefix(t *testing.T) {
 		output string
 		err    error
 	}{
-		// When LatestVersion doesn't have "v" prefix, code prepends "v"
-		"git log v2.0.0..HEAD --pretty=format:%s": {
+		// TagName="${version}" so tag has no prefix: 2.0.0
+		"git log 2.0.0..HEAD --pretty=format:%s": {
 			output: "feat: something new",
 			err:    nil,
 		},
