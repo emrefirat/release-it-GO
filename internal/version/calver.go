@@ -52,6 +52,8 @@ func (cv *CalVer) NextVersion(current string) (string, error) {
 }
 
 // parse splits a CalVer string into its components.
+// For "yyyy.mm.dd" format: parts[2] = Day, parts[3] = Minor (optional).
+// For other formats: parts[2] = Minor.
 func (cv *CalVer) parse(version string) (*CalVerParts, error) {
 	parts := strings.Split(version, ".")
 	if len(parts) < 3 {
@@ -68,16 +70,35 @@ func (cv *CalVer) parse(version string) (*CalVerParts, error) {
 		return nil, fmt.Errorf("invalid month in calver: %s", parts[1])
 	}
 
-	minor, err := strconv.Atoi(parts[2])
-	if err != nil {
-		return nil, fmt.Errorf("invalid minor in calver: %s", parts[2])
+	if month < 1 || month > 12 {
+		return nil, fmt.Errorf("invalid month in calver (must be 1-12): %d", month)
 	}
 
-	return &CalVerParts{
+	third, err := strconv.Atoi(parts[2])
+	if err != nil {
+		return nil, fmt.Errorf("invalid component in calver: %s", parts[2])
+	}
+
+	result := &CalVerParts{
 		Year:  year,
 		Month: month,
-		Minor: minor,
-	}, nil
+	}
+
+	if cv.Format == "yyyy.mm.dd" {
+		result.Day = third
+		// Optional 4th component is minor (for multiple releases per day)
+		if len(parts) >= 4 {
+			minor, err := strconv.Atoi(parts[3])
+			if err != nil {
+				return nil, fmt.Errorf("invalid minor in calver: %s", parts[3])
+			}
+			result.Minor = minor
+		}
+	} else {
+		result.Minor = third
+	}
+
+	return result, nil
 }
 
 // format creates a CalVer string from a time and minor number.
@@ -86,6 +107,9 @@ func (cv *CalVer) format(t time.Time, minor int) string {
 	case "yyyy.mm.minor":
 		return fmt.Sprintf("%d.%d.%d", t.Year(), int(t.Month()), minor)
 	case "yyyy.mm.dd":
+		if minor > 0 {
+			return fmt.Sprintf("%d.%d.%d.%d", t.Year(), int(t.Month()), t.Day(), minor)
+		}
 		return fmt.Sprintf("%d.%d.%d", t.Year(), int(t.Month()), t.Day())
 	default: // "yy.mm.minor"
 		return fmt.Sprintf("%d.%d.%d", t.Year()%100, int(t.Month()), minor)
