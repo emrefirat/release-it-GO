@@ -18,6 +18,7 @@ type Config struct {
 	Verbose      int                `json:"verbose" yaml:"verbose" toml:"verbose" mapstructure:"verbose"`
 	Increment    string             `json:"increment" yaml:"increment" toml:"increment" mapstructure:"increment"`
 	PreReleaseID string             `json:"preReleaseId" yaml:"preReleaseId" toml:"preReleaseId" mapstructure:"preReleaseId"`
+	ConfigFile   string             `json:"-" yaml:"-" toml:"-" mapstructure:"-"` // loaded config file path (not serialized)
 }
 
 // GitConfig holds all git-related configuration.
