@@ -92,6 +92,8 @@ func FormatVersion(v *semver.Version) string {
 }
 
 // addPreRelease creates a new version with the given pre-release identifier and number.
+// If preReleaseID is empty, defaults to "0" producing versions like "1.0.0-0.0".
+// Callers should validate preReleaseID before calling if a meaningful ID is required.
 func addPreRelease(base semver.Version, preReleaseID string, num int) (*semver.Version, error) {
 	if preReleaseID == "" {
 		preReleaseID = "0"

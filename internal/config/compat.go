@@ -11,6 +11,7 @@ import (
 func normalizeJSON(data []byte) []byte {
 	var raw map[string]interface{}
 	if err := json.Unmarshal(data, &raw); err != nil {
+		// Return original data; Viper will report the parse error with context
 		return data
 	}
 
@@ -116,12 +117,18 @@ func applyPluginCompat(cfg *Config, data []byte, format string) {
 
 // applyConventionalChangelogPlugin maps conventional-changelog plugin settings.
 func applyConventionalChangelogPlugin(cfg *Config, data json.RawMessage) {
+	// Use a raw map to detect which fields are explicitly set in the plugin config.
+	// This prevents bool zero-value (false) from overriding user's explicit config.
+	var rawFields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &rawFields); err != nil {
+		return
+	}
+
 	var pluginCfg struct {
 		Preset    string `json:"preset"`
 		Infile    string `json:"infile"`
 		Header    string `json:"header"`
 		Changelog bool   `json:"changelog"`
-		Commit    bool   `json:"commit"`
 	}
 	if err := json.Unmarshal(data, &pluginCfg); err != nil {
 		return
@@ -136,8 +143,10 @@ func applyConventionalChangelogPlugin(cfg *Config, data json.RawMessage) {
 	if pluginCfg.Header != "" {
 		cfg.Changelog.Header = pluginCfg.Header
 	}
-	// The "changelog" field in the plugin enables changelog generation
-	cfg.Changelog.Enabled = pluginCfg.Changelog
+	// Only override Enabled if the plugin explicitly sets "changelog" field
+	if _, ok := rawFields["changelog"]; ok {
+		cfg.Changelog.Enabled = pluginCfg.Changelog
+	}
 }
 
 // applyKeepAChangelogPlugin maps keep-a-changelog plugin settings.

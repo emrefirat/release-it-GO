@@ -221,6 +221,92 @@ func TestApplyPluginCompat_RequireBranchArray(t *testing.T) {
 	}
 }
 
+func TestApplyPluginCompat_PluginDoesNotOverrideExplicitConfig(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, ".release-it.json")
+	// User explicitly sets changelog.enabled: true
+	// Plugin does NOT set "changelog" field at all
+	content := `{
+		"changelog": {"enabled": true},
+		"plugins": {
+			"@release-it/conventional-changelog": {
+				"preset": "conventionalcommits",
+				"infile": "CHANGELOG.md"
+			}
+		}
+	}`
+	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadConfig(configPath)
+	if err != nil {
+		t.Fatalf("LoadConfig failed: %v", err)
+	}
+
+	// User's explicit config should be preserved
+	if !cfg.Changelog.Enabled {
+		t.Error("changelog.enabled should remain true (user config takes priority over plugin)")
+	}
+	if cfg.Changelog.Preset != "conventionalcommits" {
+		t.Errorf("changelog.preset = %q, want 'conventionalcommits'", cfg.Changelog.Preset)
+	}
+}
+
+func TestApplyPluginCompat_PluginExplicitlyDisablesChangelog(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, ".release-it.json")
+	// Plugin explicitly sets "changelog": false
+	content := `{
+		"plugins": {
+			"@release-it/conventional-changelog": {
+				"preset": "angular",
+				"changelog": false
+			}
+		}
+	}`
+	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadConfig(configPath)
+	if err != nil {
+		t.Fatalf("LoadConfig failed: %v", err)
+	}
+
+	if cfg.Changelog.Enabled {
+		t.Error("changelog.enabled should be false (plugin explicitly set changelog: false)")
+	}
+}
+
+func TestLoadConfigFromBytes_JSONNormalization(t *testing.T) {
+	// requireBranch as array should be normalized to comma-separated string
+	data := []byte(`{"git": {"requireBranch": ["main", "develop"]}}`)
+
+	cfg, err := LoadConfigFromBytes(data, "json")
+	if err != nil {
+		t.Fatalf("LoadConfigFromBytes failed: %v", err)
+	}
+
+	if cfg.Git.RequireBranch != "main,develop" {
+		t.Errorf("requireBranch = %q, want 'main,develop'", cfg.Git.RequireBranch)
+	}
+}
+
+func TestLoadConfigFromBytes_JSONNormalization_PluginsRemoved(t *testing.T) {
+	// "plugins" and "npm" keys should be removed during normalization
+	data := []byte(`{"git": {"tagName": "v${version}"}, "npm": {"publish": false}, "plugins": {}}`)
+
+	cfg, err := LoadConfigFromBytes(data, "json")
+	if err != nil {
+		t.Fatalf("LoadConfigFromBytes failed: %v", err)
+	}
+
+	if cfg.Git.TagName != "v${version}" {
+		t.Errorf("tagName = %q, want 'v${version}'", cfg.Git.TagName)
+	}
+}
+
 func TestApplyPluginCompat_YAMLIgnored(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, ".release-it.yaml")
