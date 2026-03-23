@@ -745,26 +745,30 @@ func (r *Runner) gitRelease() error {
 		}
 		r.ctx.Spinner.Stop(true)
 
-		// Commit
-		commitMsg := renderTagName(cfg.CommitMessage, r.ctx.Version)
-		if !r.ctx.IsCI {
-			confirmed, err := r.ctx.Prompter.Confirm(
-				fmt.Sprintf("Commit (%s)?", commitMsg), true)
-			if err != nil {
-				return err
+		// Commit — skip if nothing staged (e.g., changelog disabled, no bumper)
+		if !r.ctx.Git.HasStagedChanges() {
+			r.ctx.Logger.Verbose("    ↳ No staged changes, skipping commit")
+		} else {
+			commitMsg := renderTagName(cfg.CommitMessage, r.ctx.Version)
+			if !r.ctx.IsCI {
+				confirmed, err := r.ctx.Prompter.Confirm(
+					fmt.Sprintf("Commit (%s)?", commitMsg), true)
+				if err != nil {
+					return err
+				}
+				if !confirmed {
+					r.ctx.Logger.Print("  %s Skipped commit", ui.IconSkip)
+					return nil
+				}
 			}
-			if !confirmed {
-				r.ctx.Logger.Print("  %s Skipped commit", ui.IconSkip)
-				return nil
-			}
-		}
 
-		r.ctx.Spinner.Start("Committed")
-		if err := r.ctx.Git.Commit(commitMsg); err != nil {
-			r.ctx.Spinner.Stop(false)
-			return fmt.Errorf("commit: %w", err)
+			r.ctx.Spinner.Start("Committed")
+			if err := r.ctx.Git.Commit(commitMsg); err != nil {
+				r.ctx.Spinner.Stop(false)
+				return fmt.Errorf("commit: %w", err)
+			}
+			r.ctx.Spinner.Stop(true)
 		}
-		r.ctx.Spinner.Stop(true)
 	}
 
 	// Tag

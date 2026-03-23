@@ -1,5 +1,22 @@
 package git
 
+import "strings"
+
+// HasStagedChanges returns true if there are staged changes ready to commit.
+// In dry-run mode, always returns true since write operations are simulated.
+// On git error, assumes true to avoid skipping commits incorrectly.
+func (g *Git) HasStagedChanges() bool {
+	if g.dryRun {
+		return true
+	}
+	out, err := g.runSilent("diff", "--cached", "--name-only")
+	if err != nil {
+		// If we can't check, assume there are changes — let git commit decide
+		return true
+	}
+	return strings.TrimSpace(out) != ""
+}
+
 // Stage adds changed files to the staging area.
 // If AddUntrackedFiles is true, all files (including untracked) are staged.
 // Otherwise, only tracked files are updated.
