@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"release-it-go/internal/config"
 	"release-it-go/internal/git"
@@ -101,7 +102,9 @@ func (c *GitLabClient) createHTTPClient() *http.Client {
 
 	if caFile != "" {
 		caCert, err := os.ReadFile(caFile)
-		if err == nil {
+		if err != nil {
+			c.logger.Warn("failed to load CA certificate %s: %v", caFile, err)
+		} else {
 			caCertPool := x509.NewCertPool()
 			caCertPool.AppendCertsFromPEM(caCert)
 			tlsConfig.RootCAs = caCertPool
@@ -114,6 +117,7 @@ func (c *GitLabClient) createHTTPClient() *http.Client {
 
 	return &http.Client{
 		Transport: &http.Transport{TLSClientConfig: tlsConfig},
+		Timeout:   30 * time.Second,
 	}
 }
 
