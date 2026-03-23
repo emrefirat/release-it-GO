@@ -157,6 +157,9 @@ func TestLoadConfig_JSONFile(t *testing.T) {
 	if cfg.GitHub.Host != "api.github.com" {
 		t.Errorf("github.host should keep default, got %q", cfg.GitHub.Host)
 	}
+	if cfg.ConfigFile != cfgPath {
+		t.Errorf("ConfigFile = %q, expected %q", cfg.ConfigFile, cfgPath)
+	}
 }
 
 func TestLoadConfig_YAMLFile(t *testing.T) {
@@ -237,6 +240,9 @@ func TestLoadConfig_NoFile_ReturnsDefaults(t *testing.T) {
 	expected := DefaultConfig()
 	if cfg.Git.Commit != expected.Git.Commit {
 		t.Error("should return defaults when no config file found")
+	}
+	if cfg.ConfigFile != "" {
+		t.Errorf("ConfigFile should be empty when no config found, got %q", cfg.ConfigFile)
 	}
 }
 
@@ -320,6 +326,9 @@ func TestLoadConfig_NativeConfigPriority(t *testing.T) {
 	// Native config should win
 	if cfg.Git.TagName != "native-${version}" {
 		t.Errorf("expected native config to take priority, got tagName=%s", cfg.Git.TagName)
+	}
+	if cfg.ConfigFile != ".release-it-go.json" {
+		t.Errorf("ConfigFile = %q, expected %q", cfg.ConfigFile, ".release-it-go.json")
 	}
 }
 

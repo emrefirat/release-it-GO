@@ -179,7 +179,11 @@ func runRelease(cmd *cobra.Command, args []string) error {
 		logger.DryRun("running in dry-run mode")
 	}
 
-	logger.Debug("config loaded successfully")
+	if cfg.ConfigFile != "" {
+		logger.Debug("config loaded from %s", cfg.ConfigFile)
+	} else {
+		logger.Print("  %s No config file found, using defaults", "⚠")
+	}
 
 	// Handle no-increment flag
 	if noIncrement {

@@ -25,16 +25,27 @@ var configSearchFiles = []string{
 
 // LoadConfig loads configuration from the given path or searches for a config file
 // in the current directory. Returns defaults if no config file is found.
+// The loaded file path is stored in Config.ConfigFile (empty if using defaults).
 func LoadConfig(configPath string) (*Config, error) {
 	cfg := DefaultConfig()
 
 	if configPath != "" {
-		return loadFromFile(cfg, configPath)
+		cfg, err := loadFromFile(cfg, configPath)
+		if err != nil {
+			return nil, err
+		}
+		cfg.ConfigFile = configPath
+		return cfg, nil
 	}
 
 	for _, f := range configSearchFiles {
 		if fileExists(f) {
-			return loadFromFile(cfg, f)
+			cfg, err := loadFromFile(cfg, f)
+			if err != nil {
+				return nil, err
+			}
+			cfg.ConfigFile = f
+			return cfg, nil
 		}
 	}
 
