@@ -33,6 +33,7 @@ func TestFormatFunctions_WithColors(t *testing.T) {
 		{"FormatWarning", FormatWarning},
 		{"FormatInfo", FormatInfo},
 		{"FormatDim", FormatDim},
+		{"FormatBold", FormatBold},
 	}
 
 	for _, tt := range tests {
@@ -59,6 +60,7 @@ func TestFormatFunctions_NoColor(t *testing.T) {
 		{"FormatWarning", FormatWarning, "test"},
 		{"FormatInfo", FormatInfo, "test"},
 		{"FormatDim", FormatDim, "test"},
+		{"FormatBold", FormatBold, "test"},
 	}
 
 	for _, tt := range tests {

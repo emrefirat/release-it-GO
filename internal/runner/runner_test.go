@@ -3385,5 +3385,167 @@ func TestRunner_RunCheckCommits_NoTags(t *testing.T) {
 	}
 }
 
+// --- resolvePreReleaseBaseTag tests ---
+
+func TestRunner_ResolvePreReleaseBaseTag_ContinueSeries(t *testing.T) {
+	cfg := &config.Config{
+		CI: true,
+		Git: config.GitConfig{
+			TagName: "v${version}",
+		},
+	}
+
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{
+		"git tag -l --merged HEAD --sort=-v:refname": {
+			output: "v1.2.3-beta.1\nv1.2.3-beta.0\nv1.2.0\nv1.1.0",
+			err:    nil,
+		},
+	})
+
+	tag, err := runner.resolvePreReleaseBaseTag("beta")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if tag != "v1.2.3-beta.1" {
+		t.Errorf("expected v1.2.3-beta.1 (continue series), got %q", tag)
+	}
+}
+
+func TestRunner_ResolvePreReleaseBaseTag_NewSeries(t *testing.T) {
+	cfg := &config.Config{
+		CI: true,
+		Git: config.GitConfig{
+			TagName: "v${version}",
+		},
+	}
+
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{
+		// Pre-release base (1.0.0) < stable (2.0.0) → new series
+		"git tag -l --merged HEAD --sort=-v:refname": {
+			output: "v2.0.0\nv1.0.1-beta.0\nv1.0.0",
+			err:    nil,
+		},
+	})
+
+	tag, err := runner.resolvePreReleaseBaseTag("beta")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if tag != "v2.0.0" {
+		t.Errorf("expected v2.0.0 (new series), got %q", tag)
+	}
+}
+
+func TestRunner_ResolvePreReleaseBaseTag_NoPreReleaseTag(t *testing.T) {
+	cfg := &config.Config{
+		CI: true,
+		Git: config.GitConfig{
+			TagName: "v${version}",
+		},
+	}
+
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{
+		"git tag -l --merged HEAD --sort=-v:refname": {
+			output: "v1.0.0\nv0.9.0",
+			err:    nil,
+		},
+	})
+
+	tag, err := runner.resolvePreReleaseBaseTag("alpha")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if tag != "v1.0.0" {
+		t.Errorf("expected v1.0.0 (stable, no alpha tags), got %q", tag)
+	}
+}
+
+func TestRunner_ResolvePreReleaseBaseTag_NoStableTag(t *testing.T) {
+	cfg := &config.Config{
+		CI: true,
+		Git: config.GitConfig{
+			TagName: "v${version}",
+		},
+	}
+
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{
+		"git tag -l --merged HEAD --sort=-v:refname": {
+			output: "v0.1.0-rc.2\nv0.1.0-rc.1",
+			err:    nil,
+		},
+	})
+
+	tag, err := runner.resolvePreReleaseBaseTag("rc")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if tag != "v0.1.0-rc.2" {
+		t.Errorf("expected v0.1.0-rc.2 (no stable, continue pre-release), got %q", tag)
+	}
+}
+
+func TestRunner_ResolvePreReleaseBaseTag_NoTags(t *testing.T) {
+	cfg := &config.Config{
+		CI: true,
+		Git: config.GitConfig{
+			TagName: "v${version}",
+		},
+	}
+
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{
+		"git tag -l --merged HEAD --sort=-v:refname": {
+			output: "",
+			err:    nil,
+		},
+	})
+
+	tag, err := runner.resolvePreReleaseBaseTag("beta")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if tag != "" {
+		t.Errorf("expected empty (no tags at all), got %q", tag)
+	}
+}
+
+func TestRunner_ResolvePreReleaseBaseTag_GitError(t *testing.T) {
+	cfg := &config.Config{
+		CI: true,
+		Git: config.GitConfig{
+			TagName: "v${version}",
+		},
+	}
+
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{
+		"git tag -l --merged HEAD --sort=-v:refname": {
+			output: "",
+			err:    fmt.Errorf("git error"),
+		},
+	})
+
+	_, err := runner.resolvePreReleaseBaseTag("beta")
+	if err == nil {
+		t.Error("expected error when git fails")
+	}
+}
+
 // Ensure imports are used
 var _ = errors.New
