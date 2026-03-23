@@ -37,6 +37,35 @@ func TestRenderTagName(t *testing.T) {
 	}
 }
 
+func TestLatestVersionToTag(t *testing.T) {
+	tests := []struct {
+		name            string
+		latestVersion   string
+		tagNameTemplate string
+		expected        string
+	}{
+		{"empty version", "", "v${version}", ""},
+		{"zero version", "0.0.0", "v${version}", ""},
+		{"normal with v template", "1.0.0", "v${version}", "v1.0.0"},
+		{"v-prefixed version with v template", "v1.0.0", "v${version}", "v1.0.0"},
+		{"normal with bare template", "1.0.0", "${version}", "1.0.0"},
+		{"empty template", "1.0.0", "", "1.0.0"},
+		{"custom prefix template", "2.0.0", "release-${version}", "release-2.0.0"},
+		{"v-prefixed version with custom template", "v2.0.0", "release-${version}", "release-2.0.0"},
+		{"pre-release version", "1.0.0-beta.1", "v${version}", "v1.0.0-beta.1"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := latestVersionToTag(tt.latestVersion, tt.tagNameTemplate)
+			if result != tt.expected {
+				t.Errorf("latestVersionToTag(%q, %q) = %q, want %q",
+					tt.latestVersion, tt.tagNameTemplate, result, tt.expected)
+			}
+		})
+	}
+}
+
 func TestNewRunner(t *testing.T) {
 	cfg := &config.Config{
 		CI:     true,
