@@ -1,6 +1,7 @@
 package git
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -157,6 +158,60 @@ func TestStageFile(t *testing.T) {
 	cmd := strings.Join(executedArgs, " ")
 	if !strings.Contains(cmd, "add CHANGELOG.md") {
 		t.Errorf("expected 'add CHANGELOG.md', got: %v", executedArgs)
+	}
+}
+
+func TestHasStagedChanges_WithChanges(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	commandExecutor = func(name string, args ...string) (string, error) {
+		return "CHANGELOG.md\nVERSION\n", nil
+	}
+
+	cfg := &config.GitConfig{}
+	g := newTestGitWithConfig(cfg, false)
+	if !g.HasStagedChanges() {
+		t.Error("expected HasStagedChanges=true when files are staged")
+	}
+}
+
+func TestHasStagedChanges_NoChanges(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	commandExecutor = func(name string, args ...string) (string, error) {
+		return "", nil
+	}
+
+	cfg := &config.GitConfig{}
+	g := newTestGitWithConfig(cfg, false)
+	if g.HasStagedChanges() {
+		t.Error("expected HasStagedChanges=false when nothing staged")
+	}
+}
+
+func TestHasStagedChanges_GitError(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	commandExecutor = func(name string, args ...string) (string, error) {
+		return "", fmt.Errorf("git error")
+	}
+
+	cfg := &config.GitConfig{}
+	g := newTestGitWithConfig(cfg, false)
+	// On error, assume true to avoid incorrectly skipping commits
+	if !g.HasStagedChanges() {
+		t.Error("expected HasStagedChanges=true on git error (fail-safe)")
+	}
+}
+
+func TestHasStagedChanges_DryRun(t *testing.T) {
+	cfg := &config.GitConfig{}
+	g := newTestGitWithConfig(cfg, true) // dry-run mode
+	if !g.HasStagedChanges() {
+		t.Error("expected HasStagedChanges=true in dry-run mode")
 	}
 }
 
