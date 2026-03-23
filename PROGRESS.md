@@ -24,6 +24,9 @@
 | 13 | Webhook Notification (Slack + Teams) | Tamamlandi | 100% |
 | 14 | YAML Config Yazma + Init Format Secimi | Tamamlandi | 100% |
 | 15 | Branch-Aware Pre-Release Version Detection | Tamamlandi | 100% |
+| 16 | Kritik Bug Düzeltmeleri — URL Parsing + CalVer | Baslanmadi | 0% |
+| 17 | Pipeline Saglamlık Iyilestirmeleri | Baslanmadi | 0% |
+| 18 | Config Uyumluluk ve Edge Case Düzeltmeleri | Baslanmadi | 0% |
 
 **Son Guncelleme:** 2026-03-23
 **Aktif Gelistirici:** Claude
