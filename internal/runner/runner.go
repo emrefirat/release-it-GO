@@ -69,7 +69,9 @@ func (r *Runner) Run() error {
 			return fmt.Errorf("%s: %w", step.name, err)
 		}
 
-		// Early exit if no commits to release
+		// Early exit if no commits to release.
+		// After-hooks are intentionally skipped: the release is aborted,
+		// so post-step hooks (e.g., notifications) should not execute.
 		if r.ctx.noCommits {
 			return nil
 		}
@@ -842,6 +844,9 @@ func (r *Runner) githubRelease() error {
 
 	releaseName := renderTagName(r.ctx.Config.GitHub.ReleaseName, r.ctx.Version)
 	releaseNotes := r.ctx.Changelog
+	if releaseNotes == "" {
+		r.ctx.Logger.Verbose("    ↳ Release notes are empty (changelog disabled or no commits parsed)")
+	}
 
 	result, err := client.CreateRelease(release.ReleaseOptions{
 		TagName:            r.ctx.TagName,
@@ -908,6 +913,9 @@ func (r *Runner) gitlabRelease() error {
 
 	releaseName := renderTagName(r.ctx.Config.GitLab.ReleaseName, r.ctx.Version)
 	releaseNotes := r.ctx.Changelog
+	if releaseNotes == "" {
+		r.ctx.Logger.Verbose("    ↳ Release notes are empty (changelog disabled or no commits parsed)")
+	}
 
 	result, err := client.CreateRelease(release.ReleaseOptions{
 		TagName:      r.ctx.TagName,

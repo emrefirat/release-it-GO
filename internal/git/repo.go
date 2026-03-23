@@ -24,6 +24,9 @@ var httpsPattern = regexp.MustCompile(`^https?://(?:[^@]+@)?([^/]+)/(.+)/([^/]+?
 // Supports nested groups: git@gitlab.com:group/subgroup/repo.git
 var sshPattern = regexp.MustCompile(`^git@([^:]+):(.+)/([^/]+?)(?:\.git)?$`)
 
+// sshURLPattern matches ssh:// protocol URLs like ssh://git@host:22/owner/repo.git
+var sshURLPattern = regexp.MustCompile(`^ssh://(?:[^@]+@)?([^:/]+)(?::\d+)?/(.+)/([^/]+?)(?:\.git)?$`)
+
 // GetRepoInfo parses repository information from the given git remote.
 func GetRepoInfo(remoteName string) (*RepoInfo, error) {
 	if remoteName == "" {
@@ -56,6 +59,16 @@ func ParseRepoURL(url string) (*RepoInfo, error) {
 	}
 
 	if matches := sshPattern.FindStringSubmatch(url); matches != nil {
+		return &RepoInfo{
+			Remote:     url,
+			Protocol:   "ssh",
+			Host:       matches[1],
+			Owner:      matches[2],
+			Repository: matches[3],
+		}, nil
+	}
+
+	if matches := sshURLPattern.FindStringSubmatch(url); matches != nil {
 		return &RepoInfo{
 			Remote:     url,
 			Protocol:   "ssh",
