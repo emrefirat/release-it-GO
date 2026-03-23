@@ -93,6 +93,8 @@ func LoadConfigFromBytes(data []byte, format string) (*Config, error) {
 	cfg := DefaultConfig()
 
 	if format == "json" {
+		// Apply same normalization as file-based loading for npm compat
+		data = normalizeJSON(data)
 		if err := json.Unmarshal(data, cfg); err != nil {
 			return nil, fmt.Errorf("parsing JSON config: %w", err)
 		}

@@ -137,3 +137,30 @@ func TestFormatVersion(t *testing.T) {
 		t.Errorf("FormatVersion = %q, want %q", got, "1.2.3")
 	}
 }
+
+func TestIncrementVersion_EmptyPreReleaseID(t *testing.T) {
+	v, _ := ParseVersion("1.0.0")
+
+	// Empty preReleaseID defaults to "0", producing "2.0.0-0.0"
+	result, err := IncrementVersion(v, "premajor", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got := FormatVersion(result)
+	if got != "2.0.0-0.0" {
+		t.Errorf("premajor with empty ID = %q, want '2.0.0-0.0'", got)
+	}
+}
+
+func TestIncrementVersion_PreReleaseWithID(t *testing.T) {
+	v, _ := ParseVersion("1.0.0")
+
+	result, err := IncrementVersion(v, "premajor", "beta")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got := FormatVersion(result)
+	if got != "2.0.0-beta.0" {
+		t.Errorf("premajor with beta = %q, want '2.0.0-beta.0'", got)
+	}
+}
