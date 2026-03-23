@@ -92,6 +92,48 @@ func runGit(t *testing.T, dir string, args ...string) string {
 	return string(out)
 }
 
+// assertFileContains checks that a file contains the expected string.
+func assertFileContains(t *testing.T, path string, expected string) {
+	t.Helper()
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed to read %s: %v", path, err)
+	}
+	if !strings.Contains(string(content), expected) {
+		t.Errorf("%s does not contain %q", filepath.Base(path), expected)
+	}
+}
+
+// assertFileNotExists checks that a file does not exist.
+func assertFileNotExists(t *testing.T, path string) {
+	t.Helper()
+	if _, err := os.Stat(path); err == nil {
+		t.Errorf("expected %s to not exist", filepath.Base(path))
+	}
+}
+
+// assertWorkingDirClean checks that git status is clean.
+func assertWorkingDirClean(t *testing.T, dir string) {
+	t.Helper()
+	out := runGit(t, dir, "status", "--porcelain")
+	if strings.TrimSpace(out) != "" {
+		t.Errorf("expected clean working directory, got:\n%s", out)
+	}
+}
+
+// assertTagCount checks the number of tags in the repo.
+func assertTagCount(t *testing.T, dir string, expected int) {
+	t.Helper()
+	out := runGit(t, dir, "tag", "-l")
+	tags := strings.Split(strings.TrimSpace(out), "\n")
+	if tags[0] == "" {
+		tags = []string{}
+	}
+	if len(tags) != expected {
+		t.Errorf("expected %d tags, got %d: %v", expected, len(tags), tags)
+	}
+}
+
 // writeFile writes content to a file, creating directories as needed.
 func writeFile(t *testing.T, path string, content string) {
 	t.Helper()

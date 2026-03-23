@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"release-it-go/internal/config"
 	"release-it-go/internal/git"
@@ -498,5 +499,54 @@ func TestGitHubClient_ValidateToken_DryRun(t *testing.T) {
 	err := c.ValidateToken()
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestGitHubClient_CreateHTTPClient_DefaultTimeout(t *testing.T) {
+	c := &GitHubClient{
+		config: &config.GitHubConfig{},
+		logger: testLogger(),
+	}
+	client := c.createHTTPClient()
+	if client.Timeout != 30*time.Second {
+		t.Errorf("default timeout = %v, want 30s", client.Timeout)
+	}
+}
+
+func TestGitHubClient_CreateHTTPClient_CustomTimeout(t *testing.T) {
+	c := &GitHubClient{
+		config: &config.GitHubConfig{Timeout: 60},
+		logger: testLogger(),
+	}
+	client := c.createHTTPClient()
+	if client.Timeout != 60*time.Second {
+		t.Errorf("timeout = %v, want 60s", client.Timeout)
+	}
+}
+
+func TestGitHubClient_CreateHTTPClient_WithProxy(t *testing.T) {
+	c := &GitHubClient{
+		config: &config.GitHubConfig{Proxy: "http://proxy.example.com:8080"},
+		logger: testLogger(),
+	}
+	client := c.createHTTPClient()
+	transport, ok := client.Transport.(*http.Transport)
+	if !ok {
+		t.Fatal("expected *http.Transport")
+	}
+	if transport.Proxy == nil {
+		t.Error("expected proxy to be configured")
+	}
+}
+
+func TestGitHubClient_CreateHTTPClient_InvalidProxy(t *testing.T) {
+	c := &GitHubClient{
+		config: &config.GitHubConfig{Proxy: "://invalid"},
+		logger: testLogger(),
+	}
+	// Should not panic, should log warning and continue without proxy
+	client := c.createHTTPClient()
+	if client == nil {
+		t.Fatal("expected non-nil client even with invalid proxy")
 	}
 }

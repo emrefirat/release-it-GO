@@ -236,3 +236,67 @@ func TestCheckCommits(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckPrerequisites_NotGitRepo(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	commandExecutor = func(name string, args ...string) (string, error) {
+		cmd := strings.Join(args, " ")
+		if strings.Contains(cmd, "rev-parse --is-inside-work-tree") {
+			return "", fmt.Errorf("fatal: not a git repository")
+		}
+		return "", nil
+	}
+
+	cfg := &config.GitConfig{}
+	g := newTestGitWithConfig(cfg, false)
+	err := g.CheckPrerequisites()
+	if err == nil {
+		t.Error("expected error when not in git repo")
+	}
+	if !strings.Contains(err.Error(), "not a git repository") {
+		t.Errorf("expected 'not a git repository' in error, got: %v", err)
+	}
+}
+
+func TestCheckBranch_InvalidGlobPattern(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	commandExecutor = func(name string, args ...string) (string, error) {
+		cmd := strings.Join(args, " ")
+		if strings.Contains(cmd, "rev-parse --abbrev-ref") {
+			return "main", nil
+		}
+		return "", nil
+	}
+
+	// Invalid glob pattern "[a-" causes filepath.Match to error → falls back to exact match
+	cfg := &config.GitConfig{RequireBranch: "[a-"}
+	g := newTestGitWithConfig(cfg, false)
+	err := g.checkBranch()
+	if err == nil {
+		t.Error("expected error: branch 'main' does not match invalid pattern '[a-'")
+	}
+}
+
+func TestCheckCleanWorkingDir_GitError(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	commandExecutor = func(name string, args ...string) (string, error) {
+		cmd := strings.Join(args, " ")
+		if strings.Contains(cmd, "status") && strings.Contains(cmd, "porcelain") {
+			return "", fmt.Errorf("git crashed")
+		}
+		return "", nil
+	}
+
+	cfg := &config.GitConfig{RequireCleanWorkingDir: true}
+	g := newTestGitWithConfig(cfg, false)
+	err := g.checkCleanWorkingDir()
+	if err == nil {
+		t.Error("expected error when git status fails")
+	}
+}

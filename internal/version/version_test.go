@@ -1,6 +1,7 @@
 package version
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -178,5 +179,37 @@ func TestMatchPattern(t *testing.T) {
 				t.Errorf("matchPattern(%q, %q) = %v, want %v", tt.s, tt.pattern, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestGetLatestTagVersion_AllRefs_AllFiltered(t *testing.T) {
+	origRunGit := runGit
+	defer func() { runGit = origRunGit }()
+
+	runGit = func(args ...string) (string, error) {
+		return "v1.0.0-alpha\nv2.0.0-beta\n", nil
+	}
+
+	// All tags are pre-release, exclude pattern matches all
+	_, err := GetLatestTagVersion(VersionOptions{
+		GetFromAllRefs: true,
+		TagExclude:     "*-*",
+	})
+	if err == nil {
+		t.Error("expected error when all tags are filtered out")
+	}
+}
+
+func TestDetectVersion_FallbackToDefault(t *testing.T) {
+	origRunGit := runGit
+	defer func() { runGit = origRunGit }()
+
+	runGit = func(args ...string) (string, error) {
+		return "", fmt.Errorf("no tags")
+	}
+
+	got := DetectVersion(VersionOptions{})
+	if got != FallbackVersion {
+		t.Errorf("DetectVersion = %q, want %q", got, FallbackVersion)
 	}
 }
