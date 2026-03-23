@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"release-it-go/internal/config"
 	"release-it-go/internal/git"
@@ -572,5 +573,103 @@ func TestGitLabClient_ValidateToken_DryRun(t *testing.T) {
 	err := c.ValidateToken()
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestGitLabClient_CreateHTTPClient_DefaultTimeout(t *testing.T) {
+	c := &GitLabClient{
+		config: &config.GitLabConfig{Secure: true},
+		logger: applog.NewLogger(0, false),
+	}
+	client := c.createHTTPClient()
+	if client.Timeout != 30*time.Second {
+		t.Errorf("timeout = %v, want 30s", client.Timeout)
+	}
+}
+
+func TestGitLabClient_CreateHTTPClient_InsecureSkipVerify(t *testing.T) {
+	c := &GitLabClient{
+		config: &config.GitLabConfig{Secure: false},
+		logger: applog.NewLogger(0, false),
+	}
+	client := c.createHTTPClient()
+	transport, ok := client.Transport.(*http.Transport)
+	if !ok {
+		t.Fatal("expected *http.Transport")
+	}
+	if !transport.TLSClientConfig.InsecureSkipVerify {
+		t.Error("expected InsecureSkipVerify=true when Secure=false")
+	}
+}
+
+func TestGitLabClient_CreateHTTPClient_SecureMode(t *testing.T) {
+	c := &GitLabClient{
+		config: &config.GitLabConfig{Secure: true},
+		logger: applog.NewLogger(0, false),
+	}
+	client := c.createHTTPClient()
+	transport, ok := client.Transport.(*http.Transport)
+	if !ok {
+		t.Fatal("expected *http.Transport")
+	}
+	if transport.TLSClientConfig.InsecureSkipVerify {
+		t.Error("expected InsecureSkipVerify=false when Secure=true")
+	}
+}
+
+func TestGitLabClient_CreateHTTPClient_CACertFromFile(t *testing.T) {
+	// Create a dummy PEM cert file
+	tmpDir := t.TempDir()
+	certFile := tmpDir + "/ca.pem"
+	// Not a real cert, just testing the loading path
+	_ = os.WriteFile(certFile, []byte("-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----"), 0644)
+
+	c := &GitLabClient{
+		config: &config.GitLabConfig{
+			CertificateAuthorityFile: certFile,
+			Secure:                   true,
+		},
+		logger: applog.NewLogger(0, false),
+	}
+	// Should not panic
+	client := c.createHTTPClient()
+	if client == nil {
+		t.Fatal("expected non-nil client")
+	}
+}
+
+func TestGitLabClient_CreateHTTPClient_CACertMissing(t *testing.T) {
+	c := &GitLabClient{
+		config: &config.GitLabConfig{
+			CertificateAuthorityFile: "/nonexistent/ca.pem",
+			Secure:                   true,
+		},
+		logger: applog.NewLogger(0, false),
+	}
+	// Should not panic, should log warning and continue
+	client := c.createHTTPClient()
+	if client == nil {
+		t.Fatal("expected non-nil client even with missing cert")
+	}
+}
+
+func TestGitLabClient_CreateHTTPClient_CACertFromEnvRef(t *testing.T) {
+	tmpDir := t.TempDir()
+	certFile := tmpDir + "/ca.pem"
+	_ = os.WriteFile(certFile, []byte("-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----"), 0644)
+
+	_ = os.Setenv("TEST_CA_FILE", certFile)
+	defer func() { _ = os.Unsetenv("TEST_CA_FILE") }()
+
+	c := &GitLabClient{
+		config: &config.GitLabConfig{
+			CertificateAuthorityFileRef: "TEST_CA_FILE",
+			Secure:                      true,
+		},
+		logger: applog.NewLogger(0, false),
+	}
+	client := c.createHTTPClient()
+	if client == nil {
+		t.Fatal("expected non-nil client")
 	}
 }

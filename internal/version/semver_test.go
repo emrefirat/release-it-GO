@@ -164,3 +164,46 @@ func TestIncrementVersion_PreReleaseWithID(t *testing.T) {
 		t.Errorf("premajor with beta = %q, want '2.0.0-beta.0'", got)
 	}
 }
+
+func TestParsePreRelease_NonNumericSuffix(t *testing.T) {
+	// "beta.alpha" → no numeric suffix, returns ("beta.alpha", 0)
+	id, num := parsePreRelease("beta.alpha")
+	if num != 0 {
+		t.Errorf("expected num=0 for non-numeric suffix, got %d", num)
+	}
+	if id != "beta.alpha" {
+		t.Errorf("expected id='beta.alpha', got %q", id)
+	}
+}
+
+func TestParsePreRelease_SinglePart(t *testing.T) {
+	// "beta" → single part, no dot separator
+	id, num := parsePreRelease("beta")
+	if num != 0 {
+		t.Errorf("expected num=0, got %d", num)
+	}
+	if id != "beta" {
+		t.Errorf("expected id='beta', got %q", id)
+	}
+}
+
+func TestParsePreRelease_ValidSuffix(t *testing.T) {
+	id, num := parsePreRelease("rc.3")
+	if id != "rc" {
+		t.Errorf("expected id='rc', got %q", id)
+	}
+	if num != 3 {
+		t.Errorf("expected num=3, got %d", num)
+	}
+}
+
+func TestParsePreRelease_DottedID(t *testing.T) {
+	// "my.pre.release.5" → id="my.pre.release", num=5
+	id, num := parsePreRelease("my.pre.release.5")
+	if id != "my.pre.release" {
+		t.Errorf("expected id='my.pre.release', got %q", id)
+	}
+	if num != 5 {
+		t.Errorf("expected num=5, got %d", num)
+	}
+}

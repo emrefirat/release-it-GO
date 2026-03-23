@@ -187,3 +187,48 @@ func TestExtractNestedValue_NonMap(t *testing.T) {
 		t.Error("expected error for non-map value")
 	}
 }
+
+func TestExtractNestedValue_NonMapIntermediate(t *testing.T) {
+	// a.b.c where a.b is a string, not a map
+	obj := map[string]interface{}{
+		"a": map[string]interface{}{
+			"b": "string-not-map",
+		},
+	}
+	_, err := extractNestedValue(obj, "a.b.c")
+	if err == nil {
+		t.Error("expected error when traversing into non-map intermediate value")
+	}
+}
+
+func TestReadYAML_Malformed(t *testing.T) {
+	malformed := []byte("key: [invalid\n  yaml: {broken")
+	_, err := readYAML(malformed, "key")
+	if err == nil {
+		t.Error("expected error for malformed YAML")
+	}
+}
+
+func TestReadTOML_Malformed(t *testing.T) {
+	malformed := []byte("[broken\nkey = ")
+	_, err := readTOML(malformed, "key")
+	if err == nil {
+		t.Error("expected error for malformed TOML")
+	}
+}
+
+func TestReadYAML_KeyNotFound(t *testing.T) {
+	data := []byte("version: 1.0.0")
+	_, err := readYAML(data, "nonexistent")
+	if err == nil {
+		t.Error("expected error for missing key")
+	}
+}
+
+func TestReadTOML_KeyNotFound(t *testing.T) {
+	data := []byte("version = \"1.0.0\"")
+	_, err := readTOML(data, "nonexistent")
+	if err == nil {
+		t.Error("expected error for missing key")
+	}
+}
