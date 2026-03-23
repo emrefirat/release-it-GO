@@ -30,22 +30,22 @@ func LoadConfig(configPath string) (*Config, error) {
 	cfg := DefaultConfig()
 
 	if configPath != "" {
-		cfg, err := loadFromFile(cfg, configPath)
+		loaded, err := loadFromFile(cfg, configPath)
 		if err != nil {
 			return nil, err
 		}
-		cfg.ConfigFile = configPath
-		return cfg, nil
+		loaded.ConfigFile = configPath
+		return loaded, nil
 	}
 
 	for _, f := range configSearchFiles {
 		if fileExists(f) {
-			cfg, err := loadFromFile(cfg, f)
+			loaded, err := loadFromFile(cfg, f)
 			if err != nil {
 				return nil, err
 			}
-			cfg.ConfigFile = f
-			return cfg, nil
+			loaded.ConfigFile = f
+			return loaded, nil
 		}
 	}
 

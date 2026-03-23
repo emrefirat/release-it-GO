@@ -973,35 +973,7 @@ func (r *Runner) printSummary(duration time.Duration) {
 
 // renderTagName replaces ${version} in a template string.
 func renderTagName(template string, version string) string {
-	result := template
-	result = replaceAll(result, "${version}", version)
-	return result
-}
-
-// replaceAll is a simple string replacement helper.
-func replaceAll(s, old, new string) string {
-	for {
-		i := indexOf(s, old)
-		if i < 0 {
-			return s
-		}
-		s = s[:i] + new + s[i+len(old):]
-	}
-}
-
-// indexOf finds the first occurrence of substr in s.
-func indexOf(s, substr string) int {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return i
-		}
-	}
-	return -1
-}
-
-// hasPrefix checks if s starts with prefix.
-func hasPrefix(s, prefix string) bool {
-	return len(s) >= len(prefix) && s[:len(prefix)] == prefix
+	return strings.ReplaceAll(template, "${version}", version)
 }
 
 // latestVersionToTag converts LatestVersion to a git tag for commit range queries.

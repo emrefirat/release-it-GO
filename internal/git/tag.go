@@ -32,7 +32,7 @@ func (g *Git) GetLatestTag() (string, error) {
 
 	out, err := g.runSilent("describe", "--tags", "--abbrev=0")
 	if err != nil {
-		return "", fmt.Errorf("no git tags found")
+		return "", fmt.Errorf("no git tags found: %w", err)
 	}
 	return strings.TrimSpace(out), nil
 }
@@ -88,7 +88,6 @@ func (g *Git) GetLatestPreReleaseTagMerged(preReleaseID string) (string, error) 
 		return "", fmt.Errorf("listing merged tags: %w", err)
 	}
 
-	suffix := "-" + preReleaseID + "."
 	tags := strings.Split(strings.TrimSpace(out), "\n")
 	for _, tag := range tags {
 		tag = strings.TrimSpace(tag)
@@ -103,8 +102,14 @@ func (g *Git) GetLatestPreReleaseTagMerged(preReleaseID string) (string, error) 
 			continue
 		}
 
-		if strings.Contains(tag, suffix) {
-			return tag, nil
+		// Match exact preReleaseID: find first "-" (semver pre-release separator),
+		// then check that the pre-release section starts with "preReleaseID."
+		// This prevents "beta" from matching "betafix" tags.
+		if idx := strings.Index(tag, "-"); idx >= 0 {
+			preReleasePart := tag[idx+1:]
+			if strings.HasPrefix(preReleasePart, preReleaseID+".") {
+				return tag, nil
+			}
 		}
 	}
 
