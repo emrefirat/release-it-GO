@@ -25,9 +25,9 @@
 | 14 | YAML Config Yazma + Init Format Secimi | Tamamlandi | 100% |
 | 15 | Branch-Aware Pre-Release Version Detection | Tamamlandi | 100% |
 
-**Son Guncelleme:** 2026-02-20
+**Son Guncelleme:** 2026-03-23
 **Aktif Gelistirici:** Claude
-**Mevcut Versiyon:** dev (Phase 14 YAML config yazma + init format secimi tamamlandi - production-ready)
+**Mevcut Versiyon:** dev (Phase 15 tamamlandi - production-ready)
 
 ---
 
@@ -526,6 +526,7 @@
 - [x] BUG: printSummary lipgloss kutu gereksiz ve tekrarli (2026-02-16) → Kullanici geri bildirimi: cerceve gereksiz detay. Fix: Duz, minimal cikti formatina gecildi.
 - [x] BUG: --preRelease ayni ID ile tekrar calistirildiginda versiyon artmiyor (2026-02-16) → `1.6.0-deneme2.0 → 1.6.0-deneme2.0` ayni versiyon uretiliyor, tag zaten var hatasi. Sebep: `prepatch` increment mevcut pre-release'i dusuruyordu sonra ayni .0 ile basliyordu. Fix: Mevcut versiyon ayni pre-release ID'ye sahipse `"prerelease"` increment kullan (sayi arttirir: `.0 → .1`).
 - [x] BUG: --check-commits gecersiz commit type'lari kabul ediyor (2026-02-16) → `fic: deneme commit` gibi gecersiz type'lar conventional commit olarak geciyordu. Sebep: regex `\w+` herhangi bir kelimeyi type olarak kabul ediyordu. Fix: `allowedTypes` map eklendi (Angular preset: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert), type dogrulamasi yapiliyor. Gecersiz type icin "unknown type: fic" sebebi doner. --verbose ile kontrol edilen commitlerin listesi gosteriliyor.
+- [x] BUG: `latestVersionToTag()` hardcoded `v` prefix ekliyordu, config'deki `tagName` template'ini kullanmiyordu (2026-03-23) → Config dosyasi olmayan ortamlarda (default `tagName: "${version}"`) tag `0.1.0-main.0` olarak olusturulurken changelog `v0.1.0-main.0` ariyordu. Fix: `latestVersionToTag()` artik `renderTagName(tagNameTemplate, version)` kullaniyor. Version'dan `v` prefix'i temizlenip template'e veriliyor, `vv` tekrarlamasi onlendi.
 - [x] BUG: `push: false` olmasina ragmen "no upstream configured" hatasi (2026-02-18) → `checkUpstream()` sadece `requireUpstream` flag'ine bakiyordu, `push` durumunu kontrol etmiyordu. Elle yazilan config'lerde `push: false` + `requireUpstream` belirtilmemis ise default `true` ile upstream kontrolu calisip hata veriyordu. Init wizard bu durumu `requireUpstream = false` set ederek maskeliyordu ama asil kontrol fonksiyonu eksikti. Fix: `checkUpstream()` icine `!g.config.Push` kontrolu eklendi, push kapaliyken upstream kontrolu atlanir. Test eklendi.
 
 ---
@@ -572,6 +573,16 @@
 | 2026-02-18 | Claude | refactor: init wizard soru sirasi iyilestirildi - format sorusu sona tasinarak UX iyilestirildi |
 | 2026-02-18 | Claude | fix: push false iken upstream hatasi - checkUpstream push durumunu kontrol etmiyordu |
 | 2026-02-20 | Claude | Phase 15 tamamlandi: Branch-aware pre-release version detection - GetLatestPreReleaseTagMerged, GetLatestStableTagMerged, resolvePreReleaseBaseTag, 16 unit test + 4 integration test |
+| 2026-02-21 | Claude | refactor: CLAUDE.md modular .claude/rules/ yapisina gecti (6 kural dosyasi), Makefile iyilestirildi (ldflags, coverage, vuln, check), Docker entrypoint info-only komut destegi |
+| 2026-02-21 | Claude | revert: GitLab CI_JOB_TOKEN degisiklikleri geri alindi (ValidateToken /projects/:id + Job-Token header auto-detect) - CI_JOB_TOKEN commit/tag/push yetkisine sahip degil, Project Access Token gerekli |
+| 2026-03-23 | Claude | fix: latestVersionToTag hardcoded v prefix yerine tagName template kullaniyor - config dosyasi olmayan ortamlarda tag uyumsuzlugu giderildi |
+
+---
+
+## Gelecek Iyilestirmeler (Oncelik: Dusuk)
+
+- [ ] GitLab `ValidateToken()` endpoint'i `/user` yerine `/projects/:id` kullanabilir (CI_JOB_TOKEN uyumlulugu icin, ancak CI_JOB_TOKEN commit/push yapamadigi icin pratik faydasi sinirli)
+- [ ] GitLab CI entegrasyonu icin dokumantasyon: `git remote set-url` ayari, Project Access Token gereksinimleri, `GIT_DEPTH: 0` gerekliligi
 
 ---
 
