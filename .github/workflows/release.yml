@@ -1,133 +1,56 @@
 name: Release
 
 on:
-  push:
-    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      increment:
+        description: "Version increment (empty = auto-detect from commits)"
+        required: false
+        type: choice
+        options:
+          - ""
+          - patch
+          - minor
+          - major
 
 permissions:
   contents: write
 
 jobs:
-  test:
+  release:
+    name: Create release tag
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.PAT_TOKEN }}
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
+      - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
 
-      - name: Test
-        run: go test ./... -count=1 -timeout 300s
+      - name: Build release-it-go
+        run: go build -o ./bin/release-it-go ./cmd/release-it-go
 
-  build:
-    needs: test
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - goos: linux
-            goarch: amd64
-          - goos: linux
-            goarch: arm64
-          - goos: darwin
-            goarch: amd64
-          - goos: darwin
-            goarch: arm64
-          - goos: windows
-            goarch: amd64
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-
-      - name: Build
+      - name: Create tag with release-it-go
         env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
-          CGO_ENABLED: '0'
-          VERSION: ${{ github.ref_name }}
+          INCREMENT: ${{ inputs.increment }}
         run: |
-          EXT=""
-          if [ "$GOOS" = "windows" ]; then EXT=".exe"; fi
-          COMMIT=$(git rev-parse --short HEAD)
-          BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          mkdir -p dist
-          go build -ldflags="-s -w -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${BUILD_DATE}" \
-            -o "dist/release-it-go_${GOOS}_${GOARCH}${EXT}" \
-            ./cmd/release-it-go
+          ARGS="--ci --no-github.release"
+          if [ -n "$INCREMENT" ]; then
+            ARGS="$ARGS -i $INCREMENT"
+          fi
+          ./bin/release-it-go $ARGS
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-it-go_${{ matrix.goos }}_${{ matrix.goarch }}
-          path: dist/
-
-  publish:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: dist
-          merge-multiple: true
-
-      - name: Generate changelog
-        id: changelog
+      - name: Push tag
         run: |
-          PREV_TAG=$(git tag --sort=-v:refname | head -2 | tail -1)
-          echo "prev_tag=${PREV_TAG}" >> "$GITHUB_OUTPUT"
-          {
-            echo 'changelog<<CHANGELOG_EOF'
-            if [ -n "$PREV_TAG" ]; then
-              git log "${PREV_TAG}..HEAD" --pretty=format:"- %s" --no-merges
-            else
-              git log --pretty=format:"- %s" --no-merges -20
-            fi
-            echo ''
-            echo 'CHANGELOG_EOF'
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          generate_release_notes: false
-          body: |
-            ## release-it-go ${{ github.ref_name }}
-
-            ### Changes since ${{ steps.changelog.outputs.prev_tag }}
-            ${{ steps.changelog.outputs.changelog }}
-
-            ### Installation
-
-            **Go install:**
-            ```bash
-            go install github.com/emrefirat/release-it-GO/cmd/release-it-go@${{ github.ref_name }}
-            ```
-
-            **Binary download:** Download the appropriate binary below for your platform.
-
-            ### Platforms
-            | OS | Arch | Binary |
-            |---|---|---|
-            | Linux | amd64 | `release-it-go_linux_amd64` |
-            | Linux | arm64 | `release-it-go_linux_arm64` |
-            | macOS | amd64 | `release-it-go_darwin_amd64` |
-            | macOS | arm64 | `release-it-go_darwin_arm64` |
-            | Windows | amd64 | `release-it-go_windows_amd64.exe` |
-          files: dist/*
+          TAG=$(git describe --tags --abbrev=0)
+          echo "Pushing tag: $TAG"
+          git push origin HEAD
+          git push origin "$TAG"
