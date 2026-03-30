@@ -42,13 +42,13 @@ jobs:
         env:
           INCREMENT: ${{ inputs.increment }}
         run: |
-          ARGS="--ci --no-github.release"
           if [ -n "$INCREMENT" ]; then
-            ARGS="$ARGS -i $INCREMENT"
+            ./bin/release-it-go --ci -i "$INCREMENT"
+          else
+            ./bin/release-it-go --ci
           fi
-          ./bin/release-it-go $ARGS
 
-      - name: Push tag
+      - name: Push changes and tag
         run: |
           TAG=$(git describe --tags --abbrev=0)
           echo "Pushing tag: $TAG"
