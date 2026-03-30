@@ -1,6 +1,7 @@
 package git
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -246,5 +247,171 @@ func TestGetCommitsSinceTag_Empty(t *testing.T) {
 	}
 	if commits != nil {
 		t.Errorf("expected nil for no commits, got %v", commits)
+	}
+}
+
+// --- GetCommitCountSinceTag tests ---
+
+func TestGetCommitCountSinceTag_WithTag(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	commandExecutor = func(name string, args ...string) (string, error) {
+		return "5", nil
+	}
+
+	cfg := &config.GitConfig{}
+	g := newTestGitWithConfig(cfg, false)
+
+	count, err := g.GetCommitCountSinceTag("v1.0.0")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if count != 5 {
+		t.Errorf("expected 5, got %d", count)
+	}
+}
+
+func TestGetCommitCountSinceTag_NoTag(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	commandExecutor = func(name string, args ...string) (string, error) {
+		cmd := strings.Join(args, " ")
+		if !strings.Contains(cmd, "..") {
+			return "12", nil
+		}
+		return "", fmt.Errorf("unexpected")
+	}
+
+	cfg := &config.GitConfig{}
+	g := newTestGitWithConfig(cfg, false)
+
+	count, err := g.GetCommitCountSinceTag("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if count != 12 {
+		t.Errorf("expected 12, got %d", count)
+	}
+}
+
+func TestGetCommitCountSinceTag_Zero(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	commandExecutor = func(name string, args ...string) (string, error) {
+		return "0", nil
+	}
+
+	cfg := &config.GitConfig{}
+	g := newTestGitWithConfig(cfg, false)
+
+	count, err := g.GetCommitCountSinceTag("v1.0.0")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("expected 0, got %d", count)
+	}
+}
+
+func TestGetCommitCountSinceTag_GitError(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	commandExecutor = func(name string, args ...string) (string, error) {
+		return "", fmt.Errorf("git error")
+	}
+
+	cfg := &config.GitConfig{}
+	g := newTestGitWithConfig(cfg, false)
+
+	_, err := g.GetCommitCountSinceTag("v1.0.0")
+	if err == nil {
+		t.Error("expected error")
+	}
+}
+
+// --- GetContributorsSinceTag tests ---
+
+func TestGetContributorsSinceTag_WithDuplicates(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	commandExecutor = func(name string, args ...string) (string, error) {
+		return "Alice\nBob\nAlice\nCharlie\nBob", nil
+	}
+
+	cfg := &config.GitConfig{}
+	g := newTestGitWithConfig(cfg, false)
+
+	contributors, err := g.GetContributorsSinceTag("v1.0.0")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(contributors) != 3 {
+		t.Errorf("expected 3 unique contributors, got %d: %v", len(contributors), contributors)
+	}
+}
+
+func TestGetContributorsSinceTag_Empty(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	commandExecutor = func(name string, args ...string) (string, error) {
+		return "", nil
+	}
+
+	cfg := &config.GitConfig{}
+	g := newTestGitWithConfig(cfg, false)
+
+	contributors, err := g.GetContributorsSinceTag("v1.0.0")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if contributors != nil {
+		t.Errorf("expected nil, got %v", contributors)
+	}
+}
+
+func TestGetContributorsSinceTag_NoTag(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	commandExecutor = func(name string, args ...string) (string, error) {
+		cmd := strings.Join(args, " ")
+		if !strings.Contains(cmd, "..") {
+			return "Alice", nil
+		}
+		return "", fmt.Errorf("unexpected")
+	}
+
+	cfg := &config.GitConfig{}
+	g := newTestGitWithConfig(cfg, false)
+
+	contributors, err := g.GetContributorsSinceTag("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(contributors) != 1 || contributors[0] != "Alice" {
+		t.Errorf("expected [Alice], got %v", contributors)
+	}
+}
+
+func TestGetContributorsSinceTag_GitError(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	commandExecutor = func(name string, args ...string) (string, error) {
+		return "", fmt.Errorf("git error")
+	}
+
+	cfg := &config.GitConfig{}
+	g := newTestGitWithConfig(cfg, false)
+
+	_, err := g.GetContributorsSinceTag("v1.0.0")
+	if err == nil {
+		t.Error("expected error")
 	}
 }
