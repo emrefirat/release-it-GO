@@ -17,13 +17,32 @@ import (
 
 const defaultTimeout = 30
 
+// RichNotificationContext holds release context data for rich notifications.
+// This enables Teams MessageCard and Slack Block Kit payloads with structured data.
+type RichNotificationContext struct {
+	Version       string
+	LatestVersion string
+	TagName       string
+	Changelog     string
+	ReleaseURL    string
+	BranchName    string
+	RepoHost      string
+	RepoOwner     string
+	RepoName      string
+	CommitCount   int
+	Contributors  []string
+	ThemeColor    string // Hex color for Teams card (default: "0076D7")
+	ImageURL      string // Activity image URL for Teams card
+}
+
 // Client sends webhook notifications to configured endpoints.
 type Client struct {
-	webhooks   []config.WebhookConfig
-	vars       map[string]string
-	logger     *applog.Logger
-	dryRun     bool
-	httpClient *http.Client
+	webhooks    []config.WebhookConfig
+	vars        map[string]string
+	richContext *RichNotificationContext
+	logger      *applog.Logger
+	dryRun      bool
+	httpClient  *http.Client
 }
 
 // NewClient creates a new notification client.
@@ -35,6 +54,11 @@ func NewClient(webhooks []config.WebhookConfig, vars map[string]string, logger *
 		dryRun:     dryRun,
 		httpClient: &http.Client{},
 	}
+}
+
+// SetRichContext sets the rich notification context for structured payloads.
+func (c *Client) SetRichContext(ctx *RichNotificationContext) {
+	c.richContext = ctx
 }
 
 // SendAll sends notifications to all configured webhooks.
@@ -68,7 +92,12 @@ func (c *Client) sendOne(wh config.WebhookConfig) error {
 	case "slack":
 		payload, err = buildSlackPayload(message)
 	case "teams":
-		payload, err = buildTeamsPayload(message)
+		// Use rich MessageCard if context is available
+		if c.richContext != nil {
+			payload, err = buildTeamsRichPayload(c.richContext)
+		} else {
+			payload, err = buildTeamsPayload(message)
+		}
 	default:
 		return fmt.Errorf("unsupported webhook type: %q", wh.Type)
 	}

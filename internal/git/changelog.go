@@ -108,3 +108,58 @@ func (g *Git) GetCommitsSinceTag(tag string) ([]string, error) {
 
 	return commits, nil
 }
+
+// GetCommitCountSinceTag returns the number of commits since the given tag.
+func (g *Git) GetCommitCountSinceTag(tag string) (int, error) {
+	var args []string
+	if tag == "" {
+		args = []string{"rev-list", "--count", "HEAD"}
+	} else {
+		args = []string{"rev-list", "--count", tag + "..HEAD"}
+	}
+
+	out, err := g.runSilent(args...)
+	if err != nil {
+		return 0, err
+	}
+
+	trimmed := strings.TrimSpace(out)
+	count := 0
+	for _, ch := range trimmed {
+		if ch >= '0' && ch <= '9' {
+			count = count*10 + int(ch-'0')
+		}
+	}
+	return count, nil
+}
+
+// GetContributorsSinceTag returns unique contributor names since the given tag.
+func (g *Git) GetContributorsSinceTag(tag string) ([]string, error) {
+	var args []string
+	if tag == "" {
+		args = []string{"log", "--pretty=format:%cn", "HEAD"}
+	} else {
+		args = []string{"log", "--pretty=format:%cn", tag + "..HEAD"}
+	}
+
+	out, err := g.runSilent(args...)
+	if err != nil {
+		return nil, err
+	}
+
+	trimmed := strings.TrimSpace(out)
+	if trimmed == "" {
+		return nil, nil
+	}
+
+	seen := make(map[string]bool)
+	var unique []string
+	for _, name := range strings.Split(trimmed, "\n") {
+		name = strings.TrimSpace(name)
+		if name != "" && !seen[name] {
+			seen[name] = true
+			unique = append(unique, name)
+		}
+	}
+	return unique, nil
+}

@@ -972,6 +972,33 @@ func (r *Runner) sendNotification() error {
 	r.ctx.Spinner.Start("Notifications sent")
 
 	client := notification.NewClient(cfg.Webhooks, r.ctx.Vars, r.ctx.Logger, r.ctx.IsDryRun)
+
+	// Build rich context for structured notifications (Teams MessageCard)
+	richCtx := &notification.RichNotificationContext{
+		Version:       r.ctx.Version,
+		LatestVersion: r.ctx.LatestVersion,
+		TagName:       r.ctx.TagName,
+		Changelog:     r.ctx.Changelog,
+		ReleaseURL:    r.ctx.ReleaseURL,
+		BranchName:    r.ctx.BranchName,
+	}
+	if r.ctx.RepoInfo != nil {
+		richCtx.RepoHost = r.ctx.RepoInfo.Host
+		richCtx.RepoOwner = r.ctx.RepoInfo.Owner
+		richCtx.RepoName = r.ctx.RepoInfo.Repository
+	}
+
+	// Gather commit count and contributors
+	latestTag := latestVersionToTag(r.ctx.LatestVersion, r.ctx.Config.Git.TagName)
+	if count, err := r.ctx.Git.GetCommitCountSinceTag(latestTag); err == nil {
+		richCtx.CommitCount = count
+	}
+	if contributors, err := r.ctx.Git.GetContributorsSinceTag(latestTag); err == nil {
+		richCtx.Contributors = contributors
+	}
+
+	client.SetRichContext(richCtx)
+
 	if err := client.SendAll(); err != nil {
 		r.ctx.Spinner.Stop(false)
 		r.ctx.Logger.Warn("Notification failed: %v", err)
