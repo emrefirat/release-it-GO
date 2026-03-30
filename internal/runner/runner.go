@@ -988,13 +988,27 @@ func (r *Runner) sendNotification() error {
 		richCtx.RepoName = r.ctx.RepoInfo.Repository
 	}
 
+	// Apply webhook-level config (themeColor, imageUrl, ignoredContributors)
+	var ignoredContributors []string
+	for _, wh := range cfg.Webhooks {
+		if wh.ThemeColor != "" && richCtx.ThemeColor == "" {
+			richCtx.ThemeColor = wh.ThemeColor
+		}
+		if wh.ImageURL != "" && richCtx.ImageURL == "" {
+			richCtx.ImageURL = wh.ImageURL
+		}
+		if len(wh.IgnoredContributors) > 0 {
+			ignoredContributors = append(ignoredContributors, wh.IgnoredContributors...)
+		}
+	}
+
 	// Gather commit count and contributors
 	latestTag := latestVersionToTag(r.ctx.LatestVersion, r.ctx.Config.Git.TagName)
 	if count, err := r.ctx.Git.GetCommitCountSinceTag(latestTag); err == nil {
 		richCtx.CommitCount = count
 	}
 	if contributors, err := r.ctx.Git.GetContributorsSinceTag(latestTag); err == nil {
-		richCtx.Contributors = contributors
+		richCtx.Contributors = filterContributors(contributors, ignoredContributors)
 	}
 
 	client.SetRichContext(richCtx)
@@ -1017,6 +1031,24 @@ func (r *Runner) printSummary(duration time.Duration) {
 	} else {
 		fmt.Fprintf(os.Stderr, "%s Done in %.1fs\n", ui.FormatSuccess(ui.IconSuccess), duration.Seconds())
 	}
+}
+
+// filterContributors removes ignored contributors from the list.
+func filterContributors(contributors []string, ignored []string) []string {
+	if len(ignored) == 0 {
+		return contributors
+	}
+	ignoredSet := make(map[string]bool, len(ignored))
+	for _, name := range ignored {
+		ignoredSet[name] = true
+	}
+	filtered := make([]string, 0, len(contributors))
+	for _, name := range contributors {
+		if !ignoredSet[name] {
+			filtered = append(filtered, name)
+		}
+	}
+	return filtered
 }
 
 // renderTagName replaces ${version} in a template string.
