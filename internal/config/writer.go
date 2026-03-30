@@ -243,6 +243,13 @@ hooks:
   "after:github:release": []
   "before:gitlab:release": []
   "after:gitlab:release": []
+  # Git hooks — installed to .git/hooks/ via "release-it-go install"
+  "pre-commit": ["go fmt ./...", "go vet ./..."]
+  "commit-msg": ["./release-it-go --check-commits"]
+  "pre-push": ["go test ./..."]
+  # "post-commit": []
+  # "post-merge": []
+  # "prepare-commit-msg": []
 
 # Changelog generation settings
 changelog:
