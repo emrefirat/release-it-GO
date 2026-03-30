@@ -79,7 +79,7 @@ It is a Go reimplementation of release-it without Node.js dependencies.`,
 	rootCmd.AddCommand(newVersionCommand())
 	rootCmd.AddCommand(newCompletionCommand())
 	rootCmd.AddCommand(newInitCommand())
-	rootCmd.AddCommand(newInstallCommand())
+	rootCmd.AddCommand(newHooksCommand())
 
 	return rootCmd
 }
