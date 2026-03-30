@@ -1,0 +1,15 @@
+git:
+  commit: true
+  commitMessage: "chore(release): release v${version}"
+  tag: true
+  tagName: "v${version}"
+  push: false  # CI workflow handles push
+  requireCleanWorkingDir: false
+  requireUpstream: false
+
+github:
+  release: false  # GoReleaser handles GitHub release
+
+changelog:
+  enabled: true
+  preset: "angular"
