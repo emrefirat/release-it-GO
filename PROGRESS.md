@@ -29,7 +29,7 @@
 | 18 | Config Uyumluluk ve Edge Case Düzeltmeleri | Tamamlandi | 100% |
 | 19 | Test Kapsamı Güçlendirme | Tamamlandi | 100% |
 
-**Son Guncelleme:** 2026-03-23
+**Son Guncelleme:** 2026-03-30
 **Aktif Gelistirici:** Claude
 **Mevcut Versiyon:** dev (Phase 15 tamamlandi - production-ready)
 
@@ -531,6 +531,8 @@
 - [x] BUG: --preRelease ayni ID ile tekrar calistirildiginda versiyon artmiyor (2026-02-16) → `1.6.0-deneme2.0 → 1.6.0-deneme2.0` ayni versiyon uretiliyor, tag zaten var hatasi. Sebep: `prepatch` increment mevcut pre-release'i dusuruyordu sonra ayni .0 ile basliyordu. Fix: Mevcut versiyon ayni pre-release ID'ye sahipse `"prerelease"` increment kullan (sayi arttirir: `.0 → .1`).
 - [x] BUG: --check-commits gecersiz commit type'lari kabul ediyor (2026-02-16) → `fic: deneme commit` gibi gecersiz type'lar conventional commit olarak geciyordu. Sebep: regex `\w+` herhangi bir kelimeyi type olarak kabul ediyordu. Fix: `allowedTypes` map eklendi (Angular preset: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert), type dogrulamasi yapiliyor. Gecersiz type icin "unknown type: fic" sebebi doner. --verbose ile kontrol edilen commitlerin listesi gosteriliyor.
 - [x] BUG: `latestVersionToTag()` hardcoded `v` prefix ekliyordu, config'deki `tagName` template'ini kullanmiyordu (2026-03-23) → Config dosyasi olmayan ortamlarda (default `tagName: "${version}"`) tag `0.1.0-main.0` olarak olusturulurken changelog `v0.1.0-main.0` ariyordu. Fix: `latestVersionToTag()` artik `renderTagName(tagNameTemplate, version)` kullaniyor. Version'dan `v` prefix'i temizlenip template'e veriliyor, `vv` tekrarlamasi onlendi.
+- [x] BUG: Changelog disabled iken `git commit` "nothing to commit" hatasi veriyordu (2026-03-30) → Changelog ve bumper kapaliyken stage'de degisiklik yok, ama commit deneniyordu. Fix: `HasStagedChanges()` kontrolu eklendi, staged degisiklik yoksa commit atlanip verbose log birakilir.
+- [x] BUG: `tagName` config'i degistiginde eski formattaki tag'lar latest olarak bulunuyordu (2026-03-30) → `v${version}` → `${version}` gecisinde `GetLatestTag` hala `v1.5.0`'i buluyordu, changelog `1.5.0` tag'ini ariyordu (yok). Fix: `matchesTagNameFormat()` ile tag format filtrelemesi eklendi. Format gecisinde versiyon devamliligi icin fallback mekanizmasi, changelog'da raw tag fallback'i.
 - [x] BUG: `push: false` olmasina ragmen "no upstream configured" hatasi (2026-02-18) → `checkUpstream()` sadece `requireUpstream` flag'ine bakiyordu, `push` durumunu kontrol etmiyordu. Elle yazilan config'lerde `push: false` + `requireUpstream` belirtilmemis ise default `true` ile upstream kontrolu calisip hata veriyordu. Init wizard bu durumu `requireUpstream = false` set ederek maskeliyordu ama asil kontrol fonksiyonu eksikti. Fix: `checkUpstream()` icine `!g.config.Push` kontrolu eklendi, push kapaliyken upstream kontrolu atlanir. Test eklendi.
 
 ---
@@ -580,6 +582,15 @@
 | 2026-02-21 | Claude | refactor: CLAUDE.md modular .claude/rules/ yapisina gecti (6 kural dosyasi), Makefile iyilestirildi (ldflags, coverage, vuln, check), Docker entrypoint info-only komut destegi |
 | 2026-02-21 | Claude | revert: GitLab CI_JOB_TOKEN degisiklikleri geri alindi (ValidateToken /projects/:id + Job-Token header auto-detect) - CI_JOB_TOKEN commit/tag/push yetkisine sahip degil, Project Access Token gerekli |
 | 2026-03-23 | Claude | fix: latestVersionToTag hardcoded v prefix yerine tagName template kullaniyor - config dosyasi olmayan ortamlarda tag uyumsuzlugu giderildi |
+| 2026-03-23 | Claude | feat: config dosyasi bulunamadiginda uyari mesaji, loaded config path debug log |
+| 2026-03-23 | Claude | test: resolvePreReleaseBaseTag + FormatBold testleri (runner %79.2, ui %71.8) |
+| 2026-03-23 | Claude | fix: code review bulgulari - GitLab timeout, preRelease substring match, CA cert log, proxy log, dead code temizligi |
+| 2026-03-23 | Claude | Phase 16 tamamlandi: GitLab nested group URL destegi + CalVer yyyy.mm.dd format fix |
+| 2026-03-23 | Claude | Phase 17 tamamlandi: SSH port destegi, latestVersionToTag testleri, bos release notes uyarisi |
+| 2026-03-23 | Claude | Phase 18 tamamlandi: LoadConfigFromBytes normalization, plugin override fix |
+| 2026-03-23 | Claude | Phase 19 tamamlandi: Test kapsami guclendirme - 38 yeni test, release %90.5, git %90.5, version %91.9 |
+| 2026-03-30 | Claude | fix: changelog disabled iken bos commit hatasi - HasStagedChanges kontrolu |
+| 2026-03-30 | Claude | fix: tagName config degisikliginde format-aware tag filtreleme - matchesTagNameFormat + fallback mekanizmasi, 18 yeni test |
 
 ---
 
