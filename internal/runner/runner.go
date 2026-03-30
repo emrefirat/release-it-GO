@@ -693,6 +693,15 @@ func (r *Runner) generateChangelog() error {
 	latestTag := latestVersionToTag(r.ctx.LatestVersion, r.ctx.Config.Git.TagName)
 
 	commits, err := r.ctx.Git.GetCommitsSinceTag(latestTag)
+	if err != nil && latestTag != "" {
+		// Tag not found with current format — try the raw tag from git
+		// (handles format transition: e.g., old "v1.1.0" vs new "${version}")
+		rawTag, rawErr := r.ctx.Git.GetLatestTag()
+		if rawErr == nil && rawTag != latestTag {
+			r.ctx.Logger.Debug("tag %q not found, falling back to %q", latestTag, rawTag)
+			commits, err = r.ctx.Git.GetCommitsSinceTag(rawTag)
+		}
+	}
 	if err != nil {
 		r.ctx.Spinner.Stop(false)
 		return fmt.Errorf("getting commits: %w", err)

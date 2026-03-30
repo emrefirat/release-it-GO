@@ -24,7 +24,9 @@ func (g *Git) CreateTag(tagName string, annotation string) error {
 	return err
 }
 
-// GetLatestTag returns the most recent tag.
+// GetLatestTag returns the most recent tag, preferring tags that match the current
+// tagName format. If no matching tag is found, falls back to any tag to preserve
+// version continuity during format transitions (e.g., "v${version}" → "${version}").
 func (g *Git) GetLatestTag() (string, error) {
 	if g.config.GetLatestTagFromAllRefs {
 		return g.getLatestTagFromAllRefs()
@@ -34,7 +36,26 @@ func (g *Git) GetLatestTag() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("no git tags found: %w", err)
 	}
-	return strings.TrimSpace(out), nil
+
+	tag := strings.TrimSpace(out)
+
+	// If tag matches the current format, return it directly
+	if g.matchesEffectiveFilter(tag) {
+		return tag, nil
+	}
+
+	// Tag doesn't match current format (e.g., found "v1.0.0" but tagName is "${version}").
+	// Search for a matching tag first, then fall back to any tag for version continuity.
+	g.logger.Debug("tag %q does not match tagName format, searching for matching tag", tag)
+	matchedTag, matchErr := g.getLatestTagFromAllRefs()
+	if matchErr == nil {
+		return matchedTag, nil
+	}
+
+	// No matching tag found — this is a format transition scenario.
+	// Return the original tag so version number is preserved.
+	g.logger.Debug("no matching tags found for current format, using %q for version continuity", tag)
+	return tag, nil
 }
 
 // getLatestTagFromAllRefs lists all tags sorted by version and returns the first.
@@ -51,10 +72,7 @@ func (g *Git) getLatestTagFromAllRefs() (string, error) {
 			continue
 		}
 
-		if g.config.TagMatch != "" && !matchGlob(g.config.TagMatch, tag) {
-			continue
-		}
-		if g.config.TagExclude != "" && matchGlob(g.config.TagExclude, tag) {
+		if !g.matchesEffectiveFilter(tag) {
 			continue
 		}
 
@@ -95,10 +113,7 @@ func (g *Git) GetLatestPreReleaseTagMerged(preReleaseID string) (string, error) 
 			continue
 		}
 
-		if g.config.TagMatch != "" && !matchGlob(g.config.TagMatch, tag) {
-			continue
-		}
-		if g.config.TagExclude != "" && matchGlob(g.config.TagExclude, tag) {
+		if !g.matchesEffectiveFilter(tag) {
 			continue
 		}
 
@@ -132,10 +147,7 @@ func (g *Git) GetLatestStableTagMerged() (string, error) {
 			continue
 		}
 
-		if g.config.TagMatch != "" && !matchGlob(g.config.TagMatch, tag) {
-			continue
-		}
-		if g.config.TagExclude != "" && matchGlob(g.config.TagExclude, tag) {
+		if !g.matchesEffectiveFilter(tag) {
 			continue
 		}
 
@@ -149,6 +161,42 @@ func (g *Git) GetLatestStableTagMerged() (string, error) {
 	}
 
 	return "", nil
+}
+
+// matchesTagNameFormat checks if a tag matches the expected format derived from tagName.
+// For "${version}" (bare format), tags must start with a digit.
+// For other templates, uses glob matching.
+func matchesTagNameFormat(tagName, tag string) bool {
+	if tagName == "" {
+		return true
+	}
+	if tagName == "${version}" {
+		// Bare version: must start with a digit (rejects "v1.0.0", "release-1.0.0")
+		return len(tag) > 0 && tag[0] >= '0' && tag[0] <= '9'
+	}
+	pattern := strings.ReplaceAll(tagName, "${version}", "*")
+	return matchGlob(pattern, tag)
+}
+
+// matchesEffectiveFilter checks if a tag matches the effective tag filters.
+// If the user has explicitly set TagMatch, that takes priority.
+// Otherwise, TagName template is used to derive the expected format.
+func (g *Git) matchesEffectiveFilter(tag string) bool {
+	if g.config.TagMatch != "" {
+		// Explicit TagMatch takes priority
+		if !matchGlob(g.config.TagMatch, tag) {
+			return false
+		}
+	} else {
+		// Derive format from TagName template
+		if !matchesTagNameFormat(g.config.TagName, tag) {
+			return false
+		}
+	}
+	if g.config.TagExclude != "" && matchGlob(g.config.TagExclude, tag) {
+		return false
+	}
+	return true
 }
 
 // matchGlob performs simple glob-like pattern matching.

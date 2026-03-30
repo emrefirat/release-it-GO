@@ -462,3 +462,203 @@ func TestMatchGlob(t *testing.T) {
 		})
 	}
 }
+
+// --- tagNameToGlob tests ---
+
+func TestMatchesTagNameFormat(t *testing.T) {
+	tests := []struct {
+		name    string
+		tagName string
+		tag     string
+		want    bool
+	}{
+		// v${version} format
+		{"v-prefix matches v tag", "v${version}", "v1.0.0", true},
+		{"v-prefix rejects bare tag", "v${version}", "1.0.0", false},
+		{"v-prefix matches v-prerelease", "v${version}", "v2.0.0-beta.1", true},
+
+		// ${version} format (bare)
+		{"bare matches digit-start", "${version}", "1.0.0", true},
+		{"bare matches digit-prerelease", "${version}", "2.0.0-beta.1", true},
+		{"bare rejects v-prefix", "${version}", "v1.0.0", false},
+		{"bare rejects text-prefix", "${version}", "release-1.0.0", false},
+
+		// custom prefix
+		{"custom matches prefix", "release-${version}", "release-1.0.0", true},
+		{"custom rejects v-prefix", "release-${version}", "v1.0.0", false},
+		{"custom rejects bare", "release-${version}", "1.0.0", false},
+
+		// empty tagName (no filter)
+		{"empty accepts anything", "", "v1.0.0", true},
+		{"empty accepts bare", "", "1.0.0", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := matchesTagNameFormat(tt.tagName, tt.tag)
+			if got != tt.want {
+				t.Errorf("matchesTagNameFormat(%q, %q) = %v, want %v",
+					tt.tagName, tt.tag, got, tt.want)
+			}
+		})
+	}
+}
+
+// --- GetLatestTag format-aware filtering tests ---
+
+func TestGetLatestTag_SkipsWrongFormat(t *testing.T) {
+	// Scenario: tagName changed from "v${version}" to "${version}"
+	// Repo has both v-prefixed and non-prefixed tags
+	// GetLatestTag should skip v-prefixed tags and find the non-prefixed one
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	commandExecutor = func(name string, args ...string) (string, error) {
+		cmd := strings.Join(args, " ")
+		// git describe returns the nearest annotated tag — which may be wrong format
+		if strings.Contains(cmd, "describe") {
+			return "v1.5.0", nil
+		}
+		// Fallback: tag -l --sort lists all tags
+		if strings.Contains(cmd, "tag -l --sort") {
+			return "v1.5.0\n1.4.0\n1.3.0\nv1.2.0\n1.0.0", nil
+		}
+		return "", nil
+	}
+
+	cfg := &config.GitConfig{
+		TagName: "${version}", // Current format: no v prefix
+	}
+	g := newTestGitWithConfig(cfg, false)
+
+	tag, err := g.GetLatestTag()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Should skip v1.5.0 (wrong format) and return 1.4.0
+	if tag != "1.4.0" {
+		t.Errorf("expected '1.4.0', got %q", tag)
+	}
+}
+
+func TestGetLatestTag_VPrefixedFormat(t *testing.T) {
+	// tagName is "v${version}" — should prefer v-prefixed tags
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	commandExecutor = func(name string, args ...string) (string, error) {
+		cmd := strings.Join(args, " ")
+		if strings.Contains(cmd, "describe") {
+			return "v2.0.0", nil
+		}
+		return "", nil
+	}
+
+	cfg := &config.GitConfig{
+		TagName: "v${version}",
+	}
+	g := newTestGitWithConfig(cfg, false)
+
+	tag, err := g.GetLatestTag()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// v2.0.0 matches "v*" pattern, should be returned directly
+	if tag != "v2.0.0" {
+		t.Errorf("expected 'v2.0.0', got %q", tag)
+	}
+}
+
+func TestGetLatestTag_CustomPrefixFormat(t *testing.T) {
+	// tagName is "release-${version}" — should only match "release-*" tags
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	commandExecutor = func(name string, args ...string) (string, error) {
+		cmd := strings.Join(args, " ")
+		if strings.Contains(cmd, "describe") {
+			return "v3.0.0", nil // Wrong format
+		}
+		if strings.Contains(cmd, "tag -l --sort") {
+			return "v3.0.0\nrelease-2.0.0\nv1.0.0\nrelease-1.0.0", nil
+		}
+		return "", nil
+	}
+
+	cfg := &config.GitConfig{
+		TagName: "release-${version}",
+	}
+	g := newTestGitWithConfig(cfg, false)
+
+	tag, err := g.GetLatestTag()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if tag != "release-2.0.0" {
+		t.Errorf("expected 'release-2.0.0', got %q", tag)
+	}
+}
+
+func TestGetLatestTag_ExplicitTagMatchTakesPriority(t *testing.T) {
+	// User explicitly sets tagMatch — should override tagName-derived pattern
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	commandExecutor = func(name string, args ...string) (string, error) {
+		cmd := strings.Join(args, " ")
+		if strings.Contains(cmd, "describe") {
+			return "v1.0.0", nil
+		}
+		if strings.Contains(cmd, "tag -l --sort") {
+			return "v1.0.0\napp-2.0.0\napp-1.5.0", nil
+		}
+		return "", nil
+	}
+
+	cfg := &config.GitConfig{
+		TagName:  "v${version}",
+		TagMatch: "app-*", // Explicit override
+	}
+	g := newTestGitWithConfig(cfg, false)
+
+	tag, err := g.GetLatestTag()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// TagMatch "app-*" takes priority over tagName-derived "v*"
+	if tag != "app-2.0.0" {
+		t.Errorf("expected 'app-2.0.0', got %q", tag)
+	}
+}
+
+func TestGetLatestTag_BareFormatRejectsVPrefix(t *testing.T) {
+	// Default tagName "${version}" → only digit-start tags match
+	// If git describe returns "v1.0.0", should fallback to tag list
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	commandExecutor = func(name string, args ...string) (string, error) {
+		cmd := strings.Join(args, " ")
+		if strings.Contains(cmd, "describe") {
+			return "v1.0.0", nil // Wrong format for bare tagName
+		}
+		if strings.Contains(cmd, "tag -l --sort") {
+			return "v1.0.0\n0.9.0\n0.8.0", nil
+		}
+		return "", nil
+	}
+
+	cfg := &config.GitConfig{
+		TagName: "${version}", // Bare format → expects digit-start
+	}
+	g := newTestGitWithConfig(cfg, false)
+
+	tag, err := g.GetLatestTag()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Should skip v1.0.0 and return 0.9.0
+	if tag != "0.9.0" {
+		t.Errorf("expected '0.9.0', got %q", tag)
+	}
+}
