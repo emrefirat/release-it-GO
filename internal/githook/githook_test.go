@@ -302,3 +302,94 @@ func TestHooksFromConfig_Empty(t *testing.T) {
 		t.Errorf("expected 0 hooks for empty config, got %d", len(hooks))
 	}
 }
+
+func TestHooksFromConfig_AllGitHooks(t *testing.T) {
+	cfg := &config.HooksConfig{
+		PreCommit:        []string{"fmt"},
+		CommitMsg:        []string{"check"},
+		PrePush:          []string{"test"},
+		PostCommit:       []string{"notify"},
+		PostMerge:        []string{"install"},
+		PrepareCommitMsg: []string{"template"},
+	}
+
+	hooks := HooksFromConfig(cfg)
+	if len(hooks) != 6 {
+		t.Errorf("expected 6 git hooks, got %d", len(hooks))
+	}
+	for _, name := range []string{"pre-commit", "commit-msg", "pre-push", "post-commit", "post-merge", "prepare-commit-msg"} {
+		if _, ok := hooks[name]; !ok {
+			t.Errorf("expected %s in hooks", name)
+		}
+	}
+}
+
+func TestInstall_SkipsEmptyCommands(t *testing.T) {
+	dir := t.TempDir()
+	gitDir := filepath.Join(dir, ".git")
+	_ = os.MkdirAll(gitDir, 0755)
+
+	installer := NewInstaller(gitDir, false)
+	hooks := map[string][]string{
+		"pre-commit": {"go fmt ./..."},
+		"pre-push":   {}, // Empty — should be skipped
+	}
+
+	err := installer.Install(hooks)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !exists(filepath.Join(gitDir, "hooks", "pre-commit")) {
+		t.Error("expected pre-commit to be created")
+	}
+	if exists(filepath.Join(gitDir, "hooks", "pre-push")) {
+		t.Error("expected pre-push to be skipped (empty commands)")
+	}
+}
+
+func TestInstall_ScriptContainsShellArgs(t *testing.T) {
+	dir := t.TempDir()
+	gitDir := filepath.Join(dir, ".git")
+	_ = os.MkdirAll(gitDir, 0755)
+
+	installer := NewInstaller(gitDir, false)
+	hooks := map[string][]string{
+		"commit-msg": {"./scripts/validate.sh ${1}"},
+	}
+
+	err := installer.Install(hooks)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	content, _ := os.ReadFile(filepath.Join(gitDir, "hooks", "commit-msg"))
+	if !strings.Contains(string(content), "${1}") {
+		t.Error("expected ${1} preserved in generated script")
+	}
+}
+
+func TestRemove_MultipleManaged(t *testing.T) {
+	dir := t.TempDir()
+	gitDir := filepath.Join(dir, ".git")
+	hooksDir := filepath.Join(gitDir, "hooks")
+	_ = os.MkdirAll(hooksDir, 0755)
+
+	// Create multiple managed hooks
+	for _, name := range []string{"pre-commit", "commit-msg", "pre-push"} {
+		_ = os.WriteFile(filepath.Join(hooksDir, name),
+			[]byte("#!/bin/sh\n"+managedHeader+"\necho "+name), 0755)
+	}
+
+	installer := NewInstaller(gitDir, false)
+	err := installer.Remove()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	for _, name := range []string{"pre-commit", "commit-msg", "pre-push"} {
+		if exists(filepath.Join(hooksDir, name)) {
+			t.Errorf("expected %s to be removed", name)
+		}
+	}
+}
