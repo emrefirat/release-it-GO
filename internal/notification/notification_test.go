@@ -81,15 +81,15 @@ func TestSendAll_TeamsSuccess(t *testing.T) {
 	}
 
 	// Verify Teams payload format
-	var payload teamsPayload
+	var payload teamsMessageCard
 	if err := json.Unmarshal(receivedBody, &payload); err != nil {
 		t.Fatalf("invalid JSON payload: %v", err)
 	}
 	if payload.Type != "MessageCard" {
 		t.Errorf("expected @type MessageCard, got %q", payload.Type)
 	}
-	if payload.Text == "" {
-		t.Error("expected non-empty text in Teams payload")
+	if len(payload.Sections) == 0 {
+		t.Error("expected at least one section in Teams payload")
 	}
 }
 
@@ -285,17 +285,164 @@ func TestBuildTeamsPayload(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var p teamsPayload
+	var p teamsMessageCard
 	if err := json.Unmarshal(data, &p); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}
 	if p.Type != "MessageCard" {
 		t.Errorf("expected @type MessageCard, got %q", p.Type)
 	}
-	if p.Text != "hello teams" {
-		t.Errorf("expected %q, got %q", "hello teams", p.Text)
+	if len(p.Sections) == 0 || p.Sections[0].Text != "hello teams" {
+		t.Errorf("expected section text %q, got %+v", "hello teams", p.Sections)
 	}
 	if p.Summary != "hello teams" {
 		t.Errorf("expected summary %q, got %q", "hello teams", p.Summary)
+	}
+}
+
+func TestBuildTeamsRichPayload_FullContext(t *testing.T) {
+	ctx := &RichNotificationContext{
+		Version:       "1.2.0",
+		LatestVersion: "1.1.0",
+		TagName:       "v1.2.0",
+		Changelog:     "### Features\n- Add dashboard\n### Bug Fixes\n- Fix login",
+		RepoHost:      "gitlab.com",
+		RepoOwner:     "myteam",
+		RepoName:      "myapp",
+		CommitCount:   5,
+		Contributors:  []string{"Alice", "Bob"},
+		ThemeColor:    "FF5500",
+		ImageURL:      "https://example.com/logo.png",
+	}
+
+	data, err := buildTeamsRichPayload(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var card teamsMessageCard
+	if err := json.Unmarshal(data, &card); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	if card.Type != "MessageCard" {
+		t.Errorf("@type = %q, want MessageCard", card.Type)
+	}
+	if card.ThemeColor != "FF5500" {
+		t.Errorf("themeColor = %q, want FF5500", card.ThemeColor)
+	}
+	if len(card.Sections) < 1 {
+		t.Fatal("expected at least 1 section")
+	}
+
+	main := card.Sections[0]
+	if main.ActivityImage != "https://example.com/logo.png" {
+		t.Errorf("activityImage = %q", main.ActivityImage)
+	}
+	if !main.Markdown {
+		t.Error("expected markdown=true")
+	}
+
+	// Check facts
+	factMap := make(map[string]string)
+	for _, f := range main.Facts {
+		factMap[f.Name] = f.Value
+	}
+	if factMap["Version"] != "1.2.0" {
+		t.Errorf("Version fact = %q", factMap["Version"])
+	}
+	if factMap["Last Release"] != "1.1.0" {
+		t.Errorf("Last Release fact = %q", factMap["Last Release"])
+	}
+	if factMap["Commits"] != "5" {
+		t.Errorf("Commits fact = %q", factMap["Commits"])
+	}
+	if factMap["Contributors"] != "Alice, Bob" {
+		t.Errorf("Contributors fact = %q", factMap["Contributors"])
+	}
+
+	// Changelog section should be present
+	if len(card.Sections) < 3 {
+		t.Fatalf("expected 3+ sections (main + separator + changelog), got %d", len(card.Sections))
+	}
+	if card.Sections[2].Text == "" {
+		t.Error("expected changelog in section text")
+	}
+}
+
+func TestBuildTeamsRichPayload_MinimalContext(t *testing.T) {
+	ctx := &RichNotificationContext{
+		Version:  "0.1.0",
+		RepoName: "test-app",
+	}
+
+	data, err := buildTeamsRichPayload(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var card teamsMessageCard
+	if err := json.Unmarshal(data, &card); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	// Default theme color
+	if card.ThemeColor != "0076D7" {
+		t.Errorf("themeColor = %q, want default 0076D7", card.ThemeColor)
+	}
+
+	main := card.Sections[0]
+	// Only Version fact (no Last Release, no Commits, no Contributors)
+	if len(main.Facts) != 1 {
+		t.Errorf("expected 1 fact (Version only), got %d", len(main.Facts))
+	}
+	if main.Facts[0].Value != "0.1.0" {
+		t.Errorf("Version fact = %q", main.Facts[0].Value)
+	}
+
+	// No changelog → only 1 section (no separator + changelog)
+	if len(card.Sections) != 1 {
+		t.Errorf("expected 1 section (no changelog), got %d", len(card.Sections))
+	}
+}
+
+func TestSendAll_TeamsRichPayload(t *testing.T) {
+	var receivedBody []byte
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedBody, _ = io.ReadAll(r.Body)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	t.Setenv("TEST_TEAMS_RICH_URL", server.URL)
+
+	webhooks := []config.WebhookConfig{
+		{Type: "teams", URLRef: "TEST_TEAMS_RICH_URL"},
+	}
+	vars := map[string]string{"version": "2.0.0", "repo.repository": "myapp"}
+
+	client := NewClient(webhooks, vars, newTestLogger(), false)
+	client.SetRichContext(&RichNotificationContext{
+		Version:     "2.0.0",
+		RepoName:    "myapp",
+		RepoHost:    "github.com",
+		RepoOwner:   "org",
+		CommitCount: 3,
+	})
+
+	if err := client.SendAll(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var card teamsMessageCard
+	if err := json.Unmarshal(receivedBody, &card); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if card.Type != "MessageCard" {
+		t.Errorf("@type = %q", card.Type)
+	}
+	// Should have facts section
+	if len(card.Sections) == 0 || len(card.Sections[0].Facts) == 0 {
+		t.Error("expected facts in rich Teams payload")
 	}
 }
