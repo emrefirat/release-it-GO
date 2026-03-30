@@ -92,8 +92,8 @@ func (c *Client) sendOne(wh config.WebhookConfig) error {
 	case "slack":
 		payload, err = buildSlackPayload(message)
 	case "teams":
-		// Use rich MessageCard if context is available
-		if c.richContext != nil {
+		// Use rich MessageCard if context is available and no custom template override
+		if c.richContext != nil && wh.MessageTemplate == "" {
 			payload, err = buildTeamsRichPayload(c.richContext)
 		} else {
 			payload, err = buildTeamsPayload(message)

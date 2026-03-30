@@ -298,12 +298,18 @@ notification:
     - type: "slack"
       # Environment variable name containing Slack webhook URL
       urlRef: "SLACK_WEBHOOK_URL"
-    # Microsoft Teams webhook
+    # Microsoft Teams webhook (sends rich MessageCard with facts and changelog)
     - type: "teams"
       # Environment variable name containing Teams webhook URL
       urlRef: "TEAMS_WEBHOOK_URL"
-      # Custom message template (supports ${version}, ${releaseUrl}, ${repo.repository})
-      messageTemplate: "🚀 ${repo.repository} v${version} released!\n${releaseUrl}"
+      # Custom message template (overrides rich card, supports ${version}, ${releaseUrl}, ${repo.repository})
+      # messageTemplate: ""
+      # Card theme color (hex, default: "0076D7")
+      themeColor: "0076D7"
+      # Card activity image URL
+      # imageUrl: "https://example.com/logo.png"
+      # Contributors to exclude from notifications (e.g., bot accounts)
+      ignoredContributors: ["Jenkins", "GitLab Bot"]
       # Request timeout in seconds
       timeout: 30
 `

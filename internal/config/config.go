@@ -152,8 +152,11 @@ type NotificationConfig struct {
 
 // WebhookConfig holds a single webhook endpoint configuration.
 type WebhookConfig struct {
-	Type            string `json:"type" yaml:"type" toml:"type" mapstructure:"type"`
-	URLRef          string `json:"urlRef" yaml:"urlRef" toml:"urlRef" mapstructure:"urlRef"`
-	MessageTemplate string `json:"messageTemplate" yaml:"messageTemplate" toml:"messageTemplate" mapstructure:"messageTemplate"`
-	Timeout         int    `json:"timeout" yaml:"timeout" toml:"timeout" mapstructure:"timeout"`
+	Type                string   `json:"type" yaml:"type" toml:"type" mapstructure:"type"`
+	URLRef              string   `json:"urlRef" yaml:"urlRef" toml:"urlRef" mapstructure:"urlRef"`
+	MessageTemplate     string   `json:"messageTemplate" yaml:"messageTemplate" toml:"messageTemplate" mapstructure:"messageTemplate"`
+	Timeout             int      `json:"timeout" yaml:"timeout" toml:"timeout" mapstructure:"timeout"`
+	ThemeColor          string   `json:"themeColor" yaml:"themeColor" toml:"themeColor" mapstructure:"themeColor"`
+	ImageURL            string   `json:"imageUrl" yaml:"imageUrl" toml:"imageUrl" mapstructure:"imageUrl"`
+	IgnoredContributors []string `json:"ignoredContributors" yaml:"ignoredContributors" toml:"ignoredContributors" mapstructure:"ignoredContributors"`
 }
