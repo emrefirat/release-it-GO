@@ -3500,5 +3500,45 @@ func TestRunner_ResolvePreReleaseBaseTag_GitError(t *testing.T) {
 	}
 }
 
+// --- filterContributors tests ---
+
+func TestFilterContributors_NoIgnored(t *testing.T) {
+	contributors := []string{"Alice", "Bob", "Charlie"}
+	result := filterContributors(contributors, nil)
+	if len(result) != 3 {
+		t.Errorf("expected 3, got %d", len(result))
+	}
+}
+
+func TestFilterContributors_SomeIgnored(t *testing.T) {
+	contributors := []string{"Alice", "Jenkins", "Bob", "GitLab Bot", "Charlie"}
+	ignored := []string{"Jenkins", "GitLab Bot"}
+	result := filterContributors(contributors, ignored)
+	if len(result) != 3 {
+		t.Errorf("expected 3, got %d: %v", len(result), result)
+	}
+	for _, name := range result {
+		if name == "Jenkins" || name == "GitLab Bot" {
+			t.Errorf("expected %q to be filtered out", name)
+		}
+	}
+}
+
+func TestFilterContributors_AllIgnored(t *testing.T) {
+	contributors := []string{"Jenkins", "Bot"}
+	ignored := []string{"Jenkins", "Bot"}
+	result := filterContributors(contributors, ignored)
+	if len(result) != 0 {
+		t.Errorf("expected 0, got %d: %v", len(result), result)
+	}
+}
+
+func TestFilterContributors_EmptyContributors(t *testing.T) {
+	result := filterContributors(nil, []string{"Jenkins"})
+	if len(result) != 0 {
+		t.Errorf("expected 0, got %d", len(result))
+	}
+}
+
 // Ensure imports are used
 var _ = errors.New
