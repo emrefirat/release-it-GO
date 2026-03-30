@@ -592,6 +592,7 @@
 | 2026-03-30 | Claude | fix: changelog disabled iken bos commit hatasi - HasStagedChanges kontrolu |
 | 2026-03-30 | Claude | fix: tagName config degisikliginde format-aware tag filtreleme - matchesTagNameFormat + fallback mekanizmasi, 18 yeni test |
 | 2026-03-30 | Claude | feat: Teams zengin MessageCard bildirimi - facts (Version, Last Release, Commits, Contributors), changelog section, configurable theme/image, GetCommitCountSinceTag + GetContributorsSinceTag, 3 yeni test |
+| 2026-03-30 | Claude | feat: webhook config'e ignoredContributors, themeColor, imageUrl eklendi - bot hesap filtreleme, messageTemplate override, full example YAML guncellendi |
 
 ---
 
@@ -599,7 +600,6 @@
 
 - [ ] GitLab `ValidateToken()` endpoint'i `/user` yerine `/projects/:id` kullanabilir (CI_JOB_TOKEN uyumlulugu icin, ancak CI_JOB_TOKEN commit/push yapamadigi icin pratik faydasi sinirli)
 - [ ] GitLab CI entegrasyonu icin dokumantasyon: `git remote set-url` ayari, Project Access Token gereksinimleri, `GIT_DEPTH: 0` gerekliligi
-- [ ] Teams/Slack notification config'den `themeColor` ve `imageURL` ayarlanabilir yapilabilir
 
 ---
 
