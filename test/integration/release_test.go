@@ -747,6 +747,55 @@ func TestIntegration_PreRelease_NoFlag_BehaviorUnchanged(t *testing.T) {
 	assertTagExists(t, dir, "v1.1.0")
 }
 
+func TestIntegration_TagFormatChange_VPrefixRemoved(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	_ = os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+
+	initGitRepo(t, dir)
+
+	// Phase 1: Tags with v prefix (old format)
+	createTag(t, dir, "v1.0.0")
+	createCommits(t, dir, []string{"feat: feature one"})
+	createTag(t, dir, "v1.1.0")
+
+	// Phase 2: Developer changes tagName to "${version}" (no v prefix)
+	createCommits(t, dir, []string{"feat: feature two"})
+	cfg := newTestConfig(dir)
+	cfg.Git.TagName = "${version}" // No more v prefix
+	cfg.Git.Commit = false
+	cfg.Increment = "minor"
+
+	r := runner.NewRunner(cfg)
+	if err := r.Run(); err != nil {
+		t.Fatalf("Run() failed: %v", err)
+	}
+
+	// Should create "1.2.0" not "v1.2.0"
+	assertTagExists(t, dir, "1.2.0")
+
+	// Phase 3: Another release with new format — should find "1.2.0" as latest
+	createCommits(t, dir, []string{"fix: bugfix"})
+	cfg2 := newTestConfig(dir)
+	cfg2.Git.TagName = "${version}"
+	cfg2.Git.Commit = false
+	cfg2.Increment = "patch"
+
+	r2 := runner.NewRunner(cfg2)
+	if err := r2.Run(); err != nil {
+		t.Fatalf("Second Run() failed: %v", err)
+	}
+
+	// Should find "1.2.0" as latest (not "v1.1.0") and produce "1.2.1"
+	assertTagExists(t, dir, "1.2.1")
+	assertTagNotExists(t, dir, "v1.2.1")
+}
+
 // --- Phase 19: New integration test scenarios ---
 
 func TestIntegration_CalVer_YearMonthMinor(t *testing.T) {
