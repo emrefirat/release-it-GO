@@ -4,8 +4,10 @@ package cli
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
+	"release-it-go/internal/changelog"
 	"release-it-go/internal/config"
 	applog "release-it-go/internal/log"
 	"release-it-go/internal/runner"
@@ -36,6 +38,7 @@ var (
 	noPush           bool
 	checkCommits     bool
 	ignoreCommitLint bool
+	checkMsgFile     string
 )
 
 // NewRootCommand creates the root cobra command for release-it-go.
@@ -74,6 +77,7 @@ It is a Go reimplementation of release-it without Node.js dependencies.`,
 	// Commit lint flags
 	rootCmd.Flags().BoolVar(&checkCommits, "check-commits", false, "check commit conventions only (no release)")
 	rootCmd.Flags().BoolVar(&ignoreCommitLint, "ignore-commit-lint", false, "skip conventional commit validation")
+	rootCmd.Flags().StringVar(&checkMsgFile, "check-msg", "", "validate a single commit message file (for commit-msg hook)")
 
 	// Subcommands
 	rootCmd.AddCommand(newVersionCommand())
@@ -201,6 +205,11 @@ func runRelease(cmd *cobra.Command, args []string) error {
 		cfg.Git.RequireConventionalCommits = false
 	}
 
+	// Check single commit message file (for commit-msg hook)
+	if checkMsgFile != "" {
+		return runCheckMsg(checkMsgFile)
+	}
+
 	// Create runner and handle special modes
 	r := runner.NewRunner(cfg)
 
@@ -226,6 +235,32 @@ func runRelease(cmd *cobra.Command, args []string) error {
 
 	// Main release pipeline
 	return r.Run()
+}
+
+// runCheckMsg validates a single commit message file against conventional commit format.
+// Used in commit-msg git hooks: ./release-it-go --check-msg $1
+func runCheckMsg(filePath string) error {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("reading commit message file: %w", err)
+	}
+
+	// First line is the commit subject
+	lines := strings.SplitN(string(data), "\n", 2)
+	subject := strings.TrimSpace(lines[0])
+
+	if subject == "" {
+		return fmt.Errorf("commit message is empty")
+	}
+
+	input := []changelog.LintInput{{Hash: "", Subject: subject}}
+	_, failed := changelog.LintCommits(input)
+
+	if len(failed) > 0 {
+		return fmt.Errorf("commit message is not conventional: %s\n  message: %q\n  expected format: type(scope): description", failed[0].Reason, subject)
+	}
+
+	return nil
 }
 
 // Execute runs the root command.
