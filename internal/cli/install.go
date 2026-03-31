@@ -62,7 +62,7 @@ func runHooksInstall(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
-	gitDir, err := githook.FindGitDir()
+	projectDir, err := githook.FindProjectDir()
 	if err != nil {
 		return err
 	}
@@ -74,18 +74,18 @@ func runHooksInstall(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	installer := githook.NewInstaller(gitDir, hooksForce)
+	installer := githook.NewInstaller(projectDir, hooksForce)
 	fmt.Println("Installing git hooks...")
 	return installer.Install(hooks)
 }
 
 func runHooksRemove(cmd *cobra.Command, args []string) error {
-	gitDir, err := githook.FindGitDir()
+	projectDir, err := githook.FindProjectDir()
 	if err != nil {
 		return err
 	}
 
-	installer := githook.NewInstaller(gitDir, false)
+	installer := githook.NewInstaller(projectDir, false)
 	fmt.Println("Removing managed git hooks...")
 	return installer.Remove()
 }
