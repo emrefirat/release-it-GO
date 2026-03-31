@@ -254,13 +254,22 @@ func runCheckMsg(filePath string) error {
 	}
 
 	input := []changelog.LintInput{{Hash: "", Subject: subject}}
-	_, failed := changelog.LintCommits(input)
+	passed, failed := changelog.LintCommits(input)
 
-	if len(failed) > 0 {
-		return fmt.Errorf("commit message is not conventional: %s\n  message: %q\n  expected format: type(scope): description", failed[0].Reason, subject)
+	if len(failed) == 0 {
+		fmt.Fprintf(os.Stderr, "Commit message is conventional. %s\n", "✓")
+		return nil
 	}
 
-	return nil
+	var b strings.Builder
+	b.WriteString("Commit lint failed:\n")
+	for _, f := range failed {
+		fmt.Fprintf(&b, "  %-10s %-40s ← %s\n", "(staged)", f.Subject, f.Reason)
+	}
+	fmt.Fprintf(&b, "\n  %d of %d commits are not conventional.\n", len(failed), len(passed)+len(failed))
+	b.WriteString("  Expected format: type(scope): description\n")
+	b.WriteString("  Valid types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert\n")
+	return fmt.Errorf("%s", b.String())
 }
 
 // Execute runs the root command.
