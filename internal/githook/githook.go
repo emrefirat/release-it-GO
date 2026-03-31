@@ -1,7 +1,8 @@
 // Package githook installs and manages git hooks from release-it-go configuration.
 // Git hooks (pre-commit, commit-msg, etc.) are defined in the hooks section of the
-// config alongside release lifecycle hooks. The install command filters git hook names
-// and writes them as executable shell scripts to .git/hooks/.
+// config alongside release lifecycle hooks. The install command writes hook scripts
+// to .hooks/ directory (project root) and sets git core.hooksPath to use it.
+// This allows hooks to be committed to the repository and shared across the team.
 package githook
 
 import (
@@ -37,19 +38,22 @@ var commandExecutor = func(name string, args ...string) (string, error) {
 	return strings.TrimSpace(string(out)), err
 }
 
+// hooksDirectory is the directory name for hook scripts in project root.
+const hooksDirectory = ".hooks"
+
 // Installer handles git hook installation and removal.
 type Installer struct {
-	gitDir   string
-	hooksDir string
-	force    bool
+	projectDir string // project root directory
+	hooksDir   string // .hooks/ directory path
+	force      bool
 }
 
-// NewInstaller creates an Installer for the given git directory.
-func NewInstaller(gitDir string, force bool) *Installer {
+// NewInstaller creates an Installer for the project root directory.
+func NewInstaller(projectDir string, force bool) *Installer {
 	return &Installer{
-		gitDir:   gitDir,
-		hooksDir: filepath.Join(gitDir, "hooks"),
-		force:    force,
+		projectDir: projectDir,
+		hooksDir:   filepath.Join(projectDir, hooksDirectory),
+		force:      force,
 	}
 }
 
@@ -62,7 +66,17 @@ func FindGitDir() (string, error) {
 	return out, nil
 }
 
-// Install writes git hook scripts to .git/hooks/ for each configured hook.
+// FindProjectDir locates the top-level directory of the git repository.
+func FindProjectDir() (string, error) {
+	out, err := commandExecutor("git", "rev-parse", "--show-toplevel")
+	if err != nil {
+		return "", fmt.Errorf("not a git repository (run from project root)")
+	}
+	return out, nil
+}
+
+// Install writes git hook scripts to .hooks/ and configures git to use them.
+// Sets core.hooksPath so git reads hooks from .hooks/ instead of .git/hooks/.
 // Returns an error if a non-managed hook exists and force is false.
 func (i *Installer) Install(hooks map[string][]string) error {
 	if err := os.MkdirAll(i.hooksDir, 0755); err != nil {
@@ -98,14 +112,27 @@ func (i *Installer) Install(hooks map[string][]string) error {
 
 	if installed == 0 {
 		fmt.Println("No git hooks to install.")
-	} else {
-		fmt.Printf("\n%d git hook(s) installed to %s\n", installed, i.hooksDir)
+		return nil
 	}
+
+	// Configure git to use .hooks/ directory
+	if err := setHooksPath(hooksDirectory); err != nil {
+		return fmt.Errorf("setting core.hooksPath: %w", err)
+	}
+
+	fmt.Printf("\n%d git hook(s) installed to %s\n", installed, hooksDirectory)
 	return nil
 }
 
-// Remove deletes all managed git hooks from .git/hooks/.
+// setHooksPath configures git to read hooks from the given directory.
+func setHooksPath(path string) error {
+	_, err := commandExecutor("git", "config", "core.hooksPath", path)
+	return err
+}
+
+// Remove deletes all managed git hooks from .hooks/.
 // Non-managed (user-created) hooks are left untouched.
+// Resets core.hooksPath if no hooks remain.
 func (i *Installer) Remove() error {
 	if !exists(i.hooksDir) {
 		fmt.Println("No hooks directory found.")
@@ -113,6 +140,7 @@ func (i *Installer) Remove() error {
 	}
 
 	removed := 0
+	remaining := 0
 	for _, name := range supportedGitHooks {
 		hookPath := filepath.Join(i.hooksDir, name)
 		if !exists(hookPath) {
@@ -124,6 +152,7 @@ func (i *Installer) Remove() error {
 			return fmt.Errorf("checking hook %s: %w", name, err)
 		}
 		if !managed {
+			remaining++
 			continue
 		}
 
@@ -139,7 +168,19 @@ func (i *Installer) Remove() error {
 	} else {
 		fmt.Printf("\n%d managed hook(s) removed.\n", removed)
 	}
+
+	// Reset core.hooksPath if no hooks remain in .hooks/
+	if remaining == 0 {
+		_ = unsetHooksPath()
+	}
+
 	return nil
+}
+
+// unsetHooksPath resets git core.hooksPath to default (.git/hooks).
+func unsetHooksPath() error {
+	_, err := commandExecutor("git", "config", "--unset", "core.hooksPath")
+	return err
 }
 
 // HooksFromConfig extracts git hook definitions from HooksConfig.

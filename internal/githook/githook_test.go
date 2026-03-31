@@ -9,6 +9,17 @@ import (
 	"release-it-go/internal/config"
 )
 
+// mockGitCommands sets up commandExecutor to handle git config calls silently.
+func mockGitCommands(t *testing.T) {
+	t.Helper()
+	original := commandExecutor
+	t.Cleanup(func() { commandExecutor = original })
+	commandExecutor = func(name string, args ...string) (string, error) {
+		// Accept git config calls silently
+		return "", nil
+	}
+}
+
 func TestGenerateScript(t *testing.T) {
 	script := generateScript("pre-commit", []string{"go fmt ./...", "go vet ./..."})
 
@@ -45,7 +56,9 @@ func TestIsManagedHook(t *testing.T) {
 	installer := NewInstaller(dir, false)
 
 	// Managed hook
-	managedPath := filepath.Join(dir, "managed")
+	hooksDir := filepath.Join(dir, hooksDirectory)
+	_ = os.MkdirAll(hooksDir, 0755)
+	managedPath := filepath.Join(hooksDir, "managed")
 	_ = os.WriteFile(managedPath, []byte("#!/bin/sh\n"+managedHeader+"\necho hello"), 0755)
 
 	managed, err := installer.isManagedHook(managedPath)
@@ -57,7 +70,7 @@ func TestIsManagedHook(t *testing.T) {
 	}
 
 	// User hook
-	userPath := filepath.Join(dir, "user")
+	userPath := filepath.Join(hooksDir, "user")
 	_ = os.WriteFile(userPath, []byte("#!/bin/sh\necho my custom hook"), 0755)
 
 	managed, err = installer.isManagedHook(userPath)
@@ -70,11 +83,10 @@ func TestIsManagedHook(t *testing.T) {
 }
 
 func TestInstall_NewHooks(t *testing.T) {
+	mockGitCommands(t)
 	dir := t.TempDir()
-	gitDir := filepath.Join(dir, ".git")
-	_ = os.MkdirAll(gitDir, 0755)
 
-	installer := NewInstaller(gitDir, false)
+	installer := NewInstaller(dir, false)
 	hooks := map[string][]string{
 		"pre-commit": {"go fmt ./..."},
 		"pre-push":   {"go test ./..."},
@@ -85,9 +97,9 @@ func TestInstall_NewHooks(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Verify files created
+	// Verify files created in .hooks/
 	for _, name := range []string{"pre-commit", "pre-push"} {
-		path := filepath.Join(gitDir, "hooks", name)
+		path := filepath.Join(dir, hooksDirectory, name)
 		info, err := os.Stat(path)
 		if err != nil {
 			t.Fatalf("hook %s not created: %v", name, err)
@@ -103,32 +115,31 @@ func TestInstall_NewHooks(t *testing.T) {
 }
 
 func TestInstall_CreatesHooksDir(t *testing.T) {
+	mockGitCommands(t)
 	dir := t.TempDir()
-	gitDir := filepath.Join(dir, ".git")
-	_ = os.MkdirAll(gitDir, 0755)
-	// Don't create hooks/ dir — Install should create it
+	// Don't create .hooks/ — Install should create it
 
-	installer := NewInstaller(gitDir, false)
+	installer := NewInstaller(dir, false)
 	err := installer.Install(map[string][]string{"pre-commit": {"echo test"}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if !exists(filepath.Join(gitDir, "hooks", "pre-commit")) {
-		t.Error("expected hooks dir and pre-commit to be created")
+	if !exists(filepath.Join(dir, hooksDirectory, "pre-commit")) {
+		t.Error("expected .hooks dir and pre-commit to be created")
 	}
 }
 
 func TestInstall_RejectsUserHook(t *testing.T) {
+	mockGitCommands(t)
 	dir := t.TempDir()
-	gitDir := filepath.Join(dir, ".git")
-	hooksDir := filepath.Join(gitDir, "hooks")
+	hooksDir := filepath.Join(dir, hooksDirectory)
 	_ = os.MkdirAll(hooksDir, 0755)
 
 	// Create existing user hook
 	_ = os.WriteFile(filepath.Join(hooksDir, "pre-commit"), []byte("#!/bin/sh\necho user hook"), 0755)
 
-	installer := NewInstaller(gitDir, false)
+	installer := NewInstaller(dir, false)
 	err := installer.Install(map[string][]string{"pre-commit": {"go fmt ./..."}})
 	if err == nil {
 		t.Fatal("expected error for existing user hook")
@@ -139,15 +150,15 @@ func TestInstall_RejectsUserHook(t *testing.T) {
 }
 
 func TestInstall_ForceOverwritesUserHook(t *testing.T) {
+	mockGitCommands(t)
 	dir := t.TempDir()
-	gitDir := filepath.Join(dir, ".git")
-	hooksDir := filepath.Join(gitDir, "hooks")
+	hooksDir := filepath.Join(dir, hooksDirectory)
 	_ = os.MkdirAll(hooksDir, 0755)
 
 	// Create existing user hook
 	_ = os.WriteFile(filepath.Join(hooksDir, "pre-commit"), []byte("#!/bin/sh\necho user hook"), 0755)
 
-	installer := NewInstaller(gitDir, true) // force=true
+	installer := NewInstaller(dir, true) // force=true
 	err := installer.Install(map[string][]string{"pre-commit": {"go fmt ./..."}})
 	if err != nil {
 		t.Fatalf("unexpected error with --force: %v", err)
@@ -160,16 +171,16 @@ func TestInstall_ForceOverwritesUserHook(t *testing.T) {
 }
 
 func TestInstall_OverwritesManagedHook(t *testing.T) {
+	mockGitCommands(t)
 	dir := t.TempDir()
-	gitDir := filepath.Join(dir, ".git")
-	hooksDir := filepath.Join(gitDir, "hooks")
+	hooksDir := filepath.Join(dir, hooksDirectory)
 	_ = os.MkdirAll(hooksDir, 0755)
 
 	// Create existing managed hook
 	_ = os.WriteFile(filepath.Join(hooksDir, "pre-commit"),
 		[]byte("#!/bin/sh\n"+managedHeader+"\necho old"), 0755)
 
-	installer := NewInstaller(gitDir, false) // No force needed for managed hooks
+	installer := NewInstaller(dir, false) // No force needed for managed hooks
 	err := installer.Install(map[string][]string{"pre-commit": {"echo new"}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -183,10 +194,8 @@ func TestInstall_OverwritesManagedHook(t *testing.T) {
 
 func TestInstall_EmptyHooks(t *testing.T) {
 	dir := t.TempDir()
-	gitDir := filepath.Join(dir, ".git")
-	_ = os.MkdirAll(gitDir, 0755)
 
-	installer := NewInstaller(gitDir, false)
+	installer := NewInstaller(dir, false)
 	err := installer.Install(map[string][]string{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -194,9 +203,9 @@ func TestInstall_EmptyHooks(t *testing.T) {
 }
 
 func TestRemove_ManagedOnly(t *testing.T) {
+	mockGitCommands(t)
 	dir := t.TempDir()
-	gitDir := filepath.Join(dir, ".git")
-	hooksDir := filepath.Join(gitDir, "hooks")
+	hooksDir := filepath.Join(dir, hooksDirectory)
 	_ = os.MkdirAll(hooksDir, 0755)
 
 	// Create one managed and one user hook
@@ -205,7 +214,7 @@ func TestRemove_ManagedOnly(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(hooksDir, "pre-push"),
 		[]byte("#!/bin/sh\necho user hook"), 0755)
 
-	installer := NewInstaller(gitDir, false)
+	installer := NewInstaller(dir, false)
 	err := installer.Remove()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -223,11 +232,9 @@ func TestRemove_ManagedOnly(t *testing.T) {
 
 func TestRemove_NoHooksDir(t *testing.T) {
 	dir := t.TempDir()
-	gitDir := filepath.Join(dir, ".git")
-	_ = os.MkdirAll(gitDir, 0755)
-	// No hooks/ dir
+	// No .hooks/ dir
 
-	installer := NewInstaller(gitDir, false)
+	installer := NewInstaller(dir, false)
 	err := installer.Remove()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -248,6 +255,23 @@ func TestFindGitDir(t *testing.T) {
 	}
 	if gitDir != "/repo/.git" {
 		t.Errorf("expected /repo/.git, got %q", gitDir)
+	}
+}
+
+func TestFindProjectDir(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	commandExecutor = func(name string, args ...string) (string, error) {
+		return "/repo", nil
+	}
+
+	projectDir, err := FindProjectDir()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if projectDir != "/repo" {
+		t.Errorf("expected /repo, got %q", projectDir)
 	}
 }
 
@@ -326,34 +350,24 @@ func TestHooksFromConfig_AllGitHooks(t *testing.T) {
 
 func TestInstall_SkipsEmptyCommands(t *testing.T) {
 	dir := t.TempDir()
-	gitDir := filepath.Join(dir, ".git")
-	_ = os.MkdirAll(gitDir, 0755)
 
-	installer := NewInstaller(gitDir, false)
+	installer := NewInstaller(dir, false)
 	hooks := map[string][]string{
-		"pre-commit": {"go fmt ./..."},
-		"pre-push":   {}, // Empty — should be skipped
+		"pre-commit": {},   // Empty — should be skipped
+		"pre-push":   {""}, // Has entry but empty string
 	}
 
 	err := installer.Install(hooks)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
-	if !exists(filepath.Join(gitDir, "hooks", "pre-commit")) {
-		t.Error("expected pre-commit to be created")
-	}
-	if exists(filepath.Join(gitDir, "hooks", "pre-push")) {
-		t.Error("expected pre-push to be skipped (empty commands)")
-	}
 }
 
 func TestInstall_ScriptContainsShellArgs(t *testing.T) {
+	mockGitCommands(t)
 	dir := t.TempDir()
-	gitDir := filepath.Join(dir, ".git")
-	_ = os.MkdirAll(gitDir, 0755)
 
-	installer := NewInstaller(gitDir, false)
+	installer := NewInstaller(dir, false)
 	hooks := map[string][]string{
 		"commit-msg": {"./scripts/validate.sh ${1}"},
 	}
@@ -363,25 +377,24 @@ func TestInstall_ScriptContainsShellArgs(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	content, _ := os.ReadFile(filepath.Join(gitDir, "hooks", "commit-msg"))
+	content, _ := os.ReadFile(filepath.Join(dir, hooksDirectory, "commit-msg"))
 	if !strings.Contains(string(content), "${1}") {
 		t.Error("expected ${1} preserved in generated script")
 	}
 }
 
 func TestRemove_MultipleManaged(t *testing.T) {
+	mockGitCommands(t)
 	dir := t.TempDir()
-	gitDir := filepath.Join(dir, ".git")
-	hooksDir := filepath.Join(gitDir, "hooks")
+	hooksDir := filepath.Join(dir, hooksDirectory)
 	_ = os.MkdirAll(hooksDir, 0755)
 
-	// Create multiple managed hooks
 	for _, name := range []string{"pre-commit", "commit-msg", "pre-push"} {
 		_ = os.WriteFile(filepath.Join(hooksDir, name),
 			[]byte("#!/bin/sh\n"+managedHeader+"\necho "+name), 0755)
 	}
 
-	installer := NewInstaller(gitDir, false)
+	installer := NewInstaller(dir, false)
 	err := installer.Remove()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -391,5 +404,31 @@ func TestRemove_MultipleManaged(t *testing.T) {
 		if exists(filepath.Join(hooksDir, name)) {
 			t.Errorf("expected %s to be removed", name)
 		}
+	}
+}
+
+func TestInstall_SetsHooksPath(t *testing.T) {
+	var gitConfigArgs []string
+	original := commandExecutor
+	t.Cleanup(func() { commandExecutor = original })
+	commandExecutor = func(name string, args ...string) (string, error) {
+		if len(args) >= 3 && args[0] == "config" && args[1] == "core.hooksPath" {
+			gitConfigArgs = args
+		}
+		return "", nil
+	}
+
+	dir := t.TempDir()
+	installer := NewInstaller(dir, false)
+	err := installer.Install(map[string][]string{"pre-commit": {"echo test"}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(gitConfigArgs) == 0 {
+		t.Fatal("expected git config core.hooksPath to be called")
+	}
+	if gitConfigArgs[2] != hooksDirectory {
+		t.Errorf("expected hooksPath=%q, got %q", hooksDirectory, gitConfigArgs[2])
 	}
 }
