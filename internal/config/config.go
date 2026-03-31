@@ -105,6 +105,14 @@ type HooksConfig struct {
 	AfterGitHubRelease  []string `json:"after:github:release" yaml:"after:github:release" toml:"after:github:release" mapstructure:"after:github:release"`
 	BeforeGitLabRelease []string `json:"before:gitlab:release" yaml:"before:gitlab:release" toml:"before:gitlab:release" mapstructure:"before:gitlab:release"`
 	AfterGitLabRelease  []string `json:"after:gitlab:release" yaml:"after:gitlab:release" toml:"after:gitlab:release" mapstructure:"after:gitlab:release"`
+
+	// Git hooks — installed to .git/hooks/ via `release-it-go install`
+	PreCommit        []string `json:"pre-commit" yaml:"pre-commit" toml:"pre-commit" mapstructure:"pre-commit"`
+	CommitMsg        []string `json:"commit-msg" yaml:"commit-msg" toml:"commit-msg" mapstructure:"commit-msg"`
+	PrePush          []string `json:"pre-push" yaml:"pre-push" toml:"pre-push" mapstructure:"pre-push"`
+	PostCommit       []string `json:"post-commit" yaml:"post-commit" toml:"post-commit" mapstructure:"post-commit"`
+	PostMerge        []string `json:"post-merge" yaml:"post-merge" toml:"post-merge" mapstructure:"post-merge"`
+	PrepareCommitMsg []string `json:"prepare-commit-msg" yaml:"prepare-commit-msg" toml:"prepare-commit-msg" mapstructure:"prepare-commit-msg"`
 }
 
 // ChangelogConfig holds changelog generation configuration.
