@@ -3,6 +3,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -241,22 +242,33 @@ func runRelease(cmd *cobra.Command, args []string) error {
 // runCheckMsg validates a single commit message file against conventional commit format.
 // Used in commit-msg git hooks: ./release-it-go --check-msg $1
 // Compact output by default, verbose (-V) shows detailed help.
-func runCheckMsg(filePath string, verbose bool) error {
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return fmt.Errorf("reading commit message file: %w", err)
-	}
+// Accepts: file path, "-" for stdin, or direct message string.
+func runCheckMsg(input string, verbose bool) error {
+	var subject string
 
-	// First line is the commit subject
-	lines := strings.SplitN(string(data), "\n", 2)
-	subject := strings.TrimSpace(lines[0])
+	switch {
+	case input == "-":
+		data, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			return fmt.Errorf("reading stdin: %w", err)
+		}
+		subject = strings.TrimSpace(strings.SplitN(string(data), "\n", 2)[0])
+	case fileExists(input):
+		data, err := os.ReadFile(input)
+		if err != nil {
+			return fmt.Errorf("reading commit message file: %w", err)
+		}
+		subject = strings.TrimSpace(strings.SplitN(string(data), "\n", 2)[0])
+	default:
+		subject = strings.TrimSpace(input)
+	}
 
 	if subject == "" {
 		return fmt.Errorf("commit message is empty")
 	}
 
-	input := []changelog.LintInput{{Hash: "", Subject: subject}}
-	_, failed := changelog.LintCommits(input)
+	lintInput := []changelog.LintInput{{Hash: "", Subject: subject}}
+	_, failed := changelog.LintCommits(lintInput)
 
 	if len(failed) == 0 {
 		return nil
@@ -318,6 +330,12 @@ func reasonDescription(reason string) string {
 	default:
 		return reason
 	}
+}
+
+// fileExists checks if a path exists and is a regular file.
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
 }
 
 // Execute runs the root command.
