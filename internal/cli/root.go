@@ -4,11 +4,14 @@ package cli
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
+	"release-it-go/internal/changelog"
 	"release-it-go/internal/config"
 	applog "release-it-go/internal/log"
 	"release-it-go/internal/runner"
+	"release-it-go/internal/ui"
 )
 
 // Build information, set via ldflags.
@@ -36,6 +39,7 @@ var (
 	noPush           bool
 	checkCommits     bool
 	ignoreCommitLint bool
+	checkMsgFile     string
 )
 
 // NewRootCommand creates the root cobra command for release-it-go.
@@ -74,11 +78,13 @@ It is a Go reimplementation of release-it without Node.js dependencies.`,
 	// Commit lint flags
 	rootCmd.Flags().BoolVar(&checkCommits, "check-commits", false, "check commit conventions only (no release)")
 	rootCmd.Flags().BoolVar(&ignoreCommitLint, "ignore-commit-lint", false, "skip conventional commit validation")
+	rootCmd.Flags().StringVar(&checkMsgFile, "check-msg", "", "validate a single commit message file (for commit-msg hook)")
 
 	// Subcommands
 	rootCmd.AddCommand(newVersionCommand())
 	rootCmd.AddCommand(newCompletionCommand())
 	rootCmd.AddCommand(newInitCommand())
+	rootCmd.AddCommand(newHooksCommand())
 
 	return rootCmd
 }
@@ -200,6 +206,11 @@ func runRelease(cmd *cobra.Command, args []string) error {
 		cfg.Git.RequireConventionalCommits = false
 	}
 
+	// Check single commit message file (for commit-msg hook)
+	if checkMsgFile != "" {
+		return runCheckMsg(checkMsgFile, verboseCount > 0)
+	}
+
 	// Create runner and handle special modes
 	r := runner.NewRunner(cfg)
 
@@ -225,6 +236,88 @@ func runRelease(cmd *cobra.Command, args []string) error {
 
 	// Main release pipeline
 	return r.Run()
+}
+
+// runCheckMsg validates a single commit message file against conventional commit format.
+// Used in commit-msg git hooks: ./release-it-go --check-msg $1
+// Compact output by default, verbose (-V) shows detailed help.
+func runCheckMsg(filePath string, verbose bool) error {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("reading commit message file: %w", err)
+	}
+
+	// First line is the commit subject
+	lines := strings.SplitN(string(data), "\n", 2)
+	subject := strings.TrimSpace(lines[0])
+
+	if subject == "" {
+		return fmt.Errorf("commit message is empty")
+	}
+
+	input := []changelog.LintInput{{Hash: "", Subject: subject}}
+	_, failed := changelog.LintCommits(input)
+
+	if len(failed) == 0 {
+		return nil
+	}
+
+	reason := failed[0].Reason
+	var b strings.Builder
+
+	// Compact output (default) — single line like commitlint
+	fmt.Fprintf(&b, "\n  %s commitlint %s %d error found\n", ui.FormatError(ui.IconFail), ui.FormatDim("—"), len(failed))
+	fmt.Fprintf(&b, "\n    commit  %s\n", ui.FormatDim(fmt.Sprintf("%q", subject)))
+	fmt.Fprintf(&b, "\n    %s %-18s %s %s\n", ui.FormatError(ui.IconFail), ui.FormatError(reason), ui.FormatDim("·"), reasonDescription(reason))
+	fmt.Fprintf(&b, "\n      expected  %s  %s  e.g.  %s: add user login\n",
+		ui.FormatDim("type")+ui.FormatWarning("("+"scope"+")"+":"+" description"),
+		ui.FormatDim("·"),
+		ui.FormatSuccess("feat")+"("+ui.FormatWarning("auth")+")")
+
+	// Verbose output — show all valid types with descriptions
+	if verbose {
+		fmt.Fprintf(&b, "\n  %s Expected format:\n", ui.FormatInfo("ℹ"))
+		fmt.Fprintf(&b, "\n      type%s: description\n", ui.FormatWarning("(scope)"))
+		fmt.Fprintf(&b, "\n      %s scope is optional\n", ui.FormatDim("·"))
+		fmt.Fprintf(&b, "      %s description must start with lowercase\n", ui.FormatDim("·"))
+		fmt.Fprintf(&b, "\n  %s Valid types:\n\n", ui.FormatInfo("ℹ"))
+		types := []struct{ name, desc string }{
+			{"feat", "new feature"},
+			{"fix", "bug fix"},
+			{"docs", "documentation only"},
+			{"style", "formatting / whitespace"},
+			{"refactor", "code restructuring"},
+			{"test", "add or fix tests"},
+			{"chore", "build / dependency tasks"},
+			{"ci", "CI/CD changes"},
+			{"perf", "performance improvement"},
+			{"revert", "revert a commit"},
+		}
+		for _, t := range types {
+			fmt.Fprintf(&b, "      %s  %s %s\n",
+				ui.FormatSuccess(fmt.Sprintf("%-10s", t.name)),
+				ui.FormatDim("→"),
+				t.desc)
+		}
+		fmt.Fprintf(&b, "\n  %s Example:  %s: add user login\n",
+			ui.FormatDim("→"),
+			ui.FormatSuccess("feat")+"("+ui.FormatWarning("auth")+")")
+	}
+
+	fmt.Fprint(os.Stderr, b.String())
+	return fmt.Errorf("commit message is not conventional")
+}
+
+// reasonDescription returns a human-readable description for lint reasons.
+func reasonDescription(reason string) string {
+	switch {
+	case strings.Contains(reason, "not in conventional commit format"):
+		return "message must follow conventional commit format"
+	case strings.HasPrefix(reason, "unknown type:"):
+		return "type is not in the allowed list"
+	default:
+		return reason
+	}
 }
 
 // Execute runs the root command.
