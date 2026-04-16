@@ -10,7 +10,7 @@ A CLI tool that automates the release process as a single static Go binary. Comp
 
 | Decision | Choice | Version |
 |----------|--------|---------|
-| Language / Min | Go | 1.24.3+ |
+| Language / Min | Go | 1.26.2+ |
 | CLI framework | Cobra | v1.10.2 |
 | Config | Viper (JSON + YAML + TOML) | v1.21.0 |
 | Versioning | Masterminds/semver/v3 | v3.4.0 |
@@ -246,7 +246,7 @@ Modular rule files. **Read these when the summary above isn't enough**:
 |------|-------------|
 | `Makefile` | Build, test, lint, docker — version injection via ldflags |
 | `.goreleaser.yaml` | Multi-platform release (linux/darwin/windows × amd64/arm64), nfpm (deb/rpm/apk) |
-| `Dockerfile` | Multi-stage (golang:1.24-alpine builder + alpine:3.21 runtime), non-root user (releaser:1000), static binary |
+| `Dockerfile` | Multi-stage (golang:1.26-alpine builder + alpine:3.21 runtime), non-root user (releaser:1000), static binary |
 | `docker-entrypoint.sh` | Git identity check for Docker, info-only command support |
 | `.github/workflows/ci.yml` | CI: build + vet + test + race + coverage + lint (security job temporarily disabled) |
 | `.github/workflows/build.yml` | Multi-platform build via GoReleaser |
