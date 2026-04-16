@@ -1,614 +1,657 @@
-# PROGRESS.md - release-it-go Proje Ilerleme Takibi
+# PROGRESS.md — release-it-go Project Progress Tracker
 
-> Bu dosya, projenin genel ilerlemesini ve her fazin durumunu takip eder.
-> Her gelistirme oturumu sonunda guncellenmelidir.
-
----
-
-## Genel Durum
-
-| Faz | Baslik | Durum | Ilerleme |
-|-----|--------|-------|----------|
-| 1 | Core Foundation | Tamamlandi | 100% |
-| 2 | Git Operations | Tamamlandi | 100% |
-| 3 | Conventional Commits + Changelog | Tamamlandi | 100% |
-| 4 | GitHub + GitLab Releases | Tamamlandi | 100% |
-| 5 | Interactive UI + Hooks + Pipeline | Tamamlandi | 100% |
-| 6 | Advanced Features | Tamamlandi | 100% |
-| 7 | Testing, CI/CD, Documentation | Tamamlandi | 100% |
-| 8 | Init Command & Dual Config | Tamamlandi | 100% |
-| 9 | Conventional Commit Linting | Tamamlandi | 100% |
-| 10 | UI/Output Iyilestirmesi | Tamamlandi | 100% |
-| 11 | Docker Container Destegi | Tamamlandi | 100% |
-| 12 | Docker Pre-flight Kontrolleri | Tamamlandi | 100% |
-| 13 | Webhook Notification (Slack + Teams) | Tamamlandi | 100% |
-| 14 | YAML Config Yazma + Init Format Secimi | Tamamlandi | 100% |
-| 15 | Branch-Aware Pre-Release Version Detection | Tamamlandi | 100% |
-| 16 | Kritik Bug Düzeltmeleri — URL Parsing + CalVer | Tamamlandi | 100% |
-| 17 | Pipeline Saglamlık Iyilestirmeleri | Tamamlandi | 100% |
-| 18 | Config Uyumluluk ve Edge Case Düzeltmeleri | Tamamlandi | 100% |
-| 19 | Test Kapsamı Güçlendirme | Tamamlandi | 100% |
-
-**Son Guncelleme:** 2026-03-30
-**Aktif Gelistirici:** Claude
-**Mevcut Versiyon:** dev (Phase 15 tamamlandi - production-ready)
+> Tracks the overall project progress and the status of each phase.
+> Must be updated at the end of every development session.
 
 ---
 
-## Faz 1: Core Foundation
+## Overall Status
 
-**Durum:** Tamamlandi
+| Phase | Title | Status | Progress |
+|-------|-------|--------|----------|
+| 1 | Core Foundation | Complete | 100% |
+| 2 | Git Operations | Complete | 100% |
+| 3 | Conventional Commits + Changelog | Complete | 100% |
+| 4 | GitHub + GitLab Releases | Complete | 100% |
+| 5 | Interactive UI + Hooks + Pipeline | Complete | 100% |
+| 6 | Advanced Features | Complete | 100% |
+| 7 | Testing, CI/CD, Documentation | Complete | 100% |
+| 8 | Init Command & Dual Config | Complete | 100% |
+| 9 | Conventional Commit Linting | Complete | 100% |
+| 10 | UI/Output Improvements | Complete | 100% |
+| 11 | Docker Container Support | Complete | 100% |
+| 12 | Docker Pre-flight Checks | Complete | 100% |
+| 13 | Webhook Notification (Slack + Teams) | Complete | 100% |
+| 14 | YAML Config Writing + Init Format Selection | Complete | 100% |
+| 15 | Branch-Aware Pre-Release Version Detection | Complete | 100% |
+| 16 | Critical Bug Fixes — URL Parsing + CalVer | Complete | 100% |
+| 17 | Pipeline Robustness Improvements | Complete | 100% |
+| 18 | Config Compatibility & Edge Case Fixes | Complete | 100% |
+| 19 | Test Coverage Strengthening | Complete | 100% |
+| 20 | Git Hook Management (install / remove / check-msg) | Complete | 100% |
+
+**Last Updated:** 2026-04-16
+**Active Developer:** Claude
+**Current Version:** v0.1.3 (Phase 20 complete — production-ready)
+
+---
+
+## Phase 1: Core Foundation
+
+**Status:** Complete
 **PRD:** `docs/phase_1.md`
 
-### Yapilacaklar
+### To Do
 
 - [x] Go module init (`go mod init`)
-- [x] Cobra CLI iskeleti
-- [x] Config struct tanimlari
+- [x] Cobra CLI skeleton
+- [x] Config struct definitions
 - [x] Config loader (JSON/YAML/TOML)
-- [x] Default degerler
-- [x] CLI flags -> config merge
-- [x] Git tag'den versiyon okuma
-- [x] VERSION dosyasindan versiyon okuma
+- [x] Default values
+- [x] CLI flags → config merge
+- [x] Read version from git tag
+- [x] Read version from VERSION file
 - [x] Semver parse/increment/compare
 - [x] Template variable rendering
-- [x] Logger (verbose seviyeleri)
+- [x] Logger (verbose levels)
 - [x] Makefile
-- [x] Unit testler
-- [x] CalVer struct ve temel implementasyon
+- [x] Unit tests
+- [x] CalVer struct and basic implementation
 
-### Notlar
+### Notes
 
-- Test coverage: cli=%82.9, config=%87.9, log=%100, version=%86.5
-- semver.IncPatch() pre-release'de pre-release'i kaldirir (1.2.3-beta.0 -> 1.2.3), bu dogru semver davranisi
-- Viper ile config unmarshaling icin mapstructure tag'leri eklendi
-- runGit fonksiyonu test icin mocklanabilir (var olarak tanimli)
+- Test coverage: cli=82.9%, config=87.9%, log=100%, version=86.5%
+- semver.IncPatch() strips pre-release on pre-release versions (1.2.3-beta.0 → 1.2.3); this is correct semver behavior
+- Mapstructure tags added for Viper config unmarshaling
+- `runGit` is a function variable for test mocking
 
 ---
 
-## Faz 2: Git Operations
+## Phase 2: Git Operations
 
-**Durum:** Tamamlandi
+**Status:** Complete
 **PRD:** `docs/phase_2.md`
 
-### Yapilacaklar
+### To Do
 
-- [x] Git runner (komut calistirma)
+- [x] Git runner (command execution)
 - [x] Prerequisite checks (branch, clean, upstream, commits)
 - [x] Stage + Commit
-- [x] Tag olusturma
+- [x] Tag creation
 - [x] Push
 - [x] Repo info parse (HTTPS + SSH)
-- [x] Basit git log changelog
-- [x] Dry-run destegi
-- [x] Unit testler
+- [x] Simple git log changelog
+- [x] Dry-run support
+- [x] Unit tests
 
-### Notlar
+### Notes
 
-- Test coverage: git=%88.7
-- commandExecutor fonksiyon degiskeni ile git komutlari test icin mocklanabilir
-- isWriteOperation ile dry-run modunda okuma islemleri calismaya devam eder
-- TagExists her zaman gercek git komutu calistirir (dry-run dahil)
-- HTTPS ve SSH remote URL formatlari regex ile parse ediliyor
+- Test coverage: git=88.7%
+- The `commandExecutor` function variable allows mocking git commands in tests
+- `isWriteOperation` keeps read operations working in dry-run mode
+- `TagExists` always runs the real git command (including in dry-run)
+- HTTPS and SSH remote URL formats are parsed via regex
 
 ---
 
-## Faz 3: Conventional Commits + Changelog
+## Phase 3: Conventional Commits + Changelog
 
-**Durum:** Tamamlandi
+**Status:** Complete
 **PRD:** `docs/phase_3.md`
 
-### Yapilacaklar
+### To Do
 
 - [x] Conventional commit parser
 - [x] Bump analyzer (major/minor/patch)
-- [x] Conventional-changelog formati
-- [x] Keep-a-changelog formati
-- [x] CHANGELOG.md dosya guncelleme
-- [x] Unit testler
+- [x] Conventional-changelog format
+- [x] Keep-a-changelog format
+- [x] CHANGELOG.md file update
+- [x] Unit tests
 
-### Notlar
+### Notes
 
-- Test coverage: changelog=%93.3
-- Regex ile conventional commit parse (type, scope, !, description, body, footers)
-- Breaking change algilama: footer (BREAKING CHANGE:) ve bang (feat!) destegi
-- Conventional-changelog: Features, Bug Fixes, Performance Improvements, Reverts, BREAKING CHANGES bolumleri
-- Keep-a-changelog: Added, Changed, Fixed, Removed bolumleri
-- insertAfterHeader ile mevcut CHANGELOG.md icerigini koruyarak prepend
+- Test coverage: changelog=93.3%
+- Conventional commit parsed via regex (type, scope, !, description, body, footers)
+- Breaking change detection: footer (BREAKING CHANGE:) and bang (feat!) supported
+- Conventional-changelog: Features, Bug Fixes, Performance Improvements, Reverts, BREAKING CHANGES sections
+- Keep-a-changelog: Added, Changed, Fixed, Removed sections
+- `insertAfterHeader` preserves existing CHANGELOG.md content while prepending
 
 ---
 
-## Faz 4: GitHub + GitLab Releases
+## Phase 4: GitHub + GitLab Releases
 
-**Durum:** Tamamlandi
+**Status:** Complete
 **PRD:** `docs/phase_4.md`
 
-### Yapilacaklar
+### To Do
 
 - [x] Release provider interface
 - [x] GitHub client (create, upload, comment)
 - [x] GitLab client (create, upload, comment)
-- [x] Token yonetimi
+- [x] Token management
 - [x] Asset upload (glob)
-- [x] GitHub Enterprise destegi
-- [x] GitLab CA certificate destegi
-- [x] Dry-run destegi
-- [x] API mock testleri
+- [x] GitHub Enterprise support
+- [x] GitLab CA certificate support
+- [x] Dry-run support
+- [x] API mock tests
 
-### Notlar
+### Notes
 
-- Test coverage: release=%73.7
-- Harici SDK kullanilmadi, net/http ile dogrudan REST API cagrisi
+- Test coverage: release=73.7%
+- No external SDK used; direct REST API calls via net/http
 - GitHub: CreateRelease, UploadAssets, PostComment, ValidateToken, GHE URL, proxy, makeLatest, autoGenerate, discussionCategory
 - GitLab: CreateRelease, UploadAssets (Generic Package + Release Link), PostComment (MR/issue), ValidateToken, CA cert, custom token header
-- httptest.NewServer ile mock API testleri
-- Asset content type detection: 12+ format (zip, tar.gz, dmg, deb, rpm, exe, sig, vb.)
+- Mock API tests via httptest.NewServer
+- Asset content type detection: 12+ formats (zip, tar.gz, dmg, deb, rpm, exe, sig, etc.)
 
 ---
 
-## Faz 5: Interactive UI + Hooks + Pipeline
+## Phase 5: Interactive UI + Hooks + Pipeline
 
-**Durum:** Tamamlandi
+**Status:** Complete
 **PRD:** `docs/phase_5.md`
 
-### Yapilacaklar
+### To Do
 
-- [x] Versiyon secim prompt
-- [x] Onay prompt'lari
-- [x] Spinner animasyonu
-- [x] Renkli cikti
-- [x] CI ortam algilama
+- [x] Version selection prompt
+- [x] Confirm prompts
+- [x] Spinner animation
+- [x] Colored output
+- [x] CI environment detection
 - [x] Hook runner (before/after lifecycle)
-- [x] Ana pipeline orchestrator
-- [x] Ozel modlar (--changelog, --release-version, --only-version)
-- [x] Ozet ciktisi
-- [x] Unit testler
+- [x] Main pipeline orchestrator
+- [x] Special modes (--changelog, --release-version, --only-version)
+- [x] Summary output
+- [x] Unit tests
 
-### Notlar
+### Notes
 
-- Test coverage: ui=%42.9 (bubbletea interactive models terminal gerektiriyor), hook=%100, runner=%25.3 (pipeline adimlarinda git mock gerekli)
-- Bubbletea v1.3.10 ile interaktif terminal UI (selectModel, confirmModel, inputModel)
-- Lipgloss v1.1.0 ile renklendirme, NO_COLOR environment variable destegi
-- CI algilama: GITHUB_ACTIONS, GITLAB_CI, CIRCLECI, TRAVIS, JENKINS_URL, BITBUCKET_PIPELINE, CODEBUILD_BUILD_ID, TF_BUILD
-- NonInteractivePrompter: CI modunda tum prompt'lari otomatik yanitlar
-- HookRunner: 12 lifecycle event (before/after: init, bump, release, git:release, github:release, gitlab:release)
+- Test coverage: ui=42.9% (bubbletea interactive models require terminal), hook=100%, runner=25.3% (pipeline steps need git mocks)
+- Bubbletea v1.3.10 for interactive terminal UI (selectModel, confirmModel, inputModel)
+- Lipgloss v1.1.0 for coloring, NO_COLOR environment variable supported
+- CI detection: GITHUB_ACTIONS, GITLAB_CI, CIRCLECI, TRAVIS, JENKINS_URL, BITBUCKET_PIPELINE, CODEBUILD_BUILD_ID, TF_BUILD
+- NonInteractivePrompter: auto-answers all prompts in CI mode
+- HookRunner: 12 lifecycle events (before/after: init, bump, release, git:release, github:release, gitlab:release)
 - Template variable rendering: ${version}, ${tagName}, ${changelog}, ${releaseUrl}, ${branchName}, ${repo.*}
-- Pipeline: init -> prerequisites -> version -> changelog -> git:release -> github:release -> gitlab:release
-- Her adimda before/after hook calistirma ve UpdateVars ile degisken guncelleme
-- Dry-run tum adimlarda destekleniyor
+- Pipeline: init → prerequisites → version → changelog → git:release → github:release → gitlab:release
+- Before/after hook execution and UpdateVars on every step
+- Dry-run supported in all steps
 
 ---
 
-## Faz 6: Advanced Features
+## Phase 6: Advanced Features
 
-**Durum:** Tamamlandi
+**Status:** Complete
 **PRD:** `docs/phase_6.md`
 
-### Yapilacaklar
+### To Do
 
-- [x] Bumper: dosyadan versiyon okuma (JSON/YAML/TOML/INI/text)
-- [x] Bumper: dosyaya versiyon yazma
-- [x] Bumper: glob pattern destegi
-- [x] CalVer runner entegrasyonu
-- [x] Pre-release flows (Phase 1'de semver.go'da implement edilmisti)
-- [x] --no-increment modu
-- [x] --only-version modu
-- [x] --changelog ve --release-version CLI modlari
+- [x] Bumper: read version from file (JSON/YAML/TOML/INI/text)
+- [x] Bumper: write version to file
+- [x] Bumper: glob pattern support
+- [x] CalVer runner integration
+- [x] Pre-release flows (already implemented in Phase 1's semver.go)
+- [x] --no-increment mode
+- [x] --only-version mode
+- [x] --changelog and --release-version CLI modes
 - [x] CalVer + SemVer conflict detection
-- [x] Bumper pipeline step (bump adimi)
-- [x] Unit testler
+- [x] Bumper pipeline step (bump step)
+- [x] Unit tests
 
-### Notlar
+### Notes
 
-- Test coverage: bumper=%87.8
-- Bumper: JSON (nested path), YAML, TOML, INI ([section].key), text (consumeWholeFile) destegi
-- Bumper: glob pattern (*.json, charts/*/Chart.yaml), prefix (^, ~), dry-run destegi
-- CalVer: runner.determineCalVer() ile pipeline'a entegre edildi
-- CalVer + pre-release birlikte kullanilamiyor (CLI'da validation)
-- Pipeline'a "bump" adimi eklendi: version -> bump -> changelog
-- CLI modlari: RunChangelogOnly, RunReleaseVersionOnly, RunOnlyVersion, RunNoIncrement
-- RunOnlyVersion: versiyon secimi sonrasi otomatik CI moduna gecer
-- RunNoIncrement: versiyon artirmadan changelog ve release gunceller
-- Mevcut YAML/TOML dependency'leri kullanildi (go-yaml, go-toml via Viper)
-- INI icin stdlib ile basit parser yazildi (harici dependency yok)
+- Test coverage: bumper=87.8%
+- Bumper: JSON (nested path), YAML, TOML, INI ([section].key), text (consumeWholeFile) support
+- Bumper: glob pattern (*.json, charts/*/Chart.yaml), prefix (^, ~), dry-run support
+- CalVer: integrated into the pipeline via `runner.determineCalVer()`
+- CalVer + pre-release cannot be used together (validation in CLI)
+- "bump" step added to the pipeline: version → bump → changelog
+- CLI modes: RunChangelogOnly, RunReleaseVersionOnly, RunOnlyVersion, RunNoIncrement
+- RunOnlyVersion: switches to CI mode automatically after version selection
+- RunNoIncrement: updates changelog and release without incrementing version
+- Existing YAML/TOML deps used (go-yaml, go-toml via Viper)
+- Simple INI parser written using stdlib (no external dep)
 
 ---
 
-## Faz 7: Testing, CI/CD, Documentation
+## Phase 7: Testing, CI/CD, Documentation
 
-**Durum:** Tamamlandi
+**Status:** Complete
 **PRD:** `docs/phase_7.md`
 
-### Yapilacaklar
+### To Do
 
-- [x] Integration testler
-- [x] API mock testleri
-- [x] Coverage %80+ hedefi
+- [x] Integration tests
+- [x] API mock tests
+- [x] Coverage 80%+ target
 - [x] GitHub Actions CI workflow
 - [x] GitHub Actions Release workflow
 - [x] GoReleaser config
 - [x] Shell completions (bash/zsh/fish)
 - [x] Build info (ldflags)
 
-### Notlar
+### Notes
 
-- Test coverage: bumper=%87.8, changelog=%93.3, cli=%83.0, config=%87.9, git=%86.8, hook=%100, log=%100, release=%86.7, runner=%80.6, ui=%78.6, version=%86.5
-- Tum paketler %78+ coverage'a ulasti, toplam %80+ hedefi karsilandi
-- 17 integration test: full pipeline, patch/minor/major bump, dry-run, no-tags, changelog-only, release-version-only, disable commit/tag, conventional commit auto-detect, breaking change auto-major, bumper file update, keep-a-changelog, hook execution/failure, config JSON/YAML, no-increment, sequential releases
-- Bubbletea model testleri Init/Update/View ile direkt test edildi (terminal gerektirmeden)
-- GitLab upload assets, error handling, missing token testleri eklendi
+- Test coverage: bumper=87.8%, changelog=93.3%, cli=83.0%, config=87.9%, git=86.8%, hook=100%, log=100%, release=86.7%, runner=80.6%, ui=78.6%, version=86.5%
+- All packages reached 78%+ coverage; the overall 80%+ target was met
+- 17 integration tests: full pipeline, patch/minor/major bump, dry-run, no-tags, changelog-only, release-version-only, disable commit/tag, conventional commit auto-detect, breaking change auto-major, bumper file update, keep-a-changelog, hook execution/failure, config JSON/YAML, no-increment, sequential releases
+- Bubbletea model tests are run directly via Init/Update/View (no terminal required)
+- GitLab upload assets, error handling, missing token tests added
 - GitHub Actions CI: Go 1.22/1.23 matrix, test+lint+build, coverage check
-- GitHub Actions Release: v* tag'da GoReleaser v2 ile otomatik release
-- GoReleaser: linux/darwin/windows x amd64/arm64, ldflags (cli.Version/Commit/Date), nfpms (deb/rpm/apk)
-- Shell completions: cobra ile bash/zsh/fish/powershell, cmd.OutOrStdout() ile test edilebilir
-- Race condition testleri tum paketlerde basarili
+- GitHub Actions Release: triggered by v* tag, automatic release via GoReleaser v2
+- GoReleaser: linux/darwin/windows × amd64/arm64, ldflags (cli.Version/Commit/Date), nfpms (deb/rpm/apk)
+- Shell completions: bash/zsh/fish/powershell via cobra, testable via cmd.OutOrStdout()
+- Race condition tests pass on all packages
 
 ---
 
-## Post-Release: Gercek Ortam Testleri ve Iyilestirmeler
+## Post-Release: Real Environment Tests and Improvements
 
-**Durum:** Tamamlandi
+**Status:** Complete
 
-### Yapilacaklar
+### To Do
 
-- [x] Gercek GitLab ortaminda release testi (testproject06)
-- [x] Guvenlik fix: HTTPS URL'lerden credential stripping (CHANGELOG'a token sizmasini onleme)
+- [x] Real GitLab environment release test (private test repo)
+- [x] Security fix: HTTPS URL credential stripping (prevents token leakage in CHANGELOG)
 - [x] GoReleaser ldflags fix (main.version/commit/date)
-- [x] Eski npm release-it config uyumlulugu (normalizeJSON + applyPluginCompat)
-  - [x] requireBranch: [] → string donusumu
-  - [x] gitlab.assets: {links:[]} → []string donusumu
-  - [x] plugins section'dan changelog ayarlarinin map edilmesi
-  - [x] npm, versionFile gibi bilinmeyen alanlarin temizlenmesi
-- [x] --preRelease shorthand flag'i eklendi (sub-branch prerelease destegi)
-- [x] GitLabConfig'e PreRelease alani eklendi
-- [x] Gercek GitLab CI/CD pipeline testi (testproject05)
-  - [x] Main branch: otomatik release (v1.4.1)
-  - [x] Sub-branch: prerelease (v1.5.0-deneme2026.0)
-  - [x] SSH ile git push, personal token ile GitLab release API
-- [x] Compat testleri (6 test: conventional-changelog, keep-a-changelog, no-plugins, old npm format, requireBranch array, YAML ignored)
+- [x] Old npm release-it config compatibility (normalizeJSON + applyPluginCompat)
+  - [x] requireBranch: [] → string conversion
+  - [x] gitlab.assets: {links:[]} → []string conversion
+  - [x] Mapping changelog settings from the plugins section
+  - [x] Cleanup of unknown fields like npm, versionFile
+- [x] --preRelease shorthand flag added (sub-branch prerelease support)
+- [x] PreRelease field added to GitLabConfig
+- [x] Real GitLab CI/CD pipeline test (private test repo)
+  - [x] Main branch: automatic release (v1.4.1)
+  - [x] Sub-branch: prerelease (v1.5.0-beta.0)
+  - [x] git push via SSH, GitLab release API via personal token
+- [x] Compat tests (6 tests: conventional-changelog, keep-a-changelog, no-plugins, old npm format, requireBranch array, YAML ignored)
 
-### Notlar
+### Notes
 
-- KRITIK GUVENLIK FIX: ParseRepoURL'de HTTPS credential stripping eklendi. Eski halde oauth2:token@host formatindaki URL'ler CHANGELOG compare linklerine siziyordu.
-- npm release-it config uyumlulugu: Eski .release-it.json dosyalari (npm, plugins, requireBranch:[], assets:{links:[]}) sorunsuz yukleniyor.
-- --preRelease="identifier" shorthand'i: preReleaseId set ediyor + GitHub/GitLab release'i otomatik pre-release olarak isaretliyor.
-- GitLab CI pipeline SSH ile push yapiyor (HTTPS token git push icin guvenilir degil), API token ile release olusturuyor.
-- Gercek ortam testleri: testproject06 (v0.2.0, v0.3.0, v1.0.0) ve testproject05 (v1.4.1, v1.5.0-deneme2026.0) basarili.
+- CRITICAL SECURITY FIX: HTTPS credential stripping added to ParseRepoURL. Previously, URLs in oauth2:token@host format were leaking into CHANGELOG compare links.
+- npm release-it config compatibility: legacy .release-it.json files (npm, plugins, requireBranch:[], assets:{links:[]}) load without issues.
+- --preRelease="identifier" shorthand: sets preReleaseId + automatically marks GitHub/GitLab release as pre-release.
+- GitLab CI pipeline pushes via SSH (HTTPS token git push is not reliable), creates release via API token.
+- Real environment tests: two private test repos (v0.2.0, v0.3.0, v1.0.0 on one; v1.4.1, v1.5.0-beta.0 on the other) successful.
 
 ---
 
-## Faz 8: Init Command & Dual Config File Support
+## Phase 8: Init Command & Dual Config File Support
 
-**Durum:** Tamamlandi
+**Status:** Complete
 **PRD:** `docs/phase_8.md`
 
-### Yapilacaklar
+### To Do
 
-- [x] configSearchFiles'a `.release-it-go.*` dosyalarini oncelikli ekle
-- [x] Prompter interface'ine generic `Select` metodu ekle (bubbletea + non-interactive)
-- [x] `config/writer.go` - WriteConfigJSON (smart defaults omission)
-- [x] `config/migrate.go` - DetectLegacyConfig + MigrateLegacyConfig
-- [x] `cli/init.go` - Init komutu ve wizard akisi
-- [x] Init komutunu root.go'ya kaydet
-- [x] Unit testler (writer, migrate, init, prompt select, config priority)
-- [x] docs/phase_8.md PRD dokumani
+- [x] Add `.release-it-go.*` files to configSearchFiles with priority
+- [x] Add generic `Select` method to the Prompter interface (bubbletea + non-interactive)
+- [x] `config/writer.go` — WriteConfigJSON (smart defaults omission)
+- [x] `config/migrate.go` — DetectLegacyConfig + MigrateLegacyConfig
+- [x] `cli/init.go` — Init command and wizard flow
+- [x] Register the init command in root.go
+- [x] Unit tests (writer, migrate, init, prompt select, config priority)
+- [x] docs/phase_8.md PRD document
 
-### Notlar
+### Notes
 
-- Native config (.release-it-go.*) legacy config'den (.release-it.*) once aranir
-- WriteConfigJSON sadece default'tan farkli alanlari yazar (minimal JSON ciktisi)
-- Migration akisi: legacy oku → backup al → normalizeJSON + applyPluginCompat → native yaz
-- Init wizard: platform, changelog, git ops, commit msg, tag format, branch secimi
-- Mevcut runner_test.go mock prompter'lara Select metodu eklendi (interface uyumlulugu)
-- Init wizard'da git push kapatildiginda `requireUpstream` otomatik false yapilir (upstream kontrolu push olmadan anlamsiz)
-- `requireCleanWorkingDir` push durumundan bagimsiz olarak HER ZAMAN aktif kalir (commit/tag atarken kirli working dir tehlikeli)
-- Init komutuna ozel flag yok, root'tan gelen `--ci` flag'i NonInteractivePrompter ile tum sorulari default yanitlar
-- `--ci` modunda mevcut `.release-it-go.json` varsa Confirm("Overwrite?", default=false) → abort eder (guvenli davranis)
+- Native config (.release-it-go.*) is searched before legacy config (.release-it.*)
+- WriteConfigJSON only writes fields different from defaults (minimal JSON output)
+- Migration flow: read legacy → backup → normalizeJSON + applyPluginCompat → write native
+- Init wizard: platform, changelog, git ops, commit msg, tag format, branch selection
+- Existing runner_test.go mock prompters had Select method added (interface compatibility)
+- In the init wizard, when git push is disabled, `requireUpstream` is set to false automatically (upstream check is meaningless without push)
+- `requireCleanWorkingDir` is ALWAYS active regardless of push (a dirty working dir during commit/tag is dangerous)
+- The init command has no special flag; the root `--ci` flag passes through NonInteractivePrompter, which auto-answers all prompts with defaults
+- In `--ci` mode, if `.release-it-go.json` already exists, Confirm("Overwrite?", default=false) → aborts (safe default)
 
 ---
 
-## Faz 9: Conventional Commit Linting
+## Phase 9: Conventional Commit Linting
 
-**Durum:** Tamamlandi
+**Status:** Complete
 **PRD:** `docs/phase_9.md`
 
-### Yapilacaklar
+### To Do
 
-- [x] `git/changelog.go` - CommitInfo struct + GetCommitsWithHashSinceTag()
-- [x] `changelog/lint.go` - LintInput, LintResult, LintCommits() fonksiyonu
-- [x] `config/config.go` - RequireConventionalCommits alani
-- [x] `runner/runner.go` - checkCommitLint() pipeline adimi + RunCheckCommits() modu
-- [x] `cli/root.go` - --check-commits + --ignore-commit-lint flag'leri
-- [x] `cli/init.go` - Wizard'a "Require conventional commits?" sorusu
-- [x] `changelog/lint_test.go` - LintCommits testleri (8 test)
-- [x] `git/changelog_test.go` - GetCommitsWithHashSinceTag testleri (3 test)
+- [x] `git/changelog.go` — CommitInfo struct + GetCommitsWithHashSinceTag()
+- [x] `changelog/lint.go` — LintInput, LintResult, LintCommits() function
+- [x] `config/config.go` — RequireConventionalCommits field
+- [x] `runner/runner.go` — checkCommitLint() pipeline step + RunCheckCommits() mode
+- [x] `cli/root.go` — --check-commits + --ignore-commit-lint flags
+- [x] `cli/init.go` — "Require conventional commits?" question in the wizard
+- [x] `changelog/lint_test.go` — LintCommits tests (8 tests)
+- [x] `git/changelog_test.go` — GetCommitsWithHashSinceTag tests (3 tests)
 
-### Notlar
+### Notes
 
-- Circular dependency onleme: lint fonksiyonu `changelog` paketinde, `git.CommitInfo` yerine kendi `LintInput` struct'ini kullaniyor
-- Runner zaten hem `git` hem `changelog` import ettigi icin donusum runner'da yapiliyor
-- Merge commit (`Merge `) ve revert commit (`Revert `) otomatik gecis alir
-- commitPattern regex (parser.go'daki) dogrudan yeniden kullanildi
-- Pipeline sirasi: init → prerequisites → commitlint → version → ...
-- `--check-commits`: bagimsiz lint modu, exit code 1 ile hata donusu
-- `--ignore-commit-lint`: RequireConventionalCommits override eder
-- Tum testler race detection ile basarili
-
----
-
-## Faz 10: UI/Output Iyilestirmesi
-
-**Durum:** Tamamlandi
-
-### Yapilacaklar
-
-- [x] `ui/colors.go` - 14 Unicode ikon sabiti (IconSuccess, IconFail, IconVersion, IconTag, IconPush, IconRelease, IconChangelog, IconCommit, IconLint, IconSkip, IconLink, IconRocket, IconDryRun, IconWarning)
-- [x] `ui/colors.go` - FormatBold() fonksiyonu
-- [x] `log/logger.go` - Print() metodu (slog formatsiz dogrudan cikti)
-- [x] `log/logger.go` - Verbose() format degisikligi (slog → `↳` indented dim format)
-- [x] `ui/spinner.go` - CI Start() ciktisi (`-` → `⠋` spinner frame)
-- [x] `ui/spinner.go` - CI Stop() ciktisi (`OK`/`FAIL` → renkli `✓`/`✗` ikonlari)
-- [x] `runner/runner.go` - printBanner() (🚀 release-it-go / 🧪 dry-run banner)
-- [x] `runner/runner.go` - Versiyon mesaji (Info → Print + 📦 ikon)
-- [x] `runner/runner.go` - Skip mesajlari (Info → Print + ⏭️ ikon)
-- [x] `runner/runner.go` - printSummary() lipgloss border box ile yeniden tasarim
-- [x] `log/logger_test.go` - Print, Verbose format testleri (4 yeni test)
-- [x] Tum testler gecti (`go test ./... -race`)
-- [x] `go vet` ve `go fmt` temiz
-
-### Notlar
-
-- Ikonlar Unicode karakter, ANSI kodu degil. `NO_COLOR` sadece lipgloss renklerini kapatir, ikonlar her durumda gorunur
-- Logger.Print(): slog formatlamasi olmadan dogrudan stderr'e yazar, kullanici dostu mesajlar icin
-- Logger.Verbose(): `    ↳ mesaj` formatinda, indented ve dim renkte (verbose >= 1)
-- Logger.Debug(): Mevcut slog formati korundu (degisiklik yok)
-- CI spinner: `⠋` frame ile baslama, renkli `✓`/`✗` ile bitme
-- printSummary: lipgloss RoundedBorder ile kutu, ikonlu satirlar, duration bilgisi
-- printBanner: Run(), RunOnlyVersion(), RunNoIncrement() basina eklendi
-- 5 dosya etkilendi: ui/colors.go, log/logger.go, ui/spinner.go, runner/runner.go, log/logger_test.go
+- Circular dependency avoided: the lint function lives in the `changelog` package and uses its own `LintInput` struct rather than `git.CommitInfo`
+- Since runner imports both `git` and `changelog`, the conversion happens in runner
+- Merge commits (`Merge `) and revert commits (`Revert `) auto-pass
+- The `commitPattern` regex (in parser.go) is reused directly
+- Pipeline order: init → prerequisites → commitlint → version → ...
+- `--check-commits`: standalone lint mode, exits with code 1 on failure
+- `--ignore-commit-lint`: overrides RequireConventionalCommits
+- All tests pass with race detection
 
 ---
 
-## Faz 11: Docker Container Destegi
+## Phase 10: UI/Output Improvements
 
-**Durum:** Tamamlandi
+**Status:** Complete
+
+### To Do
+
+- [x] `ui/colors.go` — 14 Unicode icon constants (IconSuccess, IconFail, IconVersion, IconTag, IconPush, IconRelease, IconChangelog, IconCommit, IconLint, IconSkip, IconLink, IconRocket, IconDryRun, IconWarning)
+- [x] `ui/colors.go` — FormatBold() function
+- [x] `log/logger.go` — Print() method (slog-format-free direct output)
+- [x] `log/logger.go` — Verbose() format change (slog → `↳` indented dim format)
+- [x] `ui/spinner.go` — CI Start() output (`-` → `⠋` spinner frame)
+- [x] `ui/spinner.go` — CI Stop() output (`OK`/`FAIL` → colored `✓`/`✗` icons)
+- [x] `runner/runner.go` — printBanner() (🚀 release-it-go / 🧪 dry-run banner)
+- [x] `runner/runner.go` — Version message (Info → Print + 📦 icon)
+- [x] `runner/runner.go` — Skip messages (Info → Print + ⏭️ icon)
+- [x] `runner/runner.go` — printSummary() redesigned with lipgloss border box
+- [x] `log/logger_test.go` — Print, Verbose format tests (4 new tests)
+- [x] All tests pass (`go test ./... -race`)
+- [x] `go vet` and `go fmt` clean
+
+### Notes
+
+- Icons are Unicode characters, not ANSI codes. `NO_COLOR` only disables lipgloss colors; icons always show.
+- Logger.Print(): writes directly to stderr without slog formatting; for user-friendly messages.
+- Logger.Verbose(): `    ↳ message` format, indented and dim color (verbose >= 1)
+- Logger.Debug(): existing slog format preserved (no change)
+- CI spinner: starts with `⠋` frame, ends with colored `✓`/`✗`
+- printSummary: lipgloss RoundedBorder box, iconified lines, duration info
+- printBanner: added at the start of Run(), RunOnlyVersion(), RunNoIncrement()
+- 5 files affected: ui/colors.go, log/logger.go, ui/spinner.go, runner/runner.go, log/logger_test.go
+
+---
+
+## Phase 11: Docker Container Support
+
+**Status:** Complete
 **PRD:** `docs/phase_11.md`
 
-### Yapilacaklar
+### To Do
 
-- [x] `docs/phase_11.md` PRD dokumani
-- [x] `.dockerignore` build context filtresi
+- [x] `docs/phase_11.md` PRD document
+- [x] `.dockerignore` build context filter
 - [x] `Dockerfile` multi-stage build (golang:1.24.3-alpine → alpine:3.21)
-- [x] `Makefile` docker-build ve docker-run target'lari
-- [x] `PROGRESS.md` Phase 11 guncelleme
+- [x] `Makefile` docker-build and docker-run targets
+- [x] `PROGRESS.md` Phase 11 update
 
-### Notlar
+### Notes
 
 - Multi-stage build: builder (golang:1.24.3-alpine) + runtime (alpine:3.21)
 - Static binary: CGO_ENABLED=0 GOOS=linux, -trimpath -ldflags="-s -w"
-- Runtime paketler: git, openssh-client, ca-certificates
-- Non-root user: releaser (UID/GID 1000, build arg ile degistirilebilir)
-- git safe.directory '*' ile mount edilen repo'lar icin guvenli erisim
-- Build ARG'lar: VERSION, COMMIT, BUILD_DATE, USER_UID, USER_GID
-- Tahmini image boyutu: ~30MB
-- OCI metadata labels eklendi
+- Runtime packages: git, openssh-client, ca-certificates
+- Non-root user: releaser (UID/GID 1000, can be changed via build arg)
+- `git safe.directory '*'` for safe access to mounted repos
+- Build ARGs: VERSION, COMMIT, BUILD_DATE, USER_UID, USER_GID
+- Estimated image size: ~30MB
+- OCI metadata labels added
 
 ---
 
-## Faz 12: Docker Ortami Pre-flight Kontrolleri
+## Phase 12: Docker Pre-flight Checks
 
-**Durum:** Tamamlandi
+**Status:** Complete
 
-### Yapilacaklar
+### To Do
 
-- [x] `git/prerequisites.go` - checkGitIdentity() fonksiyonu (user.name/user.email kontrolu)
-- [x] `git/prerequisites.go` - CheckPrerequisites() icine identity check eklenmesi
-- [x] `git/prerequisites_test.go` - Identity testleri (5 test: commit kapali, ikisi tam, name eksik, email eksik, ikisi eksik)
-- [x] `runner/runner.go` - checkTokens() fonksiyonu (GitHub/GitLab token kontrolu)
-- [x] `runner/runner.go` - checkPrerequisites() icine token check eklenmesi
-- [x] `runner/runner_test.go` - Token testleri (11 test: release kapali, token eksik/set, custom tokenRef, skipChecks, her iki platform)
-- [x] Tum testler gecti (`go test ./... -race`)
-- [x] `go vet` ve `go build` temiz
+- [x] `git/prerequisites.go` — checkGitIdentity() function (user.name/user.email check)
+- [x] `git/prerequisites.go` — identity check added to CheckPrerequisites()
+- [x] `git/prerequisites_test.go` — Identity tests (5 tests: commit disabled, both set, name missing, email missing, both missing)
+- [x] `runner/runner.go` — checkTokens() function (GitHub/GitLab token check)
+- [x] `runner/runner.go` — token check added to checkPrerequisites()
+- [x] `runner/runner_test.go` — Token tests (11 tests: release disabled, token missing/set, custom tokenRef, skipChecks, both platforms)
+- [x] All tests pass (`go test ./... -race`)
+- [x] `go vet` and `go build` clean
 
-### Notlar
+### Notes
 
-- Git identity kontrolu sadece `git.commit: true` ise yapilir (tag-only veya push-only senaryolarda gereksiz)
-- Token kontrolu `runner` seviyesinde cunku config bilgisine (GitHub/GitLab ayarlari) erisim gerekiyor
-- `skipChecks: true` ile token kontrolu atlanabilir (CI ortaminda farkli auth mekanizmasi kullanildiginda)
-- Custom `tokenRef` destegi: kullanici farkli env variable adi kullanabilir
-- Hatalar erken (prerequisites asamasinda) verilir, pipeline gec asamada basarisiz olmaz
+- Git identity check is only performed if `git.commit: true` (unnecessary in tag-only or push-only scenarios)
+- Token check is at the `runner` level because access to config (GitHub/GitLab settings) is required
+- `skipChecks: true` skips the token check (when CI uses a different auth mechanism)
+- Custom `tokenRef` support: the user can use a different env variable name
+- Errors fail early (in prerequisites), not late in the pipeline
 
 ---
 
-## Faz 13: Webhook Notification Destegi (Slack + Teams)
+## Phase 13: Webhook Notification Support (Slack + Teams)
 
-**Durum:** Tamamlandi
+**Status:** Complete
 **PRD:** `docs/phase_13.md`
 
-### Yapilacaklar
+### To Do
 
-- [x] `internal/config/config.go` - NotificationConfig + WebhookConfig struct'lari
-- [x] `internal/config/defaults.go` - Default notification config (disabled, bos webhooks)
-- [x] `internal/notification/notification.go` - Client, SendAll, HTTP POST, resolveURL, renderMessage
-- [x] `internal/notification/slack.go` - Slack payload builder ({"text": "..."})
-- [x] `internal/notification/teams.go` - Teams MessageCard payload builder
-- [x] `internal/notification/notification_test.go` - 13 test, %98+ coverage (httptest mock server)
-- [x] `internal/runner/runner.go` - sendNotification() pipeline adimi (tum pipeline'lara eklendi)
-- [x] `internal/runner/runner_test.go` - 3 test: disabled, empty webhooks, non-fatal error
-- [x] `docs/phase_13.md` - PRD dokumani
-- [x] Tum testler gecti (`go test ./... -race`)
-- [x] `go vet` ve `go build` temiz
+- [x] `internal/config/config.go` — NotificationConfig + WebhookConfig structs
+- [x] `internal/config/defaults.go` — Default notification config (disabled, empty webhooks)
+- [x] `internal/notification/notification.go` — Client, SendAll, HTTP POST, resolveURL, renderMessage
+- [x] `internal/notification/slack.go` — Slack payload builder ({"text": "..."})
+- [x] `internal/notification/teams.go` — Teams MessageCard payload builder
+- [x] `internal/notification/notification_test.go` — 13 tests, 98%+ coverage (httptest mock server)
+- [x] `internal/runner/runner.go` — sendNotification() pipeline step (added to all pipelines)
+- [x] `internal/runner/runner_test.go` — 3 tests: disabled, empty webhooks, non-fatal error
+- [x] `docs/phase_13.md` — PRD document
+- [x] All tests pass (`go test ./... -race`)
+- [x] `go vet` and `go build` clean
 
-### Notlar
+### Notes
 
-- Notification non-fatal: basarisiz olursa uyari loglanir, pipeline durmaz
-- Webhook URL guvenlik icin config'e dogrudan yazilmaz, `urlRef` ile env variable adi belirtilir
-- Slack ve Teams icin platform-spesifik default sablonlar mevcut
-- Kullanici `messageTemplate` ile ozel sablon tanimlayabilir
-- Timeout configurable (default: 30 saniye)
-- Dry-run modunda HTTP cagrisi yapilmaz
+- Notification non-fatal: a failure logs a warning but doesn't stop the pipeline
+- Webhook URL is not written to config directly for security; the env variable name is specified via `urlRef`
+- Platform-specific default templates exist for Slack and Teams
+- The user can define a custom template via `messageTemplate`
+- Timeout is configurable (default: 30 seconds)
+- No HTTP call is made in dry-run mode
 
 ---
 
-## Faz 14: YAML Config Yazma + Init Format Secimi
+## Phase 14: YAML Config Writing + Init Format Selection
 
-**Durum:** Tamamlandi
+**Status:** Complete
 **PRD:** `docs/phase_14.md`
 
-### Yapilacaklar
+### To Do
 
-- [x] `internal/config/writer.go` - WriteConfigYAML + WriteConfigYAMLWith fonksiyonlari
-- [x] `internal/config/writer.go` - WriteConfigJSONWith fonksiyonu (ForceFields destegi)
-- [x] `internal/config/writer.go` - ForceFields tipi ve toConfigMap (diffStructForce)
-- [x] `internal/config/writer.go` - fullExampleYAML sabiti (yorumlu YAML referans)
-- [x] `internal/config/writer.go` - fullExampleJSON ve WriteFullExampleJSON kaldirildi
-- [x] `internal/config/migrate.go` - NativeConfigFileYAML sabiti
-- [x] `internal/config/migrate.go` - NativeConfigFileForFormat() fonksiyonu
-- [x] `internal/config/migrate.go` - DetectNativeConfigAny() fonksiyonu
-- [x] `internal/config/migrate.go` - MigrateLegacyConfigTo() fonksiyonu (format parametreli)
-- [x] `internal/cli/init.go` - Format secim sorusu (JSON / YAML, ilk soru)
-- [x] `internal/cli/init.go` - ForceFields ile wizard-configured alanlarin explicit yazimi
-- [x] `internal/cli/init.go` - Format degisiminde eski config'i .bak olarak yeniden adlandirma
-- [x] `internal/cli/init.go` - --full-example YAML ciktisi (.release-it-go-full.yaml)
-- [x] `internal/config/writer_test.go` - YAML yazma testleri (default, non-default, full example, loadable)
-- [x] `internal/config/writer_test.go` - TestToConfigMap_ForceFieldsIncludesDefaults
-- [x] `internal/cli/init_test.go` - TestRunInit_YAMLFormat
-- [x] `internal/cli/init_test.go` - TestRunInit_FormatSwitch_RenamesOldConfig
-- [x] `internal/cli/init_test.go` - TestRunInit_WizardWritesExplicitFields
-- [x] `docs/phase_14.md` - PRD dokumani
-- [x] Tum testler gecti (`go test ./... -race`)
-- [x] `go vet` ve `go fmt` temiz
+- [x] `internal/config/writer.go` — WriteConfigYAML + WriteConfigYAMLWith functions
+- [x] `internal/config/writer.go` — WriteConfigJSONWith function (ForceFields support)
+- [x] `internal/config/writer.go` — ForceFields type and toConfigMap (diffStructForce)
+- [x] `internal/config/writer.go` — fullExampleYAML constant (commented YAML reference)
+- [x] `internal/config/writer.go` — fullExampleJSON and WriteFullExampleJSON removed
+- [x] `internal/config/migrate.go` — NativeConfigFileYAML constant
+- [x] `internal/config/migrate.go` — NativeConfigFileForFormat() function
+- [x] `internal/config/migrate.go` — DetectNativeConfigAny() function
+- [x] `internal/config/migrate.go` — MigrateLegacyConfigTo() function (with format parameter)
+- [x] `internal/cli/init.go` — Format selection question (JSON / YAML, first question)
+- [x] `internal/cli/init.go` — Explicit writing of wizard-configured fields via ForceFields
+- [x] `internal/cli/init.go` — Rename old config to .bak when format changes
+- [x] `internal/cli/init.go` — --full-example YAML output (.release-it-go-full.yaml)
+- [x] `internal/config/writer_test.go` — YAML writing tests (default, non-default, full example, loadable)
+- [x] `internal/config/writer_test.go` — TestToConfigMap_ForceFieldsIncludesDefaults
+- [x] `internal/cli/init_test.go` — TestRunInit_YAMLFormat
+- [x] `internal/cli/init_test.go` — TestRunInit_FormatSwitch_RenamesOldConfig
+- [x] `internal/cli/init_test.go` — TestRunInit_WizardWritesExplicitFields
+- [x] `docs/phase_14.md` — PRD document
+- [x] All tests pass (`go test ./... -race`)
+- [x] `go vet` and `go fmt` clean
 
-### Notlar
+### Notes
 
-- YAML yorum satiri destegi sayesinde `--full-example` artik her opsiyon icin aciklama icerir
-- ForceFields mekanizmasi: wizard'in sordugu her alan default olsa bile config dosyasina yazilir (ornegin `commit: true`, `infile: "CHANGELOG.md"`)
-- Format degisiminde (JSON→YAML) eski dosya `.bak` olarak yedeklenir, iki config yan yana kalmaz
-- Migration da format secimini destekliyor (MigrateLegacyConfigTo)
-- `go.yaml.in/yaml/v3` (Viper'in indirect dependency'si) artik dogrudan kullaniliyor
+- Thanks to YAML comment support, `--full-example` now contains a description for every option
+- ForceFields mechanism: every field the wizard asks is written to the config file even if it equals the default (e.g., `commit: true`, `infile: "CHANGELOG.md"`)
+- When the format changes (JSON→YAML), the old file is backed up as `.bak`; the two configs do not coexist
+- Migration also supports format selection (MigrateLegacyConfigTo)
+- `go.yaml.in/yaml/v3` (Viper's indirect dependency) is now used directly
 
 ---
 
-## Faz 15: Branch-Aware Pre-Release Version Detection
+## Phase 15: Branch-Aware Pre-Release Version Detection
 
-**Durum:** Tamamlandi
+**Status:** Complete
 
-### Yapilacaklar
+### To Do
 
-- [x] `internal/git/tag.go` - GetLatestPreReleaseTagMerged() metodu (--merged HEAD ile branch-scoped pre-release tag arama)
-- [x] `internal/git/tag.go` - GetLatestStableTagMerged() metodu (--merged HEAD ile branch-scoped stable tag arama)
-- [x] `internal/runner/runner.go` - resolvePreReleaseBaseTag() metodu (seri devam/yeni seri karari)
-- [x] `internal/runner/runner.go` - determineVersion() guncellendi (preReleaseID varsa branch-aware cozumleme)
-- [x] `internal/git/tag_test.go` - GetLatestPreReleaseTagMerged unit testleri (8 test)
-- [x] `internal/git/tag_test.go` - GetLatestStableTagMerged unit testleri (8 test)
-- [x] `test/integration/release_test.go` - PreRelease_BranchAware_ContinueSeries (seri devam testi)
-- [x] `test/integration/release_test.go` - PreRelease_BranchAware_NewSeries (yeni seri testi)
-- [x] `test/integration/release_test.go` - PreRelease_BranchAware_MasterAdvanced (master ilerlemis, seri devam testi)
-- [x] `test/integration/release_test.go` - PreRelease_NoFlag_BehaviorUnchanged (standart davranis korunma testi)
+- [x] `internal/git/tag.go` — GetLatestPreReleaseTagMerged() method (branch-scoped pre-release tag search via --merged HEAD)
+- [x] `internal/git/tag.go` — GetLatestStableTagMerged() method (branch-scoped stable tag search via --merged HEAD)
+- [x] `internal/runner/runner.go` — resolvePreReleaseBaseTag() method (continue/new series decision)
+- [x] `internal/runner/runner.go` — determineVersion() updated (branch-aware resolution if preReleaseID set)
+- [x] `internal/git/tag_test.go` — GetLatestPreReleaseTagMerged unit tests (8 tests)
+- [x] `internal/git/tag_test.go` — GetLatestStableTagMerged unit tests (8 tests)
+- [x] `test/integration/release_test.go` — PreRelease_BranchAware_ContinueSeries (continue series test)
+- [x] `test/integration/release_test.go` — PreRelease_BranchAware_NewSeries (new series test)
+- [x] `test/integration/release_test.go` — PreRelease_BranchAware_MasterAdvanced (master advanced, series continues test)
+- [x] `test/integration/release_test.go` — PreRelease_NoFlag_BehaviorUnchanged (standard behavior preserved test)
 
-### Notlar
+### Notes
 
-- Sorun: `--preRelease="deneme"` ile farkli branch'lerde calisirken, diger branch'lerdeki tag'ler (v2.0.0-beta.0 gibi) en son tag olarak bulunuyordu ve seriler kiriliyordu
-- Cozum: `git tag -l --merged HEAD --sort=-v:refname` ile sadece mevcut branch'ten erisilebilir tag'lere bakilir
-- Algoritma: Pre-release tag bulundu VE base version >= stable → seri devam, aksi halde yeni seri baslat
-- 3 senaryo destekleniyor: uzun yasayan branch (seri devam), silinen/yeniden acilan branch (yeni seri), master ilerlemis ama branch izole (seri devam)
-- PreReleaseID bos ise (standart release) mevcut davranis degismiyor
-- TagMatch/TagExclude filtreleri yeni metodlarda da uygulanir
-- 16 unit test + 4 integration test eklendi, tum testler race detection ile basarili
+- Problem: When working on different branches with `--preRelease="deneme"`, tags on other branches (e.g., v2.0.0-beta.0) were being found as the latest tag and breaking series
+- Solution: `git tag -l --merged HEAD --sort=-v:refname` only looks at tags reachable from the current branch
+- Algorithm: Pre-release tag found AND base version >= stable → continue series; otherwise start a new series
+- 3 scenarios supported: long-living branch (continue series), deleted/recreated branch (new series), master advanced but branch isolated (continue series)
+- If PreReleaseID is empty (standard release), existing behavior is preserved
+- TagMatch/TagExclude filters are applied in the new methods too
+- 16 unit tests + 4 integration tests added; all tests pass with race detection
+
+---
+
+## Phase 20: Git Hook Management (install / remove / check-msg)
+
+**Status:** Complete
+**PRD:** `docs/phase_20.md`
+
+### To Do
+
+- [x] `internal/config/config.go` — git hook fields added to HooksConfig (PreCommit, CommitMsg, PrePush, PostCommit, PostMerge, PrepareCommitMsg)
+- [x] `internal/githook/githook.go` — Installer (Install, Remove, generateScript, isManagedHook, HooksFromConfig, FindGitDir, FindProjectDir)
+- [x] `internal/githook/githook_test.go` — Unit tests
+- [x] `internal/cli/install.go` — `hooks install` and `hooks remove` subcommand group (Cobra)
+- [x] `internal/cli/install_test.go` — CLI tests
+- [x] `internal/cli/root.go` — `--check-msg <file|->|<message>` flag (single message validation for the commit-msg hook)
+- [x] `internal/cli/root.go` — runCheckMsg() function (file path / stdin "-" / direct string support)
+- [x] commitlint-style compact output (default), `-V` shows valid type list
+- [x] `.hooks/` directory + `git config core.hooksPath` (husky-like)
+- [x] Managed header (`# Managed by release-it-go — DO NOT EDIT`) for non-managed hook detection
+- [x] `--force` flag to overwrite existing non-managed hooks
+- [x] All tests pass; `make check` clean
+
+### Notes
+
+- Uses `.hooks/` (project root) instead of `.git/hooks/` → can be committed to the repo, shared across the team (husky pattern)
+- `core.hooksPath` is set on install, reset on remove (if no remaining hooks)
+- `--check-msg` 3 input modes: file path, `-` (stdin), direct string. The commit-msg hook script calls `release-it-go --check-msg "$1"`
+- Conventional commit validation uses `LintCommits()` from `internal/changelog/lint.go` → same allowedTypes as `--check-commits`
+- Output format mimics commitlint (compact, colored, action-oriented error message)
+- Phase 20 was split across 5 commits: PRD → install command → hooks rename refactor → tests → check-msg flag → check-msg output improvement → string/stdin support
 
 ---
 
 ## Bugs
 
-- [x] BUG: Ilk release'de changelog "exit status 128" hatasi (2026-02-16) → `LatestVersion=0.0.0` iken `v0.0.0` tag'i araniyordu ama repo'da boyle bir tag yok. `latestVersionToTag()` helper fonksiyonu eklendi: `0.0.0` veya bos string icin bos doner, bu sayede `GetCommitsSinceTag("")` tum commitleri alir. 3 yer etkilendi: `RunChangelogOnly`, `generateChangelog`, `autoDetectIncrement`.
-- [x] BUG: Init wizard commit/tag/push'u tek soru olarak soruyordu (2026-02-16) → Kullanici commit+tag isteyip push istemeyince ikilem yasiyordu. Sorular ayrildi: "Enable git commit and tag?" + "Enable git push?" olarak iki ayri prompt yapildi. Push kapaliyken `requireUpstream` otomatik false.
-- [x] BUG: CHANGELOG.md olusturulduktan sonra commit'e dahil edilmiyordu (2026-02-16) → `Stage()` default'ta `git add . --update` ile sadece tracked dosyalari ekliyor. Yeni olusturulan CHANGELOG.md untracked oldugu icin atlaniyordu. Fix: `StageFile()` metodu eklendi, `generateChangelog()` sonunda CHANGELOG.md explicit olarak `git add` ile stage'leniyor.
-- [x] BUG: Commit yokken bile release cikiyordu, bos CHANGELOG entry'leri olusuyordu (2026-02-16) → `git.requireCommits` default'u `false` idi, commit olmadan ard arda release atilabiliyordu. Fix: default `true` yapildi. Init wizard'a "Require new commits before release?" sorusu eklendi. Artik son tag'den beri commit yoksa `no commits since latest tag` hatasi verir.
-- [x] BUG: "no commits since latest tag" error yerine graceful exit olmali (2026-02-16) → Kullanici commit yoksa hata yerine bilgi mesaji gosterip temiz cikis yapmali. Fix: prerequisites'te error yerine logger.Print + return nil.
-- [x] BUG: CI spinner cift satir gosteriyor (Start + Stop) (2026-02-16) → `⠋ Initializing...` + `✓ Initializing` tekrarli. Fix: CI Start() artik bir sey yazmiyor, sadece Stop() sonuc satirini yazar.
-- [x] BUG: Init adimi ✗ gosteriyor (basarili olmasina ragmen) (2026-02-16) → GetRepoInfo opsiyonel hata spinner'i erken Stop(false) ile kapatiyor. Fix: Opsiyonel hatalarda spinner kapatilmiyor.
-- [x] BUG: printSummary lipgloss kutu gereksiz ve tekrarli (2026-02-16) → Kullanici geri bildirimi: cerceve gereksiz detay. Fix: Duz, minimal cikti formatina gecildi.
-- [x] BUG: --preRelease ayni ID ile tekrar calistirildiginda versiyon artmiyor (2026-02-16) → `1.6.0-deneme2.0 → 1.6.0-deneme2.0` ayni versiyon uretiliyor, tag zaten var hatasi. Sebep: `prepatch` increment mevcut pre-release'i dusuruyordu sonra ayni .0 ile basliyordu. Fix: Mevcut versiyon ayni pre-release ID'ye sahipse `"prerelease"` increment kullan (sayi arttirir: `.0 → .1`).
-- [x] BUG: --check-commits gecersiz commit type'lari kabul ediyor (2026-02-16) → `fic: deneme commit` gibi gecersiz type'lar conventional commit olarak geciyordu. Sebep: regex `\w+` herhangi bir kelimeyi type olarak kabul ediyordu. Fix: `allowedTypes` map eklendi (Angular preset: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert), type dogrulamasi yapiliyor. Gecersiz type icin "unknown type: fic" sebebi doner. --verbose ile kontrol edilen commitlerin listesi gosteriliyor.
-- [x] BUG: `latestVersionToTag()` hardcoded `v` prefix ekliyordu, config'deki `tagName` template'ini kullanmiyordu (2026-03-23) → Config dosyasi olmayan ortamlarda (default `tagName: "${version}"`) tag `0.1.0-main.0` olarak olusturulurken changelog `v0.1.0-main.0` ariyordu. Fix: `latestVersionToTag()` artik `renderTagName(tagNameTemplate, version)` kullaniyor. Version'dan `v` prefix'i temizlenip template'e veriliyor, `vv` tekrarlamasi onlendi.
-- [x] BUG: Changelog disabled iken `git commit` "nothing to commit" hatasi veriyordu (2026-03-30) → Changelog ve bumper kapaliyken stage'de degisiklik yok, ama commit deneniyordu. Fix: `HasStagedChanges()` kontrolu eklendi, staged degisiklik yoksa commit atlanip verbose log birakilir.
-- [x] BUG: `tagName` config'i degistiginde eski formattaki tag'lar latest olarak bulunuyordu (2026-03-30) → `v${version}` → `${version}` gecisinde `GetLatestTag` hala `v1.5.0`'i buluyordu, changelog `1.5.0` tag'ini ariyordu (yok). Fix: `matchesTagNameFormat()` ile tag format filtrelemesi eklendi. Format gecisinde versiyon devamliligi icin fallback mekanizmasi, changelog'da raw tag fallback'i.
-- [x] BUG: `push: false` olmasina ragmen "no upstream configured" hatasi (2026-02-18) → `checkUpstream()` sadece `requireUpstream` flag'ine bakiyordu, `push` durumunu kontrol etmiyordu. Elle yazilan config'lerde `push: false` + `requireUpstream` belirtilmemis ise default `true` ile upstream kontrolu calisip hata veriyordu. Init wizard bu durumu `requireUpstream = false` set ederek maskeliyordu ama asil kontrol fonksiyonu eksikti. Fix: `checkUpstream()` icine `!g.config.Push` kontrolu eklendi, push kapaliyken upstream kontrolu atlanir. Test eklendi.
+- [x] BUG: First-release changelog "exit status 128" error (2026-02-16) → When `LatestVersion=0.0.0`, the `v0.0.0` tag was searched but no such tag exists. The `latestVersionToTag()` helper was added: returns empty for `0.0.0` or empty string, so `GetCommitsSinceTag("")` returns all commits. 3 sites affected: `RunChangelogOnly`, `generateChangelog`, `autoDetectIncrement`.
+- [x] BUG: Init wizard asked commit/tag/push as a single question (2026-02-16) → If a user wanted commit+tag but not push, they were stuck. Questions split: "Enable git commit and tag?" + "Enable git push?" as two prompts. When push is disabled, `requireUpstream` is automatically false.
+- [x] BUG: CHANGELOG.md was not included in the commit after creation (2026-02-16) → `Stage()` defaults to `git add . --update`, which only adds tracked files. The newly created CHANGELOG.md was untracked and skipped. Fix: `StageFile()` method added; at the end of `generateChangelog()`, CHANGELOG.md is staged explicitly via `git add`.
+- [x] BUG: A release would happen even with no commits, producing empty CHANGELOG entries (2026-02-16) → `git.requireCommits` defaulted to `false`, allowing back-to-back releases without commits. Fix: default changed to `true`. "Require new commits before release?" added to the init wizard. Now if there are no commits since the last tag, an `no commits since latest tag` error is returned.
+- [x] BUG: "no commits since latest tag" should be a graceful exit instead of an error (2026-02-16) → If the user has no commits, an info message and clean exit is preferable to an error. Fix: in prerequisites, replaced error with logger.Print + return nil.
+- [x] BUG: CI spinner showed two lines (Start + Stop) (2026-02-16) → `⠋ Initializing...` + `✓ Initializing` repeated. Fix: in CI, Start() no longer outputs anything; only Stop() writes the result line.
+- [x] BUG: init step shows ✗ (despite succeeding) (2026-02-16) → A non-fatal GetRepoInfo error was prematurely calling `Stop(false)` on the spinner. Fix: do not stop the spinner on optional errors.
+- [x] BUG: printSummary lipgloss box was unnecessary and repetitive (2026-02-16) → User feedback: the frame was unnecessary detail. Fix: switched to a flat, minimal output format.
+- [x] BUG: --preRelease re-run with the same ID didn't bump version (2026-02-16) → `1.6.0-deneme2.0 → 1.6.0-deneme2.0` produced the same version, "tag already exists" error. Reason: `prepatch` increment was stripping the existing pre-release and starting again at `.0`. Fix: if the current version already has the same pre-release ID, use the `"prerelease"` increment (which bumps the number: `.0 → .1`).
+- [x] BUG: --check-commits accepted invalid commit types (2026-02-16) → Invalid types like `fic: deneme commit` were passing as conventional commits. Reason: the regex `\w+` accepted any word as a type. Fix: `allowedTypes` map added (Angular preset: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert), with type validation. For invalid types, returns "unknown type: fic". With `--verbose`, lists the commits being checked.
+- [x] BUG: `latestVersionToTag()` hardcoded a `v` prefix instead of using the `tagName` template from config (2026-03-23) → In environments without a config file (default `tagName: "${version}"`), the tag was created as `0.1.0-main.0` while the changelog searched for `v0.1.0-main.0`. Fix: `latestVersionToTag()` now uses `renderTagName(tagNameTemplate, version)`. The `v` prefix is stripped from the version before applying the template, preventing `vv` duplication.
+- [x] BUG: With changelog disabled, `git commit` produced "nothing to commit" error (2026-03-30) → With changelog and bumper disabled, there are no staged changes, but commit was attempted. Fix: `HasStagedChanges()` check added; if there are no staged changes, the commit is skipped and a verbose log entry is written.
+- [x] BUG: When `tagName` config changed, old-format tags were being found as latest (2026-03-30) → Transitioning from `v${version}` → `${version}`, `GetLatestTag` still found `v1.5.0`, and the changelog searched for the `1.5.0` tag (which doesn't exist). Fix: `matchesTagNameFormat()` added for tag format filtering. A fallback mechanism for version continuity across format transitions, plus a raw tag fallback in changelog.
+- [x] BUG: With `push: false`, "no upstream configured" error still appeared (2026-02-18) → `checkUpstream()` only looked at the `requireUpstream` flag, not the `push` state. In manually written configs with `push: false` and `requireUpstream` unspecified, the default `true` triggered the upstream check. The init wizard masked this by setting `requireUpstream = false`, but the actual check function had the bug. Fix: `!g.config.Push` check added inside `checkUpstream()`; when push is disabled, the upstream check is skipped. Test added.
 
 ---
 
-## Degisiklik Gecmisi
+## Change History
 
-| Tarih | Gelistirici | Degisiklik |
-|-------|------------|------------|
-| 2026-02-16 | - | Proje baslatildi, PRD dosyalari olusturuldu |
-| 2026-02-16 | Claude | Phase 1 tamamlandi: CLI, config, version, logger, template, tests |
-| 2026-02-16 | Claude | Phase 2 tamamlandi: git runner, prerequisites, commit, tag, push, repo info, changelog, tests |
-| 2026-02-16 | Claude | Phase 3 tamamlandi: conventional commit parser, bump analyzer, changelog renderers (conventional + keep-a-changelog), file update |
-| 2026-02-16 | Claude | Phase 4 tamamlandi: GitHub + GitLab API client, release create, asset upload, comment, token management, GHE/CA cert support |
-| 2026-02-16 | Claude | Phase 5 tamamlandi: bubbletea UI, lipgloss colors, spinner, CI detection, hook runner, pipeline orchestrator, dry-run, tests |
-| 2026-02-16 | Claude | Phase 6 tamamlandi: bumper (JSON/YAML/TOML/INI/text), CalVer entegrasyonu, CLI modlari, pre-release flows, pipeline bump adimi |
-| 2026-02-16 | Claude | Phase 7 tamamlandi: integration tests (17), coverage %80+, CI/CD workflows, GoReleaser, shell completions, build info |
+| Date | Developer | Change |
+|------|-----------|--------|
+| 2026-02-16 | - | Project started, PRD documents created |
+| 2026-02-16 | Claude | Phase 1 complete: CLI, config, version, logger, template, tests |
+| 2026-02-16 | Claude | Phase 2 complete: git runner, prerequisites, commit, tag, push, repo info, changelog, tests |
+| 2026-02-16 | Claude | Phase 3 complete: conventional commit parser, bump analyzer, changelog renderers (conventional + keep-a-changelog), file update |
+| 2026-02-16 | Claude | Phase 4 complete: GitHub + GitLab API client, release create, asset upload, comment, token management, GHE/CA cert support |
+| 2026-02-16 | Claude | Phase 5 complete: bubbletea UI, lipgloss colors, spinner, CI detection, hook runner, pipeline orchestrator, dry-run, tests |
+| 2026-02-16 | Claude | Phase 6 complete: bumper (JSON/YAML/TOML/INI/text), CalVer integration, CLI modes, pre-release flows, pipeline bump step |
+| 2026-02-16 | Claude | Phase 7 complete: integration tests (17), coverage 80%+, CI/CD workflows, GoReleaser, shell completions, build info |
 | 2026-02-16 | Claude | Security fix: HTTPS URL credential stripping, GoReleaser ldflags fix |
-| 2026-02-16 | Claude | Config compat: npm release-it format uyumlulugu (normalizeJSON, applyPluginCompat) |
-| 2026-02-16 | Claude | feat: --preRelease shorthand flag, GitLab PreRelease alani |
-| 2026-02-16 | Claude | Gercek ortam testleri: GitLab CI pipeline (main + sub-branch prerelease) basarili |
-| 2026-02-16 | Claude | Phase 8 tamamlandi: init command, dual config support, legacy migration, smart config writer |
-| 2026-02-16 | Claude | fix: ilk release changelog hatasi (0.0.0 tag bulunamama), init wizard commit/tag/push ayirma |
-| 2026-02-16 | Claude | Phase 9 tamamlandi: conventional commit linting, --check-commits, --ignore-commit-lint, pipeline entegrasyonu |
-| 2026-02-16 | Claude | Phase 10 tamamlandi: UI/Output iyilestirmesi - ikon sabitleri, FormatBold, Logger.Print(), Verbose dim format, CI spinner ikonlari, banner, printSummary lipgloss box |
-| 2026-02-16 | Claude | fix: UI/Output iyilestirmesi v2 - CI spinner cift satir kaldirma, init ✗ bug fix, "no commits" graceful exit, printSummary kutu kaldirma, spinner mesajlari past-tense |
-| 2026-02-16 | Claude | fix: pre-release ayni ID ile versiyon artmama hatasi (prepatch → prerelease increment) |
-| 2026-02-16 | Claude | fix: commit lint type validation - allowedTypes map ile gecersiz type'lar reddediliyor, --verbose ile commit listesi gosteriliyor |
-| 2026-02-16 | Claude | Phase 11 tamamlandi: Docker container destegi - multi-stage Dockerfile, .dockerignore, Makefile docker target'lari |
-| 2026-02-16 | Claude | Phase 12 tamamlandi: Docker pre-flight kontrolleri - git identity check, token pre-flight check (GitHub/GitLab) |
-| 2026-02-17 | Claude | Phase 13 tamamlandi: Webhook notification destegi - Slack + Teams, non-fatal pipeline adimi, urlRef guvenlik pattern'i, %98+ coverage |
-| 2026-02-17 | Claude | feat: init wizard'a "Write CHANGELOG.md file?" sorusu eklendi - changelog etkinken dosya yazmayi kapama imkani |
-| 2026-02-17 | Claude | fix: init wizard'dan gereksiz "Required branch" sorusu kaldirildi - opsiyonel ayar, config'den eklenebilir |
-| 2026-02-17 | Claude | fix: init wizard'dan gereksiz "Require new commits" sorusu kaldirildi - default davranis (true) yeterli |
-| 2026-02-17 | Claude | feat: requireConventionalCommits default true yapildi, init wizard'dan sorusu kaldirildi |
-| 2026-02-17 | Claude | feat: init --full-example komutu eklendi - tum config seceneklerini gosteren ornek dosya olusturma |
-| 2026-02-17 | Claude | feat: YAML config yazma destegi + init wizard'a format secimi (JSON/YAML) eklendi |
-| 2026-02-17 | Claude | feat: init --full-example artik yorumlu YAML uretiyor (.release-it-go-full.yaml) |
-| 2026-02-17 | Claude | feat: MigrateLegacyConfigTo ile migration formata gore cikti verebiliyor |
-| 2026-02-17 | Claude | feat: DetectNativeConfigAny ile hem JSON hem YAML native config tespiti |
-| 2026-02-17 | Claude | feat: ForceFields ile wizard-configured alanlarin explicit config'e yazimi (default olsa bile) |
-| 2026-02-17 | Claude | fix: format degisiminde (JSON→YAML) eski config .bak olarak yedekleniyor, cift config onlendi |
-| 2026-02-17 | Claude | fix: TTY yoksa (Docker -it olmadan) otomatik CI moduna gecis (go-isatty) |
-| 2026-02-18 | Claude | feat: CI/CD pipeline eklendi, golangci-lint hatalari giderildi, kod kalitesi testleri eklendi |
-| 2026-02-18 | Claude | refactor: init wizard soru sirasi iyilestirildi - format sorusu sona tasinarak UX iyilestirildi |
-| 2026-02-18 | Claude | fix: push false iken upstream hatasi - checkUpstream push durumunu kontrol etmiyordu |
-| 2026-02-20 | Claude | Phase 15 tamamlandi: Branch-aware pre-release version detection - GetLatestPreReleaseTagMerged, GetLatestStableTagMerged, resolvePreReleaseBaseTag, 16 unit test + 4 integration test |
-| 2026-02-21 | Claude | refactor: CLAUDE.md modular .claude/rules/ yapisina gecti (6 kural dosyasi), Makefile iyilestirildi (ldflags, coverage, vuln, check), Docker entrypoint info-only komut destegi |
-| 2026-02-21 | Claude | revert: GitLab CI_JOB_TOKEN degisiklikleri geri alindi (ValidateToken /projects/:id + Job-Token header auto-detect) - CI_JOB_TOKEN commit/tag/push yetkisine sahip degil, Project Access Token gerekli |
-| 2026-03-23 | Claude | fix: latestVersionToTag hardcoded v prefix yerine tagName template kullaniyor - config dosyasi olmayan ortamlarda tag uyumsuzlugu giderildi |
-| 2026-03-23 | Claude | feat: config dosyasi bulunamadiginda uyari mesaji, loaded config path debug log |
-| 2026-03-23 | Claude | test: resolvePreReleaseBaseTag + FormatBold testleri (runner %79.2, ui %71.8) |
-| 2026-03-23 | Claude | fix: code review bulgulari - GitLab timeout, preRelease substring match, CA cert log, proxy log, dead code temizligi |
-| 2026-03-23 | Claude | Phase 16 tamamlandi: GitLab nested group URL destegi + CalVer yyyy.mm.dd format fix |
-| 2026-03-23 | Claude | Phase 17 tamamlandi: SSH port destegi, latestVersionToTag testleri, bos release notes uyarisi |
-| 2026-03-23 | Claude | Phase 18 tamamlandi: LoadConfigFromBytes normalization, plugin override fix |
-| 2026-03-23 | Claude | Phase 19 tamamlandi: Test kapsami guclendirme - 38 yeni test, release %90.5, git %90.5, version %91.9 |
-| 2026-03-30 | Claude | fix: changelog disabled iken bos commit hatasi - HasStagedChanges kontrolu |
-| 2026-03-30 | Claude | fix: tagName config degisikliginde format-aware tag filtreleme - matchesTagNameFormat + fallback mekanizmasi, 18 yeni test |
-| 2026-03-30 | Claude | feat: Teams zengin MessageCard bildirimi - facts (Version, Last Release, Commits, Contributors), changelog section, configurable theme/image, GetCommitCountSinceTag + GetContributorsSinceTag, 3 yeni test |
-| 2026-03-30 | Claude | feat: webhook config'e ignoredContributors, themeColor, imageUrl eklendi - bot hesap filtreleme, messageTemplate override, full example YAML guncellendi |
+| 2026-02-16 | Claude | Config compat: npm release-it format compatibility (normalizeJSON, applyPluginCompat) |
+| 2026-02-16 | Claude | feat: --preRelease shorthand flag, GitLab PreRelease field |
+| 2026-02-16 | Claude | Real environment tests: GitLab CI pipeline (main + sub-branch prerelease) successful |
+| 2026-02-16 | Claude | Phase 8 complete: init command, dual config support, legacy migration, smart config writer |
+| 2026-02-16 | Claude | fix: first-release changelog error (0.0.0 tag not found), separate init wizard commit/tag/push |
+| 2026-02-16 | Claude | Phase 9 complete: conventional commit linting, --check-commits, --ignore-commit-lint, pipeline integration |
+| 2026-02-16 | Claude | Phase 10 complete: UI/Output improvements - icon constants, FormatBold, Logger.Print(), Verbose dim format, CI spinner icons, banner, printSummary lipgloss box |
+| 2026-02-16 | Claude | fix: UI/Output improvements v2 - remove CI spinner duplicate line, init ✗ bug fix, "no commits" graceful exit, remove printSummary box, past-tense spinner messages |
+| 2026-02-16 | Claude | fix: pre-release same-ID version not incrementing bug (prepatch → prerelease increment) |
+| 2026-02-16 | Claude | fix: commit lint type validation - allowedTypes map rejects invalid types, --verbose shows commit list |
+| 2026-02-16 | Claude | Phase 11 complete: Docker container support - multi-stage Dockerfile, .dockerignore, Makefile docker targets |
+| 2026-02-16 | Claude | Phase 12 complete: Docker pre-flight checks - git identity check, token pre-flight check (GitHub/GitLab) |
+| 2026-02-17 | Claude | Phase 13 complete: Webhook notification support - Slack + Teams, non-fatal pipeline step, urlRef security pattern, 98%+ coverage |
+| 2026-02-17 | Claude | feat: "Write CHANGELOG.md file?" question added to init wizard - option to disable file writing while changelog is enabled |
+| 2026-02-17 | Claude | fix: removed unnecessary "Required branch" question from init wizard - optional setting, can be added via config |
+| 2026-02-17 | Claude | fix: removed unnecessary "Require new commits" question from init wizard - default behavior (true) is sufficient |
+| 2026-02-17 | Claude | feat: requireConventionalCommits default set to true, question removed from init wizard |
+| 2026-02-17 | Claude | feat: init --full-example command added - generates an example file with all config options |
+| 2026-02-17 | Claude | feat: YAML config writing support + format selection (JSON/YAML) added to init wizard |
+| 2026-02-17 | Claude | feat: init --full-example now generates commented YAML (.release-it-go-full.yaml) |
+| 2026-02-17 | Claude | feat: MigrateLegacyConfigTo can output migration in the chosen format |
+| 2026-02-17 | Claude | feat: DetectNativeConfigAny detects both JSON and YAML native configs |
+| 2026-02-17 | Claude | feat: ForceFields ensures wizard-configured fields are written explicitly (even if default) |
+| 2026-02-17 | Claude | fix: on format change (JSON→YAML) old config is backed up as .bak; double config prevented |
+| 2026-02-17 | Claude | fix: auto-switch to CI mode when no TTY (Docker without -it) — go-isatty |
+| 2026-02-18 | Claude | feat: CI/CD pipeline added, golangci-lint errors resolved, code quality tests added |
+| 2026-02-18 | Claude | refactor: init wizard question order improved — format question moved to the end for better UX |
+| 2026-02-18 | Claude | fix: upstream error with push false — checkUpstream wasn't checking push state |
+| 2026-02-20 | Claude | Phase 15 complete: Branch-aware pre-release version detection - GetLatestPreReleaseTagMerged, GetLatestStableTagMerged, resolvePreReleaseBaseTag, 16 unit tests + 4 integration tests |
+| 2026-02-21 | Claude | refactor: CLAUDE.md migrated to modular .claude/rules/ structure (6 rule files), Makefile improved (ldflags, coverage, vuln, check), Docker entrypoint info-only command support |
+| 2026-02-21 | Claude | revert: GitLab CI_JOB_TOKEN changes reverted (ValidateToken /projects/:id + Job-Token header auto-detect) — CI_JOB_TOKEN doesn't have commit/tag/push permission, Project Access Token is required |
+| 2026-03-23 | Claude | fix: latestVersionToTag uses tagName template instead of hardcoded v prefix — tag mismatch in environments without a config file resolved |
+| 2026-03-23 | Claude | feat: warning message when no config file found, debug log of loaded config path |
+| 2026-03-23 | Claude | test: resolvePreReleaseBaseTag + FormatBold tests (runner 79.2%, ui 71.8%) |
+| 2026-03-23 | Claude | fix: code review findings - GitLab timeout, preRelease substring match, CA cert log, proxy log, dead code cleanup |
+| 2026-03-23 | Claude | Phase 16 complete: GitLab nested group URL support + CalVer yyyy.mm.dd format fix |
+| 2026-03-23 | Claude | Phase 17 complete: SSH port support, latestVersionToTag tests, empty release notes warning |
+| 2026-03-23 | Claude | Phase 18 complete: LoadConfigFromBytes normalization, plugin override fix |
+| 2026-03-23 | Claude | Phase 19 complete: Test coverage strengthening - 38 new tests, release 90.5%, git 90.5%, version 91.9% |
+| 2026-03-30 | Claude | fix: empty commit error with changelog disabled - HasStagedChanges check |
+| 2026-03-30 | Claude | fix: format-aware tag filtering on tagName config change - matchesTagNameFormat + fallback mechanism, 18 new tests |
+| 2026-03-30 | Claude | feat: rich Teams MessageCard notifications - facts (Version, Last Release, Commits, Contributors), changelog section, configurable theme/image, GetCommitCountSinceTag + GetContributorsSinceTag, 3 new tests |
+| 2026-03-30 | Claude | feat: ignoredContributors, themeColor, imageUrl added to webhook config - bot account filtering, messageTemplate override, full example YAML updated |
+| 2026-03-31 | Claude | docs: Phase 20 PRD added (`docs/phase_20.md`) — git hook install command design |
+| 2026-03-31 | Claude | feat: `release-it-go install` command — writes config hooks into .hooks/ directory, sets core.hooksPath (husky pattern) |
+| 2026-03-31 | Claude | refactor: `install` command refactored into `hooks install` / `hooks remove` subcommand group |
+| 2026-03-31 | Claude | test: hooks command and githook edge case tests added |
+| 2026-03-31 | Claude | feat: `--check-msg` flag — single message validation for the commit-msg hook (Phase 20) |
+| 2026-03-31 | Claude | fix: `--check-msg` output format standardized with `--check-commits` |
+| 2026-03-31 | Claude | feat: commitlint-style professional output for `--check-msg` (compact + verbose modes) |
+| 2026-04-01 | Claude | feat: `--check-msg` now supports string and stdin (`-`) input (in addition to file path) |
+| 2026-04-16 | Claude | docs: documentation set created — CLAUDE.md expanded (~290 lines), ARCHITECTURE.md, DECISIONS.md added, PROGRESS.md updated with Phase 20 |
+| 2026-04-16 | Claude | docs: full English translation of CLAUDE.md, ARCHITECTURE.md, DECISIONS.md, PROGRESS.md, .claude/rules/* — language consistency with README.md and code comments |
+| 2026-04-16 | Claude | docs: CONTRIBUTING.md and TROUBLESHOOTING.md added — onboarding for new developers + common issue reference |
 
 ---
 
-## Gelecek Iyilestirmeler (Oncelik: Dusuk)
+## Future Improvements (Priority: Low)
 
-- [ ] GitLab `ValidateToken()` endpoint'i `/user` yerine `/projects/:id` kullanabilir (CI_JOB_TOKEN uyumlulugu icin, ancak CI_JOB_TOKEN commit/push yapamadigi icin pratik faydasi sinirli)
-- [ ] GitLab CI entegrasyonu icin dokumantasyon: `git remote set-url` ayari, Project Access Token gereksinimleri, `GIT_DEPTH: 0` gerekliligi
+- [ ] GitLab `ValidateToken()` endpoint could use `/projects/:id` instead of `/user` (for CI_JOB_TOKEN compatibility, though practical benefit is limited because CI_JOB_TOKEN cannot commit/push)
+- [ ] Documentation for GitLab CI integration: `git remote set-url` setup, Project Access Token requirements, `GIT_DEPTH: 0` requirement
 
 ---
 
-## Kurallar
+## Rules
 
-1. **Her oturum sonunda bu dosyayi guncelle.**
-2. Tamamlanan maddeler `[x]` ile isaretlenir.
-3. Yeni eklenen maddeler `[ ]` ile eklenir.
-4. Durum alani guncellenir: `Baslanmadi` / `Devam Ediyor` / `Tamamlandi`
-5. Ilerleme yuzdesi guncellenir.
-6. Notlar bolumune onemli kararlar, engeller veya degisiklikler yazilir.
-7. Degisiklik gecmisi tablosuna yeni satirlar eklenir.
+1. **Update this file at the end of every session.**
+2. Completed items are marked with `[x]`.
+3. New items are added with `[ ]`.
+4. Status field is updated: `Not Started` / `In Progress` / `Complete`
+5. Progress percentage is updated.
+6. Important decisions, blockers, or changes go in the Notes section.
+7. New rows are added to the Change History table.

@@ -1,23 +1,23 @@
-# Test Kurallari
+# Testing Rules
 
-## Zorunluluklar
+## Requirements
 
-- **Her yeni fonksiyon icin unit test ZORUNLU.**
-- Test coverage minimum %70 (%80 hedef).
-- Testler basarisiz olursa commit ATMA.
+- **Unit tests are REQUIRED for every new function.**
+- Minimum test coverage: 70% (target 80%).
+- DO NOT commit if tests fail.
 - Race detection: `go test -race ./...`
 
-## Test Isimlendirme
+## Test Naming
 
 ```go
 func TestFunctionName_Scenario_ExpectedResult(t *testing.T) {
-    // Arrange - Test verilerini hazirla
-    // Act - Test edilecek fonksiyonu cagir
-    // Assert - Sonuclari dogrula
+    // Arrange — Prepare test data
+    // Act — Call the function under test
+    // Assert — Verify the results
 }
 ```
 
-## Table-Driven Tests (Tercih Edilen)
+## Table-Driven Tests (Preferred)
 
 ```go
 func TestFunction(t *testing.T) {
@@ -45,9 +45,9 @@ func TestFunction(t *testing.T) {
 }
 ```
 
-## Mock Pattern (Git Islemleri)
+## Mock Pattern (Git Operations)
 
-Bu projede git komutlari `commandExecutor` fonksiyon degiskeni uzerinden calisir. Testlerde mock yapilir:
+In this project, git commands run through a `commandExecutor` function variable. Mock in tests:
 
 ```go
 original := commandExecutor
@@ -57,17 +57,17 @@ commandExecutor = func(name string, args ...string) (string, error) {
 }
 ```
 
-## Test Komutlari
+## Test Commands
 
 ```bash
-make test               # Tum testler (-v -cover -race)
-make test-unit          # Sadece internal/ testleri
-make test-integration   # Sadece test/integration/ testleri
-make coverage           # HTML coverage raporu olustur
+make test               # All tests (-v -cover -race)
+make test-unit          # internal/ tests only
+make test-integration   # test/integration/ only
+make coverage           # Generate HTML coverage report
 ```
 
-## Yapi
+## Layout
 
-- Unit testler: Her paketin kendi `*_test.go` dosyalari
-- Integration testler: `test/integration/` (gercek git repo olusturur)
-- Test fixtures: `test/integration/fixtures/` (config ornekleri)
+- Unit tests: each package's own `*_test.go` files
+- Integration tests: `test/integration/` (creates a real git repo)
+- Test fixtures: `test/integration/fixtures/` (config samples)

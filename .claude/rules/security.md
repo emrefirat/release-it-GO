@@ -1,46 +1,46 @@
-# Guvenlik Kurallari
+# Security Rules
 
-## ASLA Yapma
+## NEVER Do
 
-- Sifreleri/secret'lari plain text saklama veya koda gomme
-- Kullanici girdisini dogrulamadan kullanma
-- Sensitive bilgileri loglama (sifre, token, PII)
+- Store passwords/secrets in plain text or hardcode them in code
+- Use user input without validation
+- Log sensitive information (passwords, tokens, PII)
 - Hardcoded credentials
-- Panic'i error handling yerine kullanma
-- Error mesajlarinda internal detay verme
+- Use `panic` instead of error handling
+- Expose internal details in error messages
 
-## Her Zaman Yap
+## ALWAYS Do
 
-- Input validation uygula
-- Token'lar icin environment variable kullan (`tokenRef` pattern)
-- Dependency'leri guncel tut
-- HTTPS URL'lerde credential stripping uygula
+- Apply input validation
+- Use environment variables for tokens (`tokenRef` pattern)
+- Keep dependencies up to date
+- Apply credential stripping in HTTPS URLs
 
-## Guvenlik Araclari
+## Security Tools
 
-Commit oncesi `make check` calistirilmali (govulncheck dahil). Ek olarak:
+`make check` (which includes govulncheck) must be run before committing. Additionally:
 
 ```bash
-# Dependency vulnerability taramasi (Makefile'da `make vuln`)
+# Dependency vulnerability scan (`make vuln` in Makefile)
 govulncheck ./...
 
-# Statik guvenlik analizi - guvenlik suphesi veya yeni ozellik eklendiginde calistir
+# Static security analysis — run on suspicion or when adding a new feature
 gosec ./...
 
-# Genel statik analiz (Makefile'da `make lint`)
+# General static analysis (`make lint` in Makefile)
 golangci-lint run
 ```
 
-### Ne Zaman gosec Kullanilmali
-- Yeni HTTP client, dosya islemleri veya exec.Command kullanan kod eklendiginde
-- External input isleme mantigi degistiginde
-- Review sirasinda guvenlik endisesi olustugunda
-- Release oncesi son kontrol olarak
+### When to Use gosec
+- When adding new HTTP client, file operation, or `exec.Command` code
+- When external input handling logic changes
+- When a security concern arises during review
+- As a final check before release
 
-## Projede Kullanilan Guvenlik Paternleri
+## Security Patterns Used in This Project
 
-### Token Yonetimi
-Token'lar asla config'e yazilmaz. `tokenRef` ile env var adi belirtilir:
+### Token Management
+Tokens are never written to config. The env var name is specified via `tokenRef`:
 ```json
 {
   "github": {
@@ -49,14 +49,14 @@ Token'lar asla config'e yazilmaz. `tokenRef` ile env var adi belirtilir:
 }
 ```
 
-### Webhook URL Guvenligi
-Webhook URL'leri `urlRef` ile env var uzerinden alinir, config'e direkt yazilmaz.
+### Webhook URL Security
+Webhook URLs are read via env var using `urlRef`; they are not written directly to config.
 
-### Command Execution Guvenligi
-Git komutlari `exec.Command("git", args...)` ile calistirilir. Shell uzerinden (`sh -c`) gecilmez, bu command injection riskini onler.
+### Command Execution Security
+Git commands run via `exec.Command("git", args...)`. Never go through a shell (`sh -c`) — this prevents the command injection risk.
 
-### Docker Guvenligi
+### Docker Security
 - Non-root user (`releaser:1000`)
 - Static binary (CGO_ENABLED=0)
 - Minimal base image (alpine)
-- Git identity env var zorunlulugu (release islemleri icin)
+- Git identity env var requirement (for release operations)

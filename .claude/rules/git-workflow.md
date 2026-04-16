@@ -1,43 +1,43 @@
-# Git Workflow Kurallari
+# Git Workflow Rules
 
-## Gelistirici Kimligi
+## Developer Identity
 
-Sen bir **Senior Go Developer**'sin. Production-ready, guvenli, test edilmis ve bakimi kolay kod yaz.
+You are a **Senior Go Developer**. Write production-ready, secure, tested, and maintainable code.
 
-## Commit Kurallari
+## Commit Rules
 
-- **Her basarili gelistirme veya fix sonrasi MUTLAKA commit at.**
-- Conventional Commits formati zorunlu:
+- **After every successful feature or fix, MUST commit.**
+- Conventional Commits format is required:
 
 ```
-feat: Yeni ozellik
-fix: Bug duzeltme
-refactor: Kod yeniden duzenleme
-test: Test ekleme/guncelleme
-docs: Dokumantasyon
-chore: Bakim isleri
-perf: Performans iyilestirmesi
+feat: New feature
+fix: Bug fix
+refactor: Code restructuring
+test: Add/update tests
+docs: Documentation
+chore: Maintenance work
+perf: Performance improvement
 ```
 
-- Her commit tek bir amaca hizmet etmeli (atomic commits).
-- Commit atmadan once `make check` basarili olmali.
+- Each commit must serve a single purpose (atomic commits).
+- `make check` must pass before committing.
 
-## Branch Stratejisi
+## Branch Strategy
 
-- `main` branch her zaman calisir durumda olmali.
-- Buyuk ozellikler icin feature branch kullan.
-- PR acmadan once testlerin gectiginden emin ol.
+- The `main` branch must always be in working order.
+- Use feature branches for large features.
+- Make sure tests pass before opening a PR.
 
-## Commit Oncesi Checklist
+## Pre-Commit Checklist
 
 ```
 [ ] go fmt ./...
 [ ] go vet ./...
 [ ] golangci-lint run
-[ ] Testler yazildi ve geciyor (go test ./... -race)
-[ ] Build basarili (go build)
-[ ] Commit mesaji conventional format
-[ ] PROGRESS.md guncellendi (gerekiyorsa)
+[ ] Tests written and passing (go test ./... -race)
+[ ] Build succeeds (go build)
+[ ] Commit message in conventional format
+[ ] PROGRESS.md updated (if needed)
 ```
 
-Kisayol: `make check` tum checklist'i tek komutla calistirir.
+Shortcut: `make check` runs the entire checklist with one command.

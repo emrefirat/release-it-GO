@@ -1,98 +1,98 @@
-# Go Best Practices ve Proje Ozel Kurallar
+# Go Best Practices and Project-Specific Rules
 
 ## Dependency Management
 
-- Yeni dependency eklemeden once stdlib ile cozulup cozulemeyecegini degerlendir.
-- `go mod tidy` her dependency degisikliginden sonra calistir.
-- `go mod verify` ile checksum dogrula.
-- Indirect dependency sayisini minimize et.
+- Before adding a new dependency, evaluate whether stdlib can solve it.
+- Run `go mod tidy` after every dependency change.
+- Verify checksums with `go mod verify`.
+- Minimize the number of indirect dependencies.
 
-## Interface Tasarimi
+## Interface Design
 
-- Interface'leri kullanan tarafta tanimla (consumer side), uretici tarafta degil.
-- Kucuk interface'ler tercih et (1-3 metod). Buyuk interface'ler bolunmeli.
-- `io.Reader`, `io.Writer` gibi stdlib interface'lerini kullan mumkunse.
+- Define interfaces on the consumer side, not the producer side.
+- Prefer small interfaces (1-3 methods). Large interfaces should be split.
+- Use stdlib interfaces like `io.Reader`, `io.Writer` when possible.
 
 ```go
-// DOGRU - Kucuk, odakli interface
+// RIGHT — Small, focused interface
 type Prompter interface {
     Confirm(msg string, def bool) (bool, error)
     SelectVersion(current, recommended string, options []VersionOption) (string, error)
 }
 
-// YANLIS - God interface
+// WRONG — God interface
 type Everything interface {
-    // 20+ metod...
+    // 20+ methods...
 }
 ```
 
-## Context ve Cancellation
+## Context and Cancellation
 
-- Uzun suren islemlerde `context.Context` kabul et.
-- Goroutine baslatirken her zaman context ile iptal mekanizmasi kur.
-- HTTP client'larda timeout belirle.
+- Accept `context.Context` for long-running operations.
+- When starting a goroutine, always set up a cancellation mechanism via context.
+- Set timeouts on HTTP clients.
 
 ## Concurrency
 
-- Channel'i mutex'a tercih et (mumkunse).
-- Goroutine leak'i onlemek icin `defer cancel()` pattern'i kullan.
-- `sync.WaitGroup` ile goroutine yasam dongusunu yonet.
-- `go test -race ./...` ile race condition kontrol et.
+- Prefer channels over mutexes (when possible).
+- Use the `defer cancel()` pattern to prevent goroutine leaks.
+- Manage goroutine lifecycles with `sync.WaitGroup`.
+- Check for race conditions with `go test -race ./...`.
 
-## API ve HTTP Client Kurallari
+## API and HTTP Client Rules
 
-- HTTP client'larda timeout zorunlu (default: 30s).
-- Retry mantigi icin exponential backoff kullan.
-- Response body'yi her zaman `defer resp.Body.Close()` ile kapat.
-- TLS sertifika dogrulama atlama (InsecureSkipVerify) sadece test ortaminda.
+- Timeouts on HTTP clients are required (default: 30s).
+- Use exponential backoff for retry logic.
+- Always close the response body with `defer resp.Body.Close()`.
+- Skipping TLS certificate verification (InsecureSkipVerify) is only allowed in test environments.
 
-## Config Yonetimi
+## Config Management
 
-- Default degerler `config/defaults.go`'da merkezi tanimlanir.
-- Config struct'lari `config/config.go`'da.
-- Yeni config alani eklerken: struct + default + JSON/YAML tag + test.
-- Config dosya formatlari: JSON, YAML, TOML (Viper ile auto-detect).
+- Default values are centralized in `config/defaults.go`.
+- Config structs in `config/config.go`.
+- When adding a new config field: struct + default + JSON/YAML tag + test.
+- Config file formats: JSON, YAML, TOML (auto-detected by Viper).
 
-## CLI Flag Kurallari
+## CLI Flag Rules
 
-- Yeni flag eklerken `internal/cli/root.go`'da tanimla.
-- Flag isimleri kebab-case: `--pre-release`, `--dry-run`.
-- Boolean flag'ler icin `--no-` prefix'i ile disable: `--no-git.push`.
-- Her flag icin aciklayici `Usage` string'i zorunlu.
+- Define new flags in `internal/cli/root.go`.
+- Flag names use kebab-case: `--pre-release`, `--dry-run`.
+- For boolean flags, use `--no-` prefix to disable: `--no-git.push`.
+- Every flag requires a clear `Usage` string.
 
-## Pipeline Adimi Ekleme
+## Adding a Pipeline Step
 
-Yeni pipeline adimi eklemek icin:
-1. `runner.go`'da `pipelineStep` struct'ina ekle
-2. Adim fonksiyonunu implement et (spinner + error handling)
-3. Before/after hook destegi otomatik gelir
-4. Dry-run destegi zorunlu
-5. Integration test ekle
+To add a new pipeline step:
+1. Add to the `pipelineStep` struct in `runner.go`
+2. Implement the step function (spinner + error handling)
+3. Before/after hook support comes for free
+4. Dry-run support is required
+5. Add an integration test
 
-## Changelog ve Commit Analizi
+## Changelog and Commit Analysis
 
-- Commit parse: `changelog/parser.go` (Angular preset)
-- Bump analiz: `changelog/analyzer.go` (feat→minor, fix→patch, !→major)
-- Yeni commit type eklerken `allowedTypes` map'ini guncelle
+- Commit parsing: `changelog/parser.go` (Angular preset)
+- Bump analysis: `changelog/analyzer.go` (feat→minor, fix→patch, !→major)
+- When adding a new commit type, update the `allowedTypes` map
 
 ## Docker Best Practices
 
-- Multi-stage build kullan (builder + runtime).
-- Runtime image'da sadece gerekli dependency'ler (git, ca-certificates).
-- Binary her zaman static derle: `CGO_ENABLED=0`.
-- Non-root user ile calistir.
-- `.dockerignore` guncel tut.
+- Use multi-stage builds (builder + runtime).
+- Only the necessary deps in the runtime image (git, ca-certificates).
+- Always build the binary statically: `CGO_ENABLED=0`.
+- Run as non-root user.
+- Keep `.dockerignore` up to date.
 
-## Dosya Islemleri
+## File Operations
 
-- Dosya yollari icin `filepath.Join` kullan (platform-independent).
-- Gecici dosyalar icin `os.CreateTemp` veya `t.TempDir()` (testlerde).
-- Dosya izinleri: 0644 (dosya), 0755 (dizin, executable).
-- Dosya acildiktan sonra `defer f.Close()`.
+- Use `filepath.Join` for file paths (platform-independent).
+- Use `os.CreateTemp` or `t.TempDir()` (in tests) for temp files.
+- File permissions: 0644 (file), 0755 (directory, executable).
+- Use `defer f.Close()` after opening a file.
 
-## Hata Mesajlari
+## Error Messages
 
-- Kullaniciya yonelik mesajlar aciklayici ve aksiyon onerir olmali.
-- Internal error detail'leri kullaniciya gosterme.
-- Verbose modda (-v) daha fazla detay goster.
-- Error zincirinde `%w` ile wrap et, root cause'a ulasilabilsin.
+- User-facing messages should be clear and actionable.
+- Don't expose internal error details to the user.
+- Show more detail in verbose mode (-v).
+- Wrap errors with `%w` so the root cause is reachable.

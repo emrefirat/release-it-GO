@@ -1,45 +1,45 @@
-# Kod Kalitesi Kurallari
+# Code Quality Rules
 
-## Context7 ile Dokumantasyon Kontrolu
+## Documentation Lookup with Context7
 
-Kod yazarken veya kutuphane/API kullanirken **Context7 MCP aracini kullan**:
+When writing code or using a library/API, **use the Context7 MCP tool**:
 
-1. Oncelikle `resolve-library-id` ile kutuphane ID'sini bul
-2. Ardindan `query-docs` ile guncel dokumantasyonu sorgula
-3. Tahmine dayali kod yazma — her zaman guncel API'yi dogrula
+1. First find the library ID with `resolve-library-id`
+2. Then query current documentation with `query-docs`
+3. Don't write code from guesses — always verify the current API
 
-Ozellikle su durumlarda Context7 kullan:
-- Yeni dependency eklerken (semver, cobra, viper, bubbletea, lipgloss)
-- Mevcut dependency'nin API'sini kullanirken emin degilsen
-- Bilmedigin bir Go stdlib paketi kullanirken
+Use Context7 especially when:
+- Adding a new dependency (semver, cobra, viper, bubbletea, lipgloss)
+- Unsure about an existing dependency's API
+- Using an unfamiliar Go stdlib package
 
 ## Naming Conventions
 
-| Tur | Format | Ornek |
-|-----|--------|-------|
-| Package | kucuk harf, tek kelime | `config`, `git`, `release` |
+| Kind | Format | Example |
+|------|--------|---------|
+| Package | lowercase, single word | `config`, `git`, `release` |
 | Exported | PascalCase | `CreateRelease`, `UserID` |
 | Unexported | camelCase | `generateSlug`, `validateInput` |
-| Constants | PascalCase veya SCREAMING_SNAKE | `MaxRetries`, `DEFAULT_TIMEOUT` |
+| Constants | PascalCase or SCREAMING_SNAKE | `MaxRetries`, `DEFAULT_TIMEOUT` |
 | Interfaces | -er suffix | `Reader`, `Prompter`, `ReleaseProvider` |
-| Acronyms | Tutarli buyuk/kucuk | `HTTPServer`, `userID` |
+| Acronyms | Consistent case | `HTTPServer`, `userID` |
 
 ## Error Handling
 
 ```go
-// YANLIS - Error'u ignore etme
+// WRONG — Don't ignore errors
 result, _ := someFunction()
 
-// DOGRU - Her error'u handle et
+// RIGHT — Handle every error
 result, err := someFunction()
 if err != nil {
     return fmt.Errorf("someFunction failed: %w", err)
 }
 ```
 
-- `%w` ile error wrapping kullan.
-- Sadece error'u olusturan yerde logla (en ust seviyede: main veya runner).
-- `panic` kullanma (sadece kurtarilamaz durumlar icin).
+- Use `%w` for error wrapping.
+- Log only where the error originates (top level: main or runner).
+- Don't use `panic` (only for unrecoverable situations).
 
 ## Custom Error Types
 
@@ -50,12 +50,12 @@ var (
 )
 ```
 
-## Kod Organizasyonu
+## Code Organization
 
-- Dosya basina tek sorumluluk.
-- Fonksiyonlar 50 satiri gecmemeli (mumkunse).
-- Deep nesting yapma (3+ seviye), early return kullan.
-- Magic number kullanma, constant tanimla.
+- One responsibility per file.
+- Functions shouldn't exceed 50 lines (when possible).
+- Avoid deep nesting (3+ levels); use early return.
+- Don't use magic numbers; define constants.
 
 ## Early Return Pattern
 
@@ -72,24 +72,24 @@ func process(data *Data) error {
 }
 ```
 
-## Yapilmamasi Gerekenler
+## Things Not to Do
 
-- `panic` kullanma
-- Global state kullanma
-- `init()` fonksiyonlarinda side effect
-- Circular dependency olusturma
+- Don't use `panic`
+- Don't use global state
+- Side effects in `init()` functions
+- Circular dependencies
 - God objects/functions
-- Error'lari ignore etme (`_`)
+- Ignoring errors (`_`)
 
 ## Logging
 
-- `log/slog` stdlib kullan.
-- Structured logging tercih et.
-- Log level: normal / verbose / debug (yapilandirabilir).
-- Sensitive veri loglama (sifre, token, PII).
+- Use the `log/slog` stdlib.
+- Prefer structured logging.
+- Log levels: normal / verbose / debug (configurable).
+- Don't log sensitive data (passwords, tokens, PII).
 
 ## Performance
 
-- Buyuk slice'lar icin capacity belirt: `make([]Item, 0, len(data))`
-- Gereksiz allocation'lardan kacin.
-- Goroutine leak'lerden kacin - context kullan.
+- For large slices, specify capacity: `make([]Item, 0, len(data))`
+- Avoid unnecessary allocations.
+- Avoid goroutine leaks — use context.
