@@ -2,6 +2,8 @@ package cli
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -187,5 +189,74 @@ func TestNewRootCommand_CompletionInvalidShell(t *testing.T) {
 	err := cmd.Execute()
 	if err == nil {
 		t.Error("expected error for invalid shell")
+	}
+}
+
+func TestFileExists_RegularFile_ReturnsTrue(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sample.txt")
+	if err := os.WriteFile(path, []byte("content"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	if !fileExists(path) {
+		t.Error("expected true for existing regular file")
+	}
+}
+
+func TestFileExists_Directory_ReturnsFalse(t *testing.T) {
+	dir := t.TempDir()
+	if fileExists(dir) {
+		t.Error("expected false for a directory path")
+	}
+}
+
+func TestFileExists_Missing_ReturnsFalse(t *testing.T) {
+	dir := t.TempDir()
+	missing := filepath.Join(dir, "does-not-exist")
+	if fileExists(missing) {
+		t.Error("expected false for missing path")
+	}
+}
+
+func TestFileExists_EmptyString_ReturnsFalse(t *testing.T) {
+	if fileExists("") {
+		t.Error("expected false for empty path")
+	}
+}
+
+func TestReasonDescription(t *testing.T) {
+	tests := []struct {
+		name     string
+		reason   string
+		expected string
+	}{
+		{
+			name:     "not conventional substring",
+			reason:   "commit 'abc' not in conventional commit format",
+			expected: "message must follow conventional commit format",
+		},
+		{
+			name:     "unknown type prefix",
+			reason:   "unknown type: fic",
+			expected: "type is not in the allowed list",
+		},
+		{
+			name:     "fallback passes reason through",
+			reason:   "some other reason",
+			expected: "some other reason",
+		},
+		{
+			name:     "empty reason falls through",
+			reason:   "",
+			expected: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := reasonDescription(tt.reason)
+			if got != tt.expected {
+				t.Errorf("reasonDescription(%q) = %q, want %q", tt.reason, got, tt.expected)
+			}
+		})
 	}
 }
