@@ -29,10 +29,11 @@
 | 18 | Config Compatibility & Edge Case Fixes | Complete | 100% |
 | 19 | Test Coverage Strengthening | Complete | 100% |
 | 20 | Git Hook Management (install / remove / check-msg) | Complete | 100% |
+| 21 | P0 Test Coverage Completion (QA audit) | Complete | 100% |
 
-**Last Updated:** 2026-04-16
+**Last Updated:** 2026-04-17
 **Active Developer:** Claude
-**Current Version:** v0.1.3 (Phase 20 complete — production-ready)
+**Current Version:** v0.1.3 (Phase 21 complete — production-ready)
 
 ---
 
@@ -550,6 +551,46 @@
 
 ---
 
+## Phase 21: P0 Test Coverage Completion (QA audit)
+
+**Status:** Complete
+**PRD:** `docs/phase_21.md`
+
+### To Do
+
+- [x] Bölüm 1 — `cli/root.go` helpers: `fileExists`, `reasonDescription` (table-driven)
+- [x] Bölüm 2 — `cli/root.go` `runCheckMsg` with file / stdin / direct string modes plus verbose output
+- [x] Bölüm 3 — `cli/install.go` `runHooksInstall` + `runHooksRemove` against real temp git repos
+- [x] Bölüm 4 — `cli/init.go` `runInit` dispatcher (`--full-example`, CI mode, existing native config abort)
+- [x] Bölüm 5 — `runner/runner.go` `githubRelease` + `gitlabRelease` dry-run, prompt accept/decline, missing token
+- [x] Zero production code changes (tests only)
+- [x] `make check` clean (fmt, vet, lint, test, build); `make vuln` unchanged (pre-existing stdlib advisories)
+
+### Coverage Outcome
+
+| Paket | Önce | Sonra | Hedef | Durum |
+|-------|------|-------|-------|-------|
+| `internal/cli` | 58.8% | **84.9%** | 75%+ | ✓ Exceeded |
+| `internal/runner` | 78.1% | **83.5%** | 85%+ | ↘ 1.5% short |
+| `runCheckMsg` | 0% | covered | 70%+ | ✓ |
+| `runHooksInstall` | 0% | covered | 70%+ | ✓ |
+| `runHooksRemove` | 0% | covered | 70%+ | ✓ |
+| `runInit` | 0% | covered | 70%+ | ✓ |
+| `fileExists` | 0% | 100% | 70%+ | ✓ |
+| `reasonDescription` | 0% | covered | 70%+ | ✓ |
+| `githubRelease` | 28.6% | **71.4%** | 70%+ | ✓ |
+| `gitlabRelease` | 28.6% | **71.4%** | 70%+ | ✓ |
+
+### Notes
+
+- Helpers for stdin/stderr capture (`captureStderr`, `withStdin`) swap globals for the duration of a test closure — restored via defer. No production code touched.
+- `setupGitRepo` helper spins up a fresh git repo in `t.TempDir()` with user identity configured; used by all hooks tests.
+- Runner tests discovered that `NewRunner` sets `ctx.IsCI` via `ui.IsCI()`, which returns true under `go test` (no TTY on stdin). Tests that need the interactive branch must set `runner.ctx.IsCI = false` explicitly after `NewRunner`. Matches the existing `Interactive_Declined` test pattern.
+- `runner` package ended at 83.5% vs 85% target. The remaining gap is `client.ValidateToken()` HTTP round-trip inside `checkTokens` and asset-upload paths inside `githubRelease`/`gitlabRelease` — both require either real HTTPS servers or production-side URL injection. Deferred to Phase 22 (P1 integration tests).
+- All tests run under `-race`; no data races introduced.
+
+---
+
 ## Bugs
 
 - [x] BUG: First-release changelog "exit status 128" error (2026-02-16) → When `LatestVersion=0.0.0`, the `v0.0.0` tag was searched but no such tag exists. The `latestVersionToTag()` helper was added: returns empty for `0.0.0` or empty string, so `GetCommitsSinceTag("")` returns all commits. 3 sites affected: `RunChangelogOnly`, `generateChangelog`, `autoDetectIncrement`.
@@ -636,6 +677,7 @@
 | 2026-04-16 | Claude | docs: documentation set created — CLAUDE.md expanded (~290 lines), ARCHITECTURE.md, DECISIONS.md added, PROGRESS.md updated with Phase 20 |
 | 2026-04-16 | Claude | docs: full English translation of CLAUDE.md, ARCHITECTURE.md, DECISIONS.md, PROGRESS.md, .claude/rules/* — language consistency with README.md and code comments |
 | 2026-04-16 | Claude | docs: CONTRIBUTING.md and TROUBLESHOOTING.md added — onboarding for new developers + common issue reference |
+| 2026-04-17 | Claude | Phase 21 complete: P0 test coverage gaps closed — runCheckMsg, hooks install/remove, runInit dispatcher, runner github/gitlab dry-run integration; cli 58.8%→84.9%, runner 78.1%→83.5%; zero production code changes |
 
 ---
 
