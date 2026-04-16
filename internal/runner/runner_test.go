@@ -232,6 +232,228 @@ func TestRunner_GitlabRelease_NoRepoInfo(t *testing.T) {
 	}
 }
 
+// testGitHubRepo returns a RepoInfo pointing at github.com.
+func testGitHubRepo() *git.RepoInfo {
+	return &git.RepoInfo{
+		Host:       "github.com",
+		Owner:      "testowner",
+		Repository: "testrepo",
+		Protocol:   "https",
+	}
+}
+
+// testGitLabRepo returns a RepoInfo pointing at gitlab.com.
+func testGitLabRepo() *git.RepoInfo {
+	return &git.RepoInfo{
+		Host:       "gitlab.com",
+		Owner:      "testowner",
+		Repository: "testrepo",
+		Protocol:   "https",
+	}
+}
+
+func TestRunner_GithubRelease_DryRun_SetsReleaseURL(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "fake-token")
+	cfg := &config.Config{
+		CI:     true,
+		DryRun: true,
+		GitHub: config.GitHubConfig{
+			Release:     true,
+			TokenRef:    "GITHUB_TOKEN",
+			ReleaseName: "Release ${version}",
+			MakeLatest:  true,
+		},
+	}
+	runner := NewRunner(cfg)
+	runner.ctx.RepoInfo = testGitHubRepo()
+	runner.ctx.Version = "1.2.3"
+	runner.ctx.TagName = "v1.2.3"
+	runner.ctx.Changelog = "- some change\n"
+
+	if err := runner.githubRelease(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if runner.ctx.ReleaseURL != "(dry-run)" {
+		t.Errorf("expected ReleaseURL=(dry-run), got %q", runner.ctx.ReleaseURL)
+	}
+}
+
+func TestRunner_GithubRelease_NonCI_PromptDecline_Skips(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "fake-token")
+	cfg := &config.Config{
+		DryRun: true,
+		GitHub: config.GitHubConfig{
+			Release:     true,
+			TokenRef:    "GITHUB_TOKEN",
+			ReleaseName: "Release ${version}",
+		},
+	}
+	runner := NewRunner(cfg)
+	runner.ctx.RepoInfo = testGitHubRepo()
+	runner.ctx.Version = "1.0.0"
+	runner.ctx.TagName = "v1.0.0"
+	// NewRunner sets IsCI via ui.IsCI() which returns true when stdin isn't a
+	// TTY (as in `go test`). Force interactive path for this test.
+	runner.ctx.IsCI = false
+	runner.ctx.Prompter = &mockPrompter{confirmResult: false}
+
+	if err := runner.githubRelease(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if runner.ctx.ReleaseURL != "" {
+		t.Errorf("expected empty ReleaseURL on decline, got %q", runner.ctx.ReleaseURL)
+	}
+}
+
+func TestRunner_GithubRelease_NonCI_PromptAccept_ProceedsInDryRun(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "fake-token")
+	cfg := &config.Config{
+		DryRun: true,
+		GitHub: config.GitHubConfig{
+			Release:     true,
+			TokenRef:    "GITHUB_TOKEN",
+			ReleaseName: "Release ${version}",
+		},
+	}
+	runner := NewRunner(cfg)
+	runner.ctx.RepoInfo = testGitHubRepo()
+	runner.ctx.Version = "1.0.0"
+	runner.ctx.TagName = "v1.0.0"
+	runner.ctx.IsCI = false
+	runner.ctx.Prompter = &mockPrompter{confirmResult: true}
+
+	if err := runner.githubRelease(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if runner.ctx.ReleaseURL != "(dry-run)" {
+		t.Errorf("expected ReleaseURL=(dry-run) after accept, got %q", runner.ctx.ReleaseURL)
+	}
+}
+
+func TestRunner_GithubRelease_MissingToken_ReturnsError(t *testing.T) {
+	// Ensure the env var is empty for this test.
+	t.Setenv("GITHUB_TOKEN", "")
+	cfg := &config.Config{
+		CI:     true,
+		DryRun: true,
+		GitHub: config.GitHubConfig{
+			Release:  true,
+			TokenRef: "GITHUB_TOKEN",
+		},
+	}
+	runner := NewRunner(cfg)
+	runner.ctx.RepoInfo = testGitHubRepo()
+
+	err := runner.githubRelease()
+	if err == nil {
+		t.Fatal("expected error when GITHUB_TOKEN is not set")
+	}
+	if !strings.Contains(err.Error(), "GitHub client") {
+		t.Errorf("expected wrap with 'GitHub client', got %v", err)
+	}
+}
+
+func TestRunner_GitlabRelease_DryRun_SetsReleaseURL(t *testing.T) {
+	t.Setenv("GITLAB_TOKEN", "fake-token")
+	cfg := &config.Config{
+		CI:     true,
+		DryRun: true,
+		GitLab: config.GitLabConfig{
+			Release:     true,
+			TokenRef:    "GITLAB_TOKEN",
+			TokenHeader: "Private-Token",
+			ReleaseName: "Release ${version}",
+		},
+	}
+	runner := NewRunner(cfg)
+	runner.ctx.RepoInfo = testGitLabRepo()
+	runner.ctx.Version = "1.2.3"
+	runner.ctx.TagName = "v1.2.3"
+	runner.ctx.Changelog = "- fix x\n"
+
+	if err := runner.gitlabRelease(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if runner.ctx.ReleaseURL != "(dry-run)" {
+		t.Errorf("expected ReleaseURL=(dry-run), got %q", runner.ctx.ReleaseURL)
+	}
+}
+
+func TestRunner_GitlabRelease_NonCI_PromptDecline_Skips(t *testing.T) {
+	t.Setenv("GITLAB_TOKEN", "fake-token")
+	cfg := &config.Config{
+		DryRun: true,
+		GitLab: config.GitLabConfig{
+			Release:     true,
+			TokenRef:    "GITLAB_TOKEN",
+			TokenHeader: "Private-Token",
+			ReleaseName: "Release ${version}",
+		},
+	}
+	runner := NewRunner(cfg)
+	runner.ctx.RepoInfo = testGitLabRepo()
+	runner.ctx.Version = "1.0.0"
+	runner.ctx.TagName = "v1.0.0"
+	runner.ctx.IsCI = false
+	runner.ctx.Prompter = &mockPrompter{confirmResult: false}
+
+	if err := runner.gitlabRelease(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if runner.ctx.ReleaseURL != "" {
+		t.Errorf("expected empty ReleaseURL on decline, got %q", runner.ctx.ReleaseURL)
+	}
+}
+
+func TestRunner_GitlabRelease_NonCI_PromptAccept_ProceedsInDryRun(t *testing.T) {
+	t.Setenv("GITLAB_TOKEN", "fake-token")
+	cfg := &config.Config{
+		DryRun: true,
+		GitLab: config.GitLabConfig{
+			Release:     true,
+			TokenRef:    "GITLAB_TOKEN",
+			TokenHeader: "Private-Token",
+			ReleaseName: "Release ${version}",
+		},
+	}
+	runner := NewRunner(cfg)
+	runner.ctx.RepoInfo = testGitLabRepo()
+	runner.ctx.Version = "1.0.0"
+	runner.ctx.TagName = "v1.0.0"
+	runner.ctx.IsCI = false
+	runner.ctx.Prompter = &mockPrompter{confirmResult: true}
+
+	if err := runner.gitlabRelease(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if runner.ctx.ReleaseURL != "(dry-run)" {
+		t.Errorf("expected ReleaseURL=(dry-run) after accept, got %q", runner.ctx.ReleaseURL)
+	}
+}
+
+func TestRunner_GitlabRelease_MissingToken_ReturnsError(t *testing.T) {
+	t.Setenv("GITLAB_TOKEN", "")
+	cfg := &config.Config{
+		CI:     true,
+		DryRun: true,
+		GitLab: config.GitLabConfig{
+			Release:     true,
+			TokenRef:    "GITLAB_TOKEN",
+			TokenHeader: "Private-Token",
+		},
+	}
+	runner := NewRunner(cfg)
+	runner.ctx.RepoInfo = testGitLabRepo()
+
+	err := runner.gitlabRelease()
+	if err == nil {
+		t.Fatal("expected error when GITLAB_TOKEN is not set")
+	}
+	if !strings.Contains(err.Error(), "GitLab client") {
+		t.Errorf("expected wrap with 'GitLab client', got %v", err)
+	}
+}
+
 func TestRunner_PrintSummary_DryRun(t *testing.T) {
 	cfg := &config.Config{
 		CI:     true,
