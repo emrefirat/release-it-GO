@@ -224,6 +224,151 @@ func TestFileExists_EmptyString_ReturnsFalse(t *testing.T) {
 	}
 }
 
+func TestRunCheckMsg_DirectString_Valid_ReturnsNil(t *testing.T) {
+	if err := runCheckMsg("feat: add login", false); err != nil {
+		t.Errorf("expected nil, got %v", err)
+	}
+}
+
+func TestRunCheckMsg_DirectString_Invalid_ReturnsError(t *testing.T) {
+	stderr := captureStderr(t, func() {
+		if err := runCheckMsg("oops no type", false); err == nil {
+			t.Error("expected error for non-conventional message")
+		}
+	})
+	if !bytesContains(stderr, "commitlint") {
+		t.Errorf("expected commitlint header in stderr, got: %s", stderr)
+	}
+}
+
+func TestRunCheckMsg_EmptyString_ReturnsEmptyError(t *testing.T) {
+	err := runCheckMsg("", false)
+	if err == nil || err.Error() != "commit message is empty" {
+		t.Errorf("expected 'commit message is empty', got %v", err)
+	}
+}
+
+func TestRunCheckMsg_FileMode_Valid_ReturnsNil(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "COMMIT_EDITMSG")
+	if err := os.WriteFile(path, []byte("fix(auth): handle expired tokens\n\nbody line"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	if err := runCheckMsg(path, false); err != nil {
+		t.Errorf("expected nil, got %v", err)
+	}
+}
+
+func TestRunCheckMsg_FileMode_Invalid_ReturnsError(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "COMMIT_EDITMSG")
+	if err := os.WriteFile(path, []byte("update docs\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	_ = captureStderr(t, func() {
+		if err := runCheckMsg(path, false); err == nil {
+			t.Error("expected error for non-conventional file content")
+		}
+	})
+}
+
+func TestRunCheckMsg_FileMode_OnlyFirstLineChecked(t *testing.T) {
+	// Valid first line but invalid rest — should still pass (only subject is linted).
+	dir := t.TempDir()
+	path := filepath.Join(dir, "COMMIT_EDITMSG")
+	if err := os.WriteFile(path, []byte("feat: valid subject\nthis body is free-form text"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	if err := runCheckMsg(path, false); err != nil {
+		t.Errorf("expected nil, got %v", err)
+	}
+}
+
+func TestRunCheckMsg_Stdin_Valid_ReturnsNil(t *testing.T) {
+	withStdin(t, "feat: via stdin\n", func() {
+		if err := runCheckMsg("-", false); err != nil {
+			t.Errorf("expected nil, got %v", err)
+		}
+	})
+}
+
+func TestRunCheckMsg_Stdin_Invalid_ReturnsError(t *testing.T) {
+	withStdin(t, "no type here\n", func() {
+		_ = captureStderr(t, func() {
+			if err := runCheckMsg("-", false); err == nil {
+				t.Error("expected error for non-conventional stdin content")
+			}
+		})
+	})
+}
+
+func TestRunCheckMsg_Verbose_PrintsValidTypes(t *testing.T) {
+	stderr := captureStderr(t, func() {
+		_ = runCheckMsg("bad msg no colon", true)
+	})
+	// Verbose output should list valid types — check for a few.
+	for _, expected := range []string{"feat", "fix", "chore", "Valid types"} {
+		if !bytesContains(stderr, expected) {
+			t.Errorf("expected %q in verbose output, got: %s", expected, stderr)
+		}
+	}
+}
+
+func TestRunCheckMsg_FileMode_UnreadableFile_StillTreatedAsString(t *testing.T) {
+	// fileExists returns false for directories, so a directory path falls into
+	// the default "direct string" branch. This documents current behavior.
+	dir := t.TempDir()
+	_ = captureStderr(t, func() {
+		if err := runCheckMsg(dir, false); err == nil {
+			t.Error("expected error — directory path is treated as string and isn't conventional")
+		}
+	})
+}
+
+// captureStderr temporarily replaces os.Stderr for the duration of fn and
+// returns whatever was written. Restores os.Stderr on return.
+func captureStderr(t *testing.T, fn func()) []byte {
+	t.Helper()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	oldStderr := os.Stderr
+	os.Stderr = w
+	done := make(chan []byte, 1)
+	go func() {
+		var buf bytes.Buffer
+		_, _ = buf.ReadFrom(r)
+		done <- buf.Bytes()
+	}()
+	fn()
+	_ = w.Close()
+	os.Stderr = oldStderr
+	return <-done
+}
+
+// withStdin temporarily replaces os.Stdin with a pipe feeding `input` for the
+// duration of fn. Restores os.Stdin on return.
+func withStdin(t *testing.T, input string, fn func()) {
+	t.Helper()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	oldStdin := os.Stdin
+	os.Stdin = r
+	defer func() { os.Stdin = oldStdin }()
+	go func() {
+		_, _ = w.WriteString(input)
+		_ = w.Close()
+	}()
+	fn()
+}
+
+func bytesContains(haystack []byte, needle string) bool {
+	return bytes.Contains(haystack, []byte(needle))
+}
+
 func TestReasonDescription(t *testing.T) {
 	tests := []struct {
 		name     string
