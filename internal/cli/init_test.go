@@ -529,3 +529,103 @@ func TestInitCommand_Exists(t *testing.T) {
 	}
 	t.Error("init command not found in root command")
 }
+
+func TestNewInitCommand_HasFullExampleFlag(t *testing.T) {
+	cmd := newInitCommand()
+	flag := cmd.Flags().Lookup("full-example")
+	if flag == nil {
+		t.Error("expected --full-example flag on init command")
+	}
+}
+
+// chdirTemp chdirs into a fresh tempdir, restores original cwd via Cleanup.
+func chdirTemp(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(origDir) })
+	return dir
+}
+
+func TestRunInit_FullExampleFlag_GeneratesYAML(t *testing.T) {
+	chdirTemp(t)
+	origFlag := fullExampleFlag
+	fullExampleFlag = true
+	t.Cleanup(func() { fullExampleFlag = origFlag })
+
+	if err := runInit(nil, nil); err != nil {
+		t.Fatalf("runInit with --full-example: %v", err)
+	}
+
+	if _, err := os.Stat(fullExampleFile); err != nil {
+		t.Errorf("expected %s to be created: %v", fullExampleFile, err)
+	}
+}
+
+func TestRunInit_CIMode_WritesDefaultConfig(t *testing.T) {
+	chdirTemp(t)
+	origCI := ciMode
+	origFlag := fullExampleFlag
+	ciMode = true
+	fullExampleFlag = false
+	t.Cleanup(func() {
+		ciMode = origCI
+		fullExampleFlag = origFlag
+	})
+
+	// In CI mode, NonInteractivePrompter returns defaults for every prompt.
+	// No existing native config + no legacy → wizard runs with defaults.
+	if err := runInit(nil, nil); err != nil {
+		t.Fatalf("runInit in CI mode: %v", err)
+	}
+
+	if !config.DetectNativeConfig() {
+		t.Error("expected default config to be created via CI-mode dispatcher")
+	}
+}
+
+func TestRunInit_CIMode_ExistingNativeConfig_Aborts(t *testing.T) {
+	dir := chdirTemp(t)
+	origCI := ciMode
+	origFlag := fullExampleFlag
+	ciMode = true
+	fullExampleFlag = false
+	t.Cleanup(func() {
+		ciMode = origCI
+		fullExampleFlag = origFlag
+	})
+
+	// Pre-create a native config — NonInteractivePrompter returns the default
+	// for Confirm (false for overwrite), so runInit should abort without error.
+	existing := config.NativeConfigFile
+	if err := os.WriteFile(existing, []byte(`{"git":{"commit":true}}`), 0o644); err != nil {
+		t.Fatalf("write existing: %v", err)
+	}
+
+	originalSize := fileSize(t, existing)
+
+	if err := runInit(nil, nil); err != nil {
+		t.Fatalf("runInit should abort gracefully, got: %v", err)
+	}
+
+	// File should be untouched (same size and content — default Confirm=false means abort)
+	if fileSize(t, existing) != originalSize {
+		t.Error("existing config should remain unchanged when Overwrite? is declined")
+	}
+	_ = dir
+}
+
+func fileSize(t *testing.T, path string) int64 {
+	t.Helper()
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat %s: %v", path, err)
+	}
+	return info.Size()
+}
