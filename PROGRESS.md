@@ -30,10 +30,11 @@
 | 19 | Test Coverage Strengthening | Complete | 100% |
 | 20 | Git Hook Management (install / remove / check-msg) | Complete | 100% |
 | 21 | P0 Test Coverage Completion (QA audit) | Complete | 100% |
+| 22 | Atomic Git Push Default | Complete | 100% |
 
-**Last Updated:** 2026-04-17
+**Last Updated:** 2026-04-21
 **Active Developer:** Claude
-**Current Version:** v0.1.3 (Phase 21 complete — production-ready)
+**Current Version:** v0.1.3 (Phase 22 complete — production-ready)
 
 ---
 
@@ -591,6 +592,33 @@
 
 ---
 
+## Phase 22: Atomic Git Push Default
+
+**Status:** Complete
+**PRD:** `docs/phase_22.md`
+
+### To Do
+
+- [x] `internal/git/push_test.go` — expect `--atomic` in default args + TestPush_CustomArgsOverridesDefault
+- [x] `internal/config/config_test.go` — default test asserts `["--follow-tags", "--atomic"]`
+- [x] `internal/config/defaults.go` — append `--atomic` to default `PushArgs`
+- [x] `internal/config/writer.go` — fullExampleYAML reflects new default with explanation
+- [x] `README.md` — config reference updated
+- [x] `TROUBLESHOOTING.md` — entries for "atomic not supported" + orphan tag recovery
+- [x] `CHANGELOG.md` — Unreleased entry
+- [x] Coverage preserved (internal/git 91.8%, internal/config 88.4%)
+- [x] All packages green under `-race`; vet + lint clean
+
+### Notes
+
+- Root cause discovered via user-reported CI failure: `git push --follow-tags` is not atomic; in a Jenkins run, the tag (0.10.0) was pushed while the master ref was rejected with `fetch first`, leaving an orphan tag on the remote. The next CI run computed the same version and tripped over the existing tag.
+- `--atomic` (git 2.4+, 2015) forces all refs in a single transaction; if one ref is rejected, none land on the remote. Eliminates the orphan-tag scenario at the source.
+- Behavior change is opt-out: legacy git servers (pre-2015) without atomic protocol support reject the push with a clear error message; users override `git.pushArgs` to revert.
+- Test-first approach (CLAUDE.md Rule #5): tests updated to expect new default, observed red, then default changed → green. Atomic test+code commit (no broken-in-the-middle state).
+- Zero new code in production path — only a one-element append in defaults.go.
+
+---
+
 ## Bugs
 
 - [x] BUG: First-release changelog "exit status 128" error (2026-02-16) → When `LatestVersion=0.0.0`, the `v0.0.0` tag was searched but no such tag exists. The `latestVersionToTag()` helper was added: returns empty for `0.0.0` or empty string, so `GetCommitsSinceTag("")` returns all commits. 3 sites affected: `RunChangelogOnly`, `generateChangelog`, `autoDetectIncrement`.
@@ -678,6 +706,7 @@
 | 2026-04-16 | Claude | docs: full English translation of CLAUDE.md, ARCHITECTURE.md, DECISIONS.md, PROGRESS.md, .claude/rules/* — language consistency with README.md and code comments |
 | 2026-04-16 | Claude | docs: CONTRIBUTING.md and TROUBLESHOOTING.md added — onboarding for new developers + common issue reference |
 | 2026-04-17 | Claude | Phase 21 complete: P0 test coverage gaps closed — runCheckMsg, hooks install/remove, runInit dispatcher, runner github/gitlab dry-run integration; cli 58.8%→84.9%, runner 78.1%→83.5%; zero production code changes |
+| 2026-04-21 | Claude | Phase 22 complete: --atomic added to default git.pushArgs to prevent orphan tags in parallel CI runs; behavior change is opt-out via config; coverage preserved |
 
 ---
 
