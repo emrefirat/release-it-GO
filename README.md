@@ -171,7 +171,7 @@ git:
   tagAnnotation: "Release ${version}"   # Annotation for annotated tags
   tagArgs: []                           # Extra git tag arguments
   push: true                            # Push to remote (default: true)
-  pushArgs: ["--follow-tags"]           # Extra push arguments
+  pushArgs: ["--follow-tags", "--atomic"]  # Extra push arguments (atomic prevents orphan tags)
   pushRepo: "origin"                    # Remote name (default: "origin")
   requireBranch: ""                     # Required branch (empty = any)
   requireCleanWorkingDir: true          # Abort if working directory is dirty

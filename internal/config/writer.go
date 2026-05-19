@@ -151,7 +151,9 @@ git:
   tagArgs: []
   push: true
   # Extra arguments passed to git push command
-  pushArgs: ["--follow-tags"]
+  # --atomic makes branch + tag pushes a single transaction.
+  # Remove it if your git server is pre-2015 and rejects the atomic capability.
+  pushArgs: ["--follow-tags", "--atomic"]
   # Remote repository name for push
   pushRepo: "origin"
   # Only allow releases from this branch (empty = any branch)

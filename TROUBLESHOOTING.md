@@ -26,6 +26,46 @@ If the tag was pushed and downloaded, deleting it may break consumers. Prefer bu
 
 ---
 
+### `the receiving end does not support --atomic push`
+
+**Cause**: The default `git.pushArgs` includes `--atomic` to prevent orphan tags in parallel CI scenarios. A small number of legacy git servers (pre-2015) do not advertise the atomic capability and reject pushes that request it.
+
+**Fix**: Override `pushArgs` in your config to drop the flag.
+
+```yaml
+git:
+  pushArgs: ["--follow-tags"]
+```
+
+```json
+{
+  "git": {
+    "pushArgs": ["--follow-tags"]
+  }
+}
+```
+
+This restores the pre-Phase-22 behavior. Note: without `--atomic`, a push that succeeds on the tag but fails on the branch (e.g., concurrent CI advanced the branch) leaves the remote with an orphan tag whose commit is not reachable from the branch. Subsequent runs may then fail with "tag already exists". If you can, upgrade your git server instead of disabling atomic.
+
+---
+
+### `tag already exists` on a fresh CI run (orphan tag)
+
+**Cause**: A previous run created the tag and pushed it to the remote, but the branch push was rejected (fetch-first) and the run failed. The tag remains on the remote, pointing to a commit that isn't reachable from the branch. The next CI run computes the same version and trips over the existing tag.
+
+**Fix**:
+```bash
+# Delete the orphan tag from remote
+git push origin :refs/tags/<orphan-tag>
+
+# And locally if cached
+git tag -d <orphan-tag>
+```
+
+**Prevention**: This scenario is what `--atomic` (default since Phase 22) prevents. If you disabled it via `pushArgs`, consider re-enabling.
+
+---
+
 ### `no upstream configured`
 
 **Cause**: The current branch has no upstream tracking branch, but `git.requireUpstream: true` (default).
