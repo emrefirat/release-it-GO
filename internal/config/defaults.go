@@ -10,7 +10,7 @@ func DefaultConfig() *Config {
 			TagName:                    "${version}",
 			TagAnnotation:              "Release ${version}",
 			Push:                       true,
-			PushArgs:                   []string{"--follow-tags"},
+			PushArgs:                   []string{"--follow-tags", "--atomic"},
 			PushRepo:                   "origin",
 			RequireCleanWorkingDir:     true,
 			RequireUpstream:            true,

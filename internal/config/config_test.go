@@ -34,8 +34,15 @@ func TestDefaultConfig_GitDefaults(t *testing.T) {
 		})
 	}
 
-	if len(cfg.Git.PushArgs) != 1 || cfg.Git.PushArgs[0] != "--follow-tags" {
-		t.Errorf("git.pushArgs = %v, expected [--follow-tags]", cfg.Git.PushArgs)
+	expectedPushArgs := []string{"--follow-tags", "--atomic"}
+	if len(cfg.Git.PushArgs) != len(expectedPushArgs) {
+		t.Errorf("git.pushArgs = %v, expected %v", cfg.Git.PushArgs, expectedPushArgs)
+	} else {
+		for i, want := range expectedPushArgs {
+			if cfg.Git.PushArgs[i] != want {
+				t.Errorf("git.pushArgs[%d] = %q, expected %q", i, cfg.Git.PushArgs[i], want)
+			}
+		}
 	}
 }
 

@@ -32,6 +32,42 @@ func TestPush_Default(t *testing.T) {
 	if !strings.Contains(cmd, "--follow-tags") {
 		t.Error("expected default --follow-tags in args")
 	}
+	// --atomic prevents orphan tags when a concurrent push has updated the
+	// branch ref (refs are pushed as a single transaction).
+	if !strings.Contains(cmd, "--atomic") {
+		t.Error("expected default --atomic in args")
+	}
+}
+
+func TestPush_CustomArgsOverridesDefault(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	var executedArgs []string
+	commandExecutor = func(name string, args ...string) (string, error) {
+		executedArgs = args
+		return "", nil
+	}
+
+	// User explicitly sets pushArgs without --atomic (e.g., old git server).
+	// The custom value must be used as-is; the default must not bleed in.
+	cfg := &config.GitConfig{
+		PushArgs: []string{"--follow-tags"},
+	}
+	g := newTestGitWithConfig(cfg, false)
+
+	err := g.Push()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	cmd := strings.Join(executedArgs, " ")
+	if strings.Contains(cmd, "--atomic") {
+		t.Errorf("user override should not include --atomic, got: %s", cmd)
+	}
+	if !strings.Contains(cmd, "--follow-tags") {
+		t.Errorf("expected --follow-tags from user config, got: %s", cmd)
+	}
 }
 
 func TestPush_CustomRepo(t *testing.T) {
