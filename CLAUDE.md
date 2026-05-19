@@ -10,7 +10,7 @@ A CLI tool that automates the release process as a single static Go binary. Comp
 
 | Decision | Choice | Version |
 |----------|--------|---------|
-| Language / Min | Go | 1.26.2+ |
+| Language / Min | Go | 1.26.3+ |
 | CLI framework | Cobra | v1.10.2 |
 | Config | Viper (JSON + YAML + TOML) | v1.21.0 |
 | Versioning | Masterminds/semver/v3 | v3.4.0 |
