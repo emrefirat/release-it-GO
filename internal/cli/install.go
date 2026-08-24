@@ -68,14 +68,17 @@ func runHooksInstall(cmd *cobra.Command, args []string) error {
 	}
 
 	hooks := githook.HooksFromConfig(&cfg.Hooks)
+	installer := githook.NewInstaller(projectDir, hooksForce)
+
 	if len(hooks) == 0 {
 		fmt.Println("No git hooks configured in hooks section.")
 		fmt.Println("Add pre-commit, commit-msg, or pre-push to your config file.")
-		return nil
+	} else {
+		fmt.Println("Installing git hooks...")
 	}
 
-	installer := githook.NewInstaller(projectDir, hooksForce)
-	fmt.Println("Installing git hooks...")
+	// Install also prunes managed hooks that were removed from the config,
+	// so it must run even when the hooks section is empty.
 	return installer.Install(hooks)
 }
 

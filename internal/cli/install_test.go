@@ -253,6 +253,67 @@ func TestRunHooksInstall_NonManagedHookWithForce_Overwrites(t *testing.T) {
 	}
 }
 
+func TestRunHooksInstall_RemovedHookIsPruned(t *testing.T) {
+	dir := setupGitRepo(t)
+	writeConfig(t, dir, `hooks:
+  "pre-commit":
+    - "echo pc"
+  "commit-msg":
+    - "echo cm"
+`)
+	if err := runHooksInstall(nil, nil); err != nil {
+		t.Fatalf("first install: %v", err)
+	}
+
+	// User removes pre-commit from config and re-runs install
+	writeConfig(t, dir, `hooks:
+  "commit-msg":
+    - "echo cm"
+`)
+	if err := runHooksInstall(nil, nil); err != nil {
+		t.Fatalf("second install: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(dir, ".hooks", "pre-commit")); !os.IsNotExist(err) {
+		t.Error("expected pre-commit to be pruned after it was removed from config")
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".hooks", "commit-msg")); err != nil {
+		t.Errorf("expected commit-msg to remain: %v", err)
+	}
+
+	out, err := exec.Command("git", "-C", dir, "config", "--local", "core.hooksPath").Output()
+	if err != nil {
+		t.Fatalf("read core.hooksPath: %v", err)
+	}
+	if strings.TrimSpace(string(out)) != ".hooks" {
+		t.Errorf("expected core.hooksPath to remain .hooks, got %q", strings.TrimSpace(string(out)))
+	}
+}
+
+func TestRunHooksInstall_AllHooksRemoved_UnsetsHooksPath(t *testing.T) {
+	dir := setupGitRepo(t)
+	writeConfig(t, dir, `hooks:
+  "pre-commit":
+    - "echo pc"
+`)
+	if err := runHooksInstall(nil, nil); err != nil {
+		t.Fatalf("install: %v", err)
+	}
+
+	// User removes the whole hooks section and re-runs install
+	writeConfig(t, dir, "git:\n  commit: true\n")
+	if err := runHooksInstall(nil, nil); err != nil {
+		t.Fatalf("reinstall with empty hooks: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(dir, ".hooks", "pre-commit")); !os.IsNotExist(err) {
+		t.Error("expected stale pre-commit to be pruned when hooks section removed")
+	}
+	if out, err := exec.Command("git", "-C", dir, "config", "--local", "core.hooksPath").Output(); err == nil {
+		t.Errorf("expected core.hooksPath to be unset, still %q", strings.TrimSpace(string(out)))
+	}
+}
+
 func TestRunHooksRemove_NotAGitRepo_ReturnsError(t *testing.T) {
 	dir := t.TempDir()
 	origCwd, _ := os.Getwd()

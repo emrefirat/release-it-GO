@@ -349,6 +349,7 @@ func TestHooksFromConfig_AllGitHooks(t *testing.T) {
 }
 
 func TestInstall_SkipsEmptyCommands(t *testing.T) {
+	mockGitCommands(t) // pre-push has a command entry, so core.hooksPath gets set
 	dir := t.TempDir()
 
 	installer := NewInstaller(dir, false)
@@ -430,5 +431,157 @@ func TestInstall_SetsHooksPath(t *testing.T) {
 	}
 	if gitConfigArgs[2] != hooksDirectory {
 		t.Errorf("expected hooksPath=%q, got %q", hooksDirectory, gitConfigArgs[2])
+	}
+}
+
+func TestInstall_RemovesStaleManagedHook(t *testing.T) {
+	mockGitCommands(t)
+	dir := t.TempDir()
+	installer := NewInstaller(dir, false)
+
+	// First install: two hooks configured
+	err := installer.Install(map[string][]string{
+		"pre-commit": {"echo pc"},
+		"commit-msg": {"echo cm"},
+	})
+	if err != nil {
+		t.Fatalf("first install: %v", err)
+	}
+
+	// Second install: pre-commit was removed from config
+	err = installer.Install(map[string][]string{
+		"commit-msg": {"echo cm"},
+	})
+	if err != nil {
+		t.Fatalf("second install: %v", err)
+	}
+
+	if exists(filepath.Join(dir, hooksDirectory, "pre-commit")) {
+		t.Error("expected stale managed pre-commit to be removed after reinstall")
+	}
+	if !exists(filepath.Join(dir, hooksDirectory, "commit-msg")) {
+		t.Error("expected commit-msg to remain installed")
+	}
+}
+
+func TestInstall_PruneLeavesNonManagedHook(t *testing.T) {
+	mockGitCommands(t)
+	dir := t.TempDir()
+	hooksDir := filepath.Join(dir, hooksDirectory)
+	_ = os.MkdirAll(hooksDir, 0755)
+
+	// User-created hook that is NOT in config — the prune must never touch it
+	userContent := "#!/bin/sh\necho custom user hook\n"
+	_ = os.WriteFile(filepath.Join(hooksDir, "pre-push"), []byte(userContent), 0755)
+
+	installer := NewInstaller(dir, false)
+	if err := installer.Install(map[string][]string{"commit-msg": {"echo cm"}}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	content, err := os.ReadFile(filepath.Join(hooksDir, "pre-push"))
+	if err != nil {
+		t.Fatalf("user pre-push should still exist: %v", err)
+	}
+	if string(content) != userContent {
+		t.Error("user hook content was modified")
+	}
+}
+
+func TestInstall_EmptyMapPrunesAllAndUnsetsHooksPath(t *testing.T) {
+	var gitCalls [][]string
+	original := commandExecutor
+	t.Cleanup(func() { commandExecutor = original })
+	commandExecutor = func(name string, args ...string) (string, error) {
+		gitCalls = append(gitCalls, append([]string{name}, args...))
+		return "", nil
+	}
+
+	dir := t.TempDir()
+	hooksDir := filepath.Join(dir, hooksDirectory)
+	_ = os.MkdirAll(hooksDir, 0755)
+	for _, name := range []string{"pre-commit", "commit-msg"} {
+		_ = os.WriteFile(filepath.Join(hooksDir, name),
+			[]byte("#!/bin/sh\n"+managedHeader+"\necho "+name), 0755)
+	}
+
+	installer := NewInstaller(dir, false)
+	if err := installer.Install(map[string][]string{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	for _, name := range []string{"pre-commit", "commit-msg"} {
+		if exists(filepath.Join(hooksDir, name)) {
+			t.Errorf("expected stale managed hook %s to be removed", name)
+		}
+	}
+
+	unsetCalled := false
+	for _, call := range gitCalls {
+		if len(call) >= 4 && call[1] == "config" && call[2] == "--unset" && call[3] == "core.hooksPath" {
+			unsetCalled = true
+		}
+	}
+	if !unsetCalled {
+		t.Error("expected core.hooksPath to be unset when no hooks remain")
+	}
+}
+
+func TestInstall_EmptyMapKeepsHooksPathWhenUserHooksRemain(t *testing.T) {
+	var gitCalls [][]string
+	original := commandExecutor
+	t.Cleanup(func() { commandExecutor = original })
+	commandExecutor = func(name string, args ...string) (string, error) {
+		gitCalls = append(gitCalls, append([]string{name}, args...))
+		return "", nil
+	}
+
+	dir := t.TempDir()
+	hooksDir := filepath.Join(dir, hooksDirectory)
+	_ = os.MkdirAll(hooksDir, 0755)
+	_ = os.WriteFile(filepath.Join(hooksDir, "pre-commit"),
+		[]byte("#!/bin/sh\n"+managedHeader+"\necho managed"), 0755)
+	_ = os.WriteFile(filepath.Join(hooksDir, "pre-push"),
+		[]byte("#!/bin/sh\necho user hook"), 0755)
+
+	installer := NewInstaller(dir, false)
+	if err := installer.Install(map[string][]string{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if exists(filepath.Join(hooksDir, "pre-commit")) {
+		t.Error("expected stale managed pre-commit to be removed")
+	}
+	if !exists(filepath.Join(hooksDir, "pre-push")) {
+		t.Error("expected user pre-push to remain")
+	}
+
+	for _, call := range gitCalls {
+		if len(call) >= 4 && call[1] == "config" && call[2] == "--unset" && call[3] == "core.hooksPath" {
+			t.Error("core.hooksPath must NOT be unset while user hooks remain in .hooks/")
+		}
+	}
+}
+
+func TestInstall_EmptyMapNoHooksDir_NoGitCalls(t *testing.T) {
+	gitCalls := 0
+	original := commandExecutor
+	t.Cleanup(func() { commandExecutor = original })
+	commandExecutor = func(name string, args ...string) (string, error) {
+		gitCalls++
+		return "", nil
+	}
+
+	dir := t.TempDir()
+	installer := NewInstaller(dir, false)
+	if err := installer.Install(map[string][]string{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if exists(filepath.Join(dir, hooksDirectory)) {
+		t.Error(".hooks directory should not be created when nothing is configured")
+	}
+	if gitCalls != 0 {
+		t.Errorf("expected no git calls, got %d", gitCalls)
 	}
 }

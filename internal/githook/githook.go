@@ -77,15 +77,26 @@ func FindProjectDir() (string, error) {
 
 // Install writes git hook scripts to .hooks/ and configures git to use them.
 // Sets core.hooksPath so git reads hooks from .hooks/ instead of .git/hooks/.
+// Managed hooks that are no longer configured are pruned so .hooks/ always
+// mirrors the config; non-managed (user-created) hooks are left untouched.
 // Returns an error if a non-managed hook exists and force is false.
 func (i *Installer) Install(hooks map[string][]string) error {
-	if err := os.MkdirAll(i.hooksDir, 0755); err != nil {
-		return fmt.Errorf("creating hooks directory: %w", err)
+	configured := make(map[string]bool, len(hooks))
+	for name, commands := range hooks {
+		if len(commands) > 0 {
+			configured[name] = true
+		}
+	}
+
+	if len(configured) > 0 {
+		if err := os.MkdirAll(i.hooksDir, 0755); err != nil {
+			return fmt.Errorf("creating hooks directory: %w", err)
+		}
 	}
 
 	installed := 0
-	for name, commands := range hooks {
-		if len(commands) == 0 {
+	for _, name := range supportedGitHooks {
+		if !configured[name] {
 			continue
 		}
 
@@ -102,7 +113,7 @@ func (i *Installer) Install(hooks map[string][]string) error {
 			}
 		}
 
-		script := generateScript(name, commands)
+		script := generateScript(name, hooks[name])
 		if err := os.WriteFile(hookPath, []byte(script), 0755); err != nil {
 			return fmt.Errorf("writing hook %s: %w", name, err)
 		}
@@ -110,18 +121,77 @@ func (i *Installer) Install(hooks map[string][]string) error {
 		fmt.Printf("  ✓ Installed %s\n", name)
 	}
 
-	if installed == 0 {
-		fmt.Println("No git hooks to install.")
+	removed, remaining, err := i.pruneStaleHooks(configured)
+	if err != nil {
+		return err
+	}
+
+	if installed == 0 && removed == 0 {
+		if len(hooks) > 0 {
+			fmt.Println("No git hooks to install.")
+		}
 		return nil
 	}
 
-	// Configure git to use .hooks/ directory
-	if err := setHooksPath(hooksDirectory); err != nil {
-		return fmt.Errorf("setting core.hooksPath: %w", err)
+	if installed > 0 {
+		// Configure git to use .hooks/ directory
+		if err := setHooksPath(hooksDirectory); err != nil {
+			return fmt.Errorf("setting core.hooksPath: %w", err)
+		}
+		if removed > 0 {
+			fmt.Printf("\n%d git hook(s) installed to %s, %d stale hook(s) removed\n", installed, hooksDirectory, removed)
+		} else {
+			fmt.Printf("\n%d git hook(s) installed to %s\n", installed, hooksDirectory)
+		}
+		return nil
 	}
 
-	fmt.Printf("\n%d git hook(s) installed to %s\n", installed, hooksDirectory)
+	// Nothing installed, only stale hooks pruned. Reset core.hooksPath when
+	// .hooks/ is now empty; keep it while user-created hooks remain active.
+	if remaining == 0 {
+		_ = unsetHooksPath()
+		fmt.Printf("\n%d stale git hook(s) removed; core.hooksPath reset\n", removed)
+	} else {
+		fmt.Printf("\n%d stale git hook(s) removed\n", removed)
+	}
 	return nil
+}
+
+// pruneStaleHooks deletes managed hook scripts whose names are no longer
+// configured. Non-managed (user-created) hooks are never touched. Returns the
+// number of removed scripts and how many files remain in .hooks/ afterwards.
+func (i *Installer) pruneStaleHooks(configured map[string]bool) (removed, remaining int, err error) {
+	if !exists(i.hooksDir) {
+		return 0, 0, nil
+	}
+
+	for _, name := range supportedGitHooks {
+		if configured[name] {
+			continue
+		}
+		hookPath := filepath.Join(i.hooksDir, name)
+		if !exists(hookPath) {
+			continue
+		}
+		managed, checkErr := i.isManagedHook(hookPath)
+		if checkErr != nil {
+			return removed, 0, fmt.Errorf("checking hook %s: %w", name, checkErr)
+		}
+		if !managed {
+			continue
+		}
+		if removeErr := os.Remove(hookPath); removeErr != nil {
+			return removed, 0, fmt.Errorf("removing stale hook %s: %w", name, removeErr)
+		}
+		removed++
+		fmt.Printf("  ✓ Removed %s (no longer in config)\n", name)
+	}
+
+	entries, readErr := os.ReadDir(i.hooksDir)
+	if readErr != nil {
+		return removed, 0, fmt.Errorf("reading hooks directory: %w", readErr)
+	}
+	return removed, len(entries), nil
 }
 
 // setHooksPath configures git to read hooks from the given directory.

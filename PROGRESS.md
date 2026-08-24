@@ -32,7 +32,7 @@
 | 21 | P0 Test Coverage Completion (QA audit) | Complete | 100% |
 | 22 | Atomic Git Push Default | Complete | 100% |
 
-**Last Updated:** 2026-04-21
+**Last Updated:** 2026-08-25
 **Active Developer:** Claude
 **Current Version:** v0.1.3 (Phase 22 complete — production-ready)
 
@@ -634,6 +634,8 @@
 - [x] BUG: `latestVersionToTag()` hardcoded a `v` prefix instead of using the `tagName` template from config (2026-03-23) → In environments without a config file (default `tagName: "${version}"`), the tag was created as `0.1.0-main.0` while the changelog searched for `v0.1.0-main.0`. Fix: `latestVersionToTag()` now uses `renderTagName(tagNameTemplate, version)`. The `v` prefix is stripped from the version before applying the template, preventing `vv` duplication.
 - [x] BUG: With changelog disabled, `git commit` produced "nothing to commit" error (2026-03-30) → With changelog and bumper disabled, there are no staged changes, but commit was attempted. Fix: `HasStagedChanges()` check added; if there are no staged changes, the commit is skipped and a verbose log entry is written.
 - [x] BUG: When `tagName` config changed, old-format tags were being found as latest (2026-03-30) → Transitioning from `v${version}` → `${version}`, `GetLatestTag` still found `v1.5.0`, and the changelog searched for the `1.5.0` tag (which doesn't exist). Fix: `matchesTagNameFormat()` added for tag format filtering. A fallback mechanism for version continuity across format transitions, plus a raw tag fallback in changelog.
+- [x] BUG: `hooks install` never pruned hooks removed from config (2026-08-25) → User report: preCommit was deleted from config, `hooks install` re-run, yet the pre-commit hook kept firing. `Install()` was purely additive — it only wrote configured hooks and never looked at previously installed managed scripts, and with an empty hooks section the CLI returned early before the installer ran at all, so `.hooks/<name>` + `core.hooksPath` stayed active forever. Fix: `Install()` now reconciles — managed hooks missing from config are deleted (`✓ Removed <name> (no longer in config)`), user-created hooks are never touched, hooks are written in deterministic `supportedGitHooks` order, `.hooks/` is no longer created when nothing is configured, and when a prune empties `.hooks/` entirely `core.hooksPath` is reset. CLI early-return removed so pruning runs even with an empty hooks section. 6 new unit tests + 2 new CLI tests.
+- [x] BUG: `TestInstall_SkipsEmptyCommands` mutated the developer's repo git config (2026-08-25) → The test ran `Install()` without the `commandExecutor` mock while one hook (`{""}`) was actually written, so a real `git config core.hooksPath .hooks` executed in the test cwd — the release-it-go repo itself — silently disabling all repo git hooks (no `.hooks/` dir exists here). Found while investigating the prune bug: the repo's local config had the stray `core.hooksPath=.hooks` entry. Fix: `mockGitCommands(t)` added to the test; the polluted config entry was manually unset.
 - [x] BUG: With `push: false`, "no upstream configured" error still appeared (2026-02-18) → `checkUpstream()` only looked at the `requireUpstream` flag, not the `push` state. In manually written configs with `push: false` and `requireUpstream` unspecified, the default `true` triggered the upstream check. The init wizard masked this by setting `requireUpstream = false`, but the actual check function had the bug. Fix: `!g.config.Push` check added inside `checkUpstream()`; when push is disabled, the upstream check is skipped. Test added.
 
 ---
@@ -707,6 +709,7 @@
 | 2026-04-16 | Claude | docs: CONTRIBUTING.md and TROUBLESHOOTING.md added — onboarding for new developers + common issue reference |
 | 2026-04-17 | Claude | Phase 21 complete: P0 test coverage gaps closed — runCheckMsg, hooks install/remove, runInit dispatcher, runner github/gitlab dry-run integration; cli 58.8%→84.9%, runner 78.1%→83.5%; zero production code changes |
 | 2026-04-21 | Claude | Phase 22 complete: --atomic added to default git.pushArgs to prevent orphan tags in parallel CI runs; behavior change is opt-out via config; coverage preserved |
+| 2026-08-25 | Claude | fix: `hooks install` now prunes managed hooks removed from config (reconciliation model), resets core.hooksPath when .hooks/ empties, no longer creates .hooks/ with nothing configured; deterministic install order; test isolation fix (TestInstall_SkipsEmptyCommands ran real `git config` against the developer repo) |
 
 ---
 
