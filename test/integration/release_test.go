@@ -336,6 +336,52 @@ func TestIntegration_BreakingChangeAutoMajor(t *testing.T) {
 	assertTagExists(t, dir, "v2.0.0")
 }
 
+func TestIntegration_BreakingChangeFooter_AutoMajor(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	_ = os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+
+	initGitRepo(t, dir)
+	createTag(t, dir, "v1.0.0")
+	// Spec-canonical breaking change: plain feat subject + BREAKING CHANGE footer
+	createCommits(t, dir, []string{
+		"feat: overhaul API\n\nBREAKING CHANGE: the /v1 endpoints were removed",
+	})
+
+	cfg := newTestConfig(dir)
+	// Don't set Increment — the footer alone must drive the major bump
+
+	r := runner.NewRunner(cfg)
+	err := r.Run()
+	if err != nil {
+		t.Fatalf("Run() failed: %v", err)
+	}
+
+	// Footer-based breaking change should result in major bump: 1.0.0 -> 2.0.0
+	assertTagExists(t, dir, "v2.0.0")
+
+	content, readErr := os.ReadFile(filepath.Join(dir, "CHANGELOG.md"))
+	if readErr != nil {
+		t.Fatalf("reading CHANGELOG.md: %v", readErr)
+	}
+	changelogText := string(content)
+	if !strings.Contains(changelogText, "### BREAKING CHANGES") {
+		t.Error("expected BREAKING CHANGES section in changelog")
+	}
+	if !strings.Contains(changelogText, "the /v1 endpoints were removed") {
+		t.Error("expected footer text in BREAKING CHANGES section")
+	}
+	// Commit hashes must render now that the pipeline carries them
+	if !strings.Contains(changelogText, "* overhaul API (") {
+		t.Errorf("expected commit hash after entry, changelog was:\n%s", changelogText)
+	}
+}
+
 func TestIntegration_BumperFileUpdate(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")

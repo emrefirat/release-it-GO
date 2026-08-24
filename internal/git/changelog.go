@@ -77,14 +77,27 @@ func (g *Git) GetCommitsWithHashSinceTag(tag string) ([]CommitInfo, error) {
 	return commits, nil
 }
 
-// GetCommitsSinceTag returns commit subject lines since the given tag.
-// If tag is empty, returns all commits.
-func (g *Git) GetCommitsSinceTag(tag string) ([]string, error) {
+// FullCommit holds a commit's short hash and complete message
+// (subject + body + footers).
+type FullCommit struct {
+	Hash    string
+	Message string
+}
+
+// fullCommitFormat renders "<short-hash> US <full-message> RS" per commit.
+// The ASCII unit/record separators let multi-line bodies survive parsing,
+// which subject-only formats (%s) cannot: BREAKING CHANGE footers live in
+// the body.
+const fullCommitFormat = "--pretty=format:%h%x1f%B%x1e"
+
+// GetFullCommitsSinceTag returns commits with hash and full message since the
+// given tag. If tag is empty, returns all commits.
+func (g *Git) GetFullCommitsSinceTag(tag string) ([]FullCommit, error) {
 	var args []string
 	if tag == "" {
-		args = []string{"log", "--pretty=format:%s"}
+		args = []string{"log", fullCommitFormat}
 	} else {
-		args = []string{"log", tag + "..HEAD", "--pretty=format:%s"}
+		args = []string{"log", tag + "..HEAD", fullCommitFormat}
 	}
 
 	out, err := g.runSilent(args...)
@@ -92,18 +105,23 @@ func (g *Git) GetCommitsSinceTag(tag string) ([]string, error) {
 		return nil, fmt.Errorf("getting commits since %s: %w", tag, err)
 	}
 
-	trimmed := strings.TrimSpace(out)
-	if trimmed == "" {
-		return nil, nil
-	}
-
-	lines := strings.Split(trimmed, "\n")
-	commits := make([]string, 0, len(lines))
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line != "" {
-			commits = append(commits, line)
+	records := strings.Split(out, "\x1e")
+	commits := make([]FullCommit, 0, len(records))
+	for _, rec := range records {
+		rec = strings.TrimSpace(rec)
+		if rec == "" {
+			continue
 		}
+		parts := strings.SplitN(rec, "\x1f", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		hash := strings.TrimSpace(parts[0])
+		message := strings.TrimSpace(parts[1])
+		if hash == "" || message == "" {
+			continue
+		}
+		commits = append(commits, FullCommit{Hash: hash, Message: message})
 	}
 
 	return commits, nil

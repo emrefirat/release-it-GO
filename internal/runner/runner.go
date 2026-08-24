@@ -96,16 +96,9 @@ func (r *Runner) RunChangelogOnly() error {
 		return err
 	}
 
-	latestTag := latestVersionToTag(r.ctx.LatestVersion, r.ctx.Config.Git.TagName)
-
-	commits, err := r.ctx.Git.GetCommitsSinceTag(latestTag)
+	rawCommits, err := r.commitsSinceLatestRelease()
 	if err != nil {
 		return fmt.Errorf("getting commits: %w", err)
-	}
-
-	rawCommits := make([]changelog.RawCommit, len(commits))
-	for i, msg := range commits {
-		rawCommits[i] = changelog.RawCommit{Hash: "", Message: msg}
 	}
 
 	parsed := changelog.ParseCommits(rawCommits)
@@ -634,18 +627,39 @@ func (r *Runner) bumpFiles() error {
 	return nil
 }
 
-// autoDetectIncrement uses conventional commits to determine the bump type.
-func (r *Runner) autoDetectIncrement() string {
+// commitsSinceLatestRelease returns raw commits (hash + full message) since
+// the latest release tag, ready for the conventional-commit parser. Full
+// messages matter: BREAKING CHANGE footers live in the body, which
+// subject-only fetching silently dropped. Falls back to the raw git tag when
+// the rendered tag name doesn't exist (tag format transitions, e.g. old
+// "v1.1.0" tags with a new "${version}" template).
+func (r *Runner) commitsSinceLatestRelease() ([]changelog.RawCommit, error) {
 	latestTag := latestVersionToTag(r.ctx.LatestVersion, r.ctx.Config.Git.TagName)
 
-	commits, err := r.ctx.Git.GetCommitsSinceTag(latestTag)
-	if err != nil || len(commits) == 0 {
-		return "patch"
+	commits, err := r.ctx.Git.GetFullCommitsSinceTag(latestTag)
+	if err != nil && latestTag != "" {
+		rawTag, rawErr := r.ctx.Git.GetLatestTag()
+		if rawErr == nil && rawTag != latestTag {
+			r.ctx.Logger.Debug("tag %q not found, falling back to %q", latestTag, rawTag)
+			commits, err = r.ctx.Git.GetFullCommitsSinceTag(rawTag)
+		}
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	rawCommits := make([]changelog.RawCommit, len(commits))
-	for i, msg := range commits {
-		rawCommits[i] = changelog.RawCommit{Hash: "", Message: msg}
+	for i, c := range commits {
+		rawCommits[i] = changelog.RawCommit{Hash: c.Hash, Message: c.Message}
+	}
+	return rawCommits, nil
+}
+
+// autoDetectIncrement uses conventional commits to determine the bump type.
+func (r *Runner) autoDetectIncrement() string {
+	rawCommits, err := r.commitsSinceLatestRelease()
+	if err != nil || len(rawCommits) == 0 {
+		return "patch"
 	}
 
 	parsed := changelog.ParseCommits(rawCommits)
@@ -690,26 +704,10 @@ func (r *Runner) generateChangelog() error {
 
 	r.ctx.Spinner.Start("Changelog generated")
 
-	latestTag := latestVersionToTag(r.ctx.LatestVersion, r.ctx.Config.Git.TagName)
-
-	commits, err := r.ctx.Git.GetCommitsSinceTag(latestTag)
-	if err != nil && latestTag != "" {
-		// Tag not found with current format — try the raw tag from git
-		// (handles format transition: e.g., old "v1.1.0" vs new "${version}")
-		rawTag, rawErr := r.ctx.Git.GetLatestTag()
-		if rawErr == nil && rawTag != latestTag {
-			r.ctx.Logger.Debug("tag %q not found, falling back to %q", latestTag, rawTag)
-			commits, err = r.ctx.Git.GetCommitsSinceTag(rawTag)
-		}
-	}
+	rawCommits, err := r.commitsSinceLatestRelease()
 	if err != nil {
 		r.ctx.Spinner.Stop(false)
 		return fmt.Errorf("getting commits: %w", err)
-	}
-
-	rawCommits := make([]changelog.RawCommit, len(commits))
-	for i, msg := range commits {
-		rawCommits[i] = changelog.RawCommit{Hash: "", Message: msg}
 	}
 
 	parsed := changelog.ParseCommits(rawCommits)
@@ -1059,7 +1057,7 @@ func renderTagName(template string, version string) string {
 // latestVersionToTag converts LatestVersion to a git tag for commit range queries.
 // Uses the tagName template from config to build the correct tag name.
 // Returns empty string for initial release (0.0.0) since no tag exists yet,
-// which causes GetCommitsSinceTag to return all commits.
+// which causes GetFullCommitsSinceTag to return all commits.
 func latestVersionToTag(latestVersion string, tagNameTemplate string) string {
 	if latestVersion == "" || latestVersion == "0.0.0" {
 		return ""

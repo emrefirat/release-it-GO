@@ -4,6 +4,7 @@
 
 ### Bug Fixes
 
+* `BREAKING CHANGE:` footers now trigger a major bump and populate the BREAKING CHANGES changelog section. The pipeline previously fetched only commit subject lines, so the spec-canonical footer form was silently analyzed as minor/patch and only `feat!:` worked. Commit hashes now render in changelog entries, multiline footer values are parsed, and conventional-commit auto-increment applies the same tag-format-transition fallback the changelog already had.
 * default `github.host` (`api.github.com`) was resolved as a GitHub Enterprise host, so every GitHub API call targeted the nonexistent `https://api.github.com/api/v3` path and failed with 404. The default is now `github.com` and `api.github.com` is accepted as an alias for the public API.
 * GitLab TLS verification is now **on by default**: the zero value of `gitlab.secure` used to disable certificate verification, sending the API token over unverified TLS in every default-config run. Self-signed instances should set `gitlab.certificateAuthorityFile`(`Ref`) or explicitly opt out with `secure: false`. An invalid CA file no longer installs an empty root pool (which broke all connections with an opaque x509 error); it warns and falls back to the system roots.
 * `hooks install` now prunes managed git hooks that were removed from the config (and resets `core.hooksPath` when none remain), instead of leaving stale hooks active forever.

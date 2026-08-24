@@ -12,7 +12,7 @@
 | 2 | Varsayılan `github.host: "api.github.com"` → Enterprise çözümlemesi → tüm GitHub API 404 | KRİTİK | ✅ Bu faz |
 | 3 | GitLab `secure` sıfır değeri → `InsecureSkipVerify=true` (varsayılanda TLS doğrulaması kapalı) | KRİTİK | ✅ Bu faz |
 | 4 | Geçersiz CA dosyası boş root pool kuruyor (tüm bağlantılar opak x509 hatasıyla düşer) | ORTA (3'e bağlı) | ✅ Bu faz |
-| 5 | `BREAKING CHANGE:` footer'ları işlenmiyor (git log yalnız `%s` çekiyor) → major bump çalışmıyor | KRİTİK | ⬜ |
+| 5 | `BREAKING CHANGE:` footer'ları işlenmiyor (git log yalnız `%s` çekiyor) → major bump çalışmıyor | KRİTİK | ✅ Bu faz |
 | 6 | `before:release` / `after:release` hook'ları hiç tetiklenmiyor | YÜKSEK | ⬜ |
 | 7 | Config `ci`/`dry-run`/`verbose` alanları unset flag'lerce eziliyor (`Flags().Changed` yok) | YÜKSEK | ⬜ |
 | 8 | Webhook gizli URL'leri hata mesajlarına sızıyor (`*url.Error`) | YÜKSEK | ⬜ |
@@ -41,6 +41,15 @@ if host == "" || host == "github.com" || host == "api.github.com" {
 - `secure: false` **açık opt-out** olarak korunuyor (self-signed, CA'sız instance'lar).
 - Davranış değişikliği opt-out'tur (Faz 22 `--atomic` modeliyle aynı): TROUBLESHOOTING'e `x509: certificate signed by unknown authority` girdisi eklendi.
 - Geçersiz PEM içeren CA dosyası artık boş pool kurmuyor; uyarı + sistem köklerine düşüş.
+
+### BREAKING CHANGE footer işleme (madde 5)
+
+- `internal/git/changelog.go`: yeni `GetFullCommitsSinceTag` — `--pretty=format:%h%x1f%B%x1e` (ASCII unit/record separator) ile hash + **tam mesaj** çekiyor; `%s` yalnız konu satırını getirdiğinden gövdedeki footer'lar parser'a hiç ulaşmıyordu.
+- `internal/runner/runner.go`: yeni `commitsSinceLatestRelease()` helper'ı — üç çağrı noktası (`RunChangelogOnly`, `autoDetectIncrement`, `generateChangelog`) tek kaynağa indi; raw-tag fallback'i artık **hepsinde tutarlı** (önceden yalnız changelog'da vardı: tag format geçişinde auto-increment sessizce hep "patch" dönüyordu — denetim M9 bunu da kapattı).
+- `internal/changelog/parser.go`: çok satırlı footer değerleri (git trailer devam satırları) artık destekleniyor — önceden tek devam satırı TÜM footer bölümünü düşürüyordu (denetim A14; A1 düzeltilince tetiklenecek gizli bug).
+- Yan kazanım: commit hash'leri artık pipeline'da taşındığından changelog girdilerinde `(abc1234)` hash/link ilk kez gerçekten render ediliyor (denetim A10).
+- Ölü kod temizliği: üretimde kullanımı kalmayan `GetCommitsSinceTag` ve 3 testi silindi.
+- Uçtan uca kanıt: `feat: overhaul API` + `BREAKING CHANGE:` gövdeli commit → `1.0.0 → 2.0.0`, changelog'da `### BREAKING CHANGES` bölümü + hash.
 
 ### Regresyon testleri (gönderildiği haliyle varsayılanlar)
 

@@ -62,6 +62,9 @@ func ParseCommit(raw string, hash string) *Commit {
 
 // parseBodyAndFooters splits the remaining commit text into body and footers.
 // Footers follow the git trailer convention: "Token: value" or "Token #value".
+// A footer value may span multiple lines (git trailers and the conventional
+// commits spec both allow it): non-footer lines in the trailing section are
+// folded into the preceding footer's value.
 func parseBodyAndFooters(text string) (string, []Footer) {
 	if text == "" {
 		return "", nil
@@ -69,11 +72,13 @@ func parseBodyAndFooters(text string) (string, []Footer) {
 
 	lines := strings.Split(text, "\n")
 	var footers []Footer
-	var bodyLines []string
 
-	// Scan from the end to find where footers begin
+	// Scan from the end to find where footers begin. A non-footer line is a
+	// continuation of a footer only when a footer-like line sits above it
+	// before any blank line.
 	footerStartIdx := len(lines)
-	for i := len(lines) - 1; i >= 0; i-- {
+	i := len(lines) - 1
+	for i >= 0 {
 		line := strings.TrimSpace(lines[i])
 		if line == "" {
 			// Empty line breaks footer section from body
@@ -81,20 +86,38 @@ func parseBodyAndFooters(text string) (string, []Footer) {
 		}
 		if isFooterLine(line) {
 			footerStartIdx = i
-		} else {
-			break
+			i--
+			continue
 		}
+		// Possible continuation line — look upward for its footer token.
+		j := i - 1
+		for j >= 0 && strings.TrimSpace(lines[j]) != "" && !isFooterLine(strings.TrimSpace(lines[j])) {
+			j--
+		}
+		if j >= 0 && strings.TrimSpace(lines[j]) != "" && isFooterLine(strings.TrimSpace(lines[j])) {
+			footerStartIdx = j
+			i = j - 1
+			continue
+		}
+		break
 	}
 
-	bodyLines = lines[:footerStartIdx]
+	bodyLines := lines[:footerStartIdx]
 	for i := footerStartIdx; i < len(lines); i++ {
 		line := strings.TrimSpace(lines[i])
 		if line == "" {
 			continue
 		}
-		token, value := parseFooterLine(line)
-		if token != "" {
-			footers = append(footers, Footer{Token: token, Value: value})
+		if isFooterLine(line) {
+			token, value := parseFooterLine(line)
+			if token != "" {
+				footers = append(footers, Footer{Token: token, Value: value})
+			}
+			continue
+		}
+		// Continuation of the previous footer's value
+		if len(footers) > 0 {
+			footers[len(footers)-1].Value += "\n" + line
 		}
 	}
 

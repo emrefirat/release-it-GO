@@ -766,8 +766,8 @@ func TestRunner_GenerateChangelog_Enabled_WithCommits(t *testing.T) {
 		output string
 		err    error
 	}{
-		"git log v1.0.0..HEAD --pretty=format:%s": {
-			output: "feat: add new feature\nfix: fix a bug\nchore: update deps",
+		"git log v1.0.0..HEAD --pretty=format:%h%x1f%B%x1e": {
+			output: "abc0001\x1ffeat: add new feature\x1e\nabc0002\x1ffix: fix a bug\x1e\nabc0003\x1fchore: update deps\x1e",
 			err:    nil,
 		},
 	})
@@ -801,8 +801,8 @@ func TestRunner_GenerateChangelog_Enabled_NoPrefix(t *testing.T) {
 		err    error
 	}{
 		// TagName="${version}" so tag has no prefix: 2.0.0
-		"git log 2.0.0..HEAD --pretty=format:%s": {
-			output: "feat: something new",
+		"git log 2.0.0..HEAD --pretty=format:%h%x1f%B%x1e": {
+			output: "abc0004\x1ffeat: something new\x1e",
 			err:    nil,
 		},
 	})
@@ -836,8 +836,8 @@ func TestRunner_GenerateChangelog_Enabled_LatestVersionWithVPrefix(t *testing.T)
 		err    error
 	}{
 		// If latest version already has "v" prefix, it should not be doubled
-		"git log v1.0.0..HEAD --pretty=format:%s": {
-			output: "fix: patch fix",
+		"git log v1.0.0..HEAD --pretty=format:%h%x1f%B%x1e": {
+			output: "abc0005\x1ffix: patch fix\x1e",
 			err:    nil,
 		},
 	})
@@ -870,7 +870,7 @@ func TestRunner_GenerateChangelog_GetCommitsError(t *testing.T) {
 		output string
 		err    error
 	}{
-		"git log v1.0.0..HEAD --pretty=format:%s": {
+		"git log v1.0.0..HEAD --pretty=format:%h%x1f%B%x1e": {
 			output: "",
 			err:    fmt.Errorf("git error"),
 		},
@@ -907,8 +907,8 @@ func TestRunner_GenerateChangelog_UpdateFile(t *testing.T) {
 		output string
 		err    error
 	}{
-		"git log v1.0.0..HEAD --pretty=format:%s": {
-			output: "feat: new feature",
+		"git log v1.0.0..HEAD --pretty=format:%h%x1f%B%x1e": {
+			output: "abc0006\x1ffeat: new feature\x1e",
 			err:    nil,
 		},
 		"git add " + changelogFile: {
@@ -955,8 +955,8 @@ func TestRunner_GenerateChangelog_DryRun_DoesNotWriteFile(t *testing.T) {
 		output string
 		err    error
 	}{
-		"git log v1.0.0..HEAD --pretty=format:%s": {
-			output: "feat: new feature",
+		"git log v1.0.0..HEAD --pretty=format:%h%x1f%B%x1e": {
+			output: "abc0007\x1ffeat: new feature\x1e",
 			err:    nil,
 		},
 	})
@@ -992,8 +992,8 @@ func TestRunner_GenerateChangelog_KeepAChangelog(t *testing.T) {
 		output string
 		err    error
 	}{
-		"git log v1.0.0..HEAD --pretty=format:%s": {
-			output: "feat: add login\nfix: resolve crash",
+		"git log v1.0.0..HEAD --pretty=format:%h%x1f%B%x1e": {
+			output: "abc0008\x1ffeat: add login\x1e\nabc0009\x1ffix: resolve crash\x1e",
 			err:    nil,
 		},
 	})
@@ -1333,6 +1333,66 @@ func (m *sequentialMockPrompter) Select(question string, options []string, defau
 
 // --- autoDetectIncrement tests ---
 
+func TestRunner_AutoDetectIncrement_BreakingChangeFooter(t *testing.T) {
+	cfg := &config.Config{
+		CI: true,
+		Git: config.GitConfig{
+			TagName: "v${version}",
+		},
+	}
+
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{
+		"git log v1.0.0..HEAD --pretty=format:%h%x1f%B%x1e": {
+			output: "abc1234\x1ffeat: change API\n\nBREAKING CHANGE: the old endpoints were removed\x1e",
+			err:    nil,
+		},
+	})
+
+	runner.ctx.LatestVersion = "1.0.0"
+
+	result := runner.autoDetectIncrement()
+	if result != "major" {
+		t.Errorf("expected major for BREAKING CHANGE footer (spec-canonical form), got %s", result)
+	}
+}
+
+func TestRunner_AutoDetectIncrement_TagFormatTransition_FallsBackToRawTag(t *testing.T) {
+	cfg := &config.Config{
+		CI: true,
+		Git: config.GitConfig{
+			TagName: "${version}", // new format — but repo's latest tag is v-prefixed
+		},
+	}
+
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{
+		"git log 1.1.0..HEAD --pretty=format:%h%x1f%B%x1e": {
+			output: "",
+			err:    fmt.Errorf("fatal: ambiguous argument '1.1.0..HEAD': unknown revision"),
+		},
+		"git describe --tags --abbrev=0": {
+			output: "v1.1.0",
+			err:    nil,
+		},
+		"git log v1.1.0..HEAD --pretty=format:%h%x1f%B%x1e": {
+			output: "abc1234\x1ffeat: new capability\x1e",
+			err:    nil,
+		},
+	})
+
+	runner.ctx.LatestVersion = "1.1.0"
+
+	result := runner.autoDetectIncrement()
+	if result != "minor" {
+		t.Errorf("expected minor via raw-tag fallback (was silently 'patch' before), got %s", result)
+	}
+}
+
 func TestRunner_AutoDetectIncrement_FeatCommit(t *testing.T) {
 	cfg := &config.Config{
 		CI: true,
@@ -1345,8 +1405,8 @@ func TestRunner_AutoDetectIncrement_FeatCommit(t *testing.T) {
 		output string
 		err    error
 	}{
-		"git log v1.0.0..HEAD --pretty=format:%s": {
-			output: "feat: add new feature\nfix: fix something",
+		"git log v1.0.0..HEAD --pretty=format:%h%x1f%B%x1e": {
+			output: "abc000e\x1ffeat: add new feature\x1e\nabc000f\x1ffix: fix something\x1e",
 			err:    nil,
 		},
 	})
@@ -1371,8 +1431,8 @@ func TestRunner_AutoDetectIncrement_FixCommitOnly(t *testing.T) {
 		output string
 		err    error
 	}{
-		"git log v1.0.0..HEAD --pretty=format:%s": {
-			output: "fix: fix bug A\nfix: fix bug B",
+		"git log v1.0.0..HEAD --pretty=format:%h%x1f%B%x1e": {
+			output: "abc0010\x1ffix: fix bug A\x1e\nabc0011\x1ffix: fix bug B\x1e",
 			err:    nil,
 		},
 	})
@@ -1397,8 +1457,8 @@ func TestRunner_AutoDetectIncrement_BreakingChange(t *testing.T) {
 		output string
 		err    error
 	}{
-		"git log v1.0.0..HEAD --pretty=format:%s": {
-			output: "feat!: breaking change\nfix: fix something",
+		"git log v1.0.0..HEAD --pretty=format:%h%x1f%B%x1e": {
+			output: "abc0012\x1ffeat!: breaking change\x1e\nabc0013\x1ffix: fix something\x1e",
 			err:    nil,
 		},
 	})
@@ -1423,7 +1483,7 @@ func TestRunner_AutoDetectIncrement_NoCommits(t *testing.T) {
 		output string
 		err    error
 	}{
-		"git log v1.0.0..HEAD --pretty=format:%s": {
+		"git log v1.0.0..HEAD --pretty=format:%h%x1f%B%x1e": {
 			output: "",
 			err:    nil,
 		},
@@ -1449,7 +1509,7 @@ func TestRunner_AutoDetectIncrement_GitError(t *testing.T) {
 		output string
 		err    error
 	}{
-		"git log v1.0.0..HEAD --pretty=format:%s": {
+		"git log v1.0.0..HEAD --pretty=format:%h%x1f%B%x1e": {
 			output: "",
 			err:    fmt.Errorf("git log failed"),
 		},
@@ -1475,8 +1535,8 @@ func TestRunner_AutoDetectIncrement_NonConventionalCommits(t *testing.T) {
 		output string
 		err    error
 	}{
-		"git log v1.0.0..HEAD --pretty=format:%s": {
-			output: "update readme\nsome random change",
+		"git log v1.0.0..HEAD --pretty=format:%h%x1f%B%x1e": {
+			output: "abc0014\x1fupdate readme\x1e\nabc0015\x1fsome random change\x1e",
 			err:    nil,
 		},
 	})
@@ -1501,7 +1561,7 @@ func TestRunner_AutoDetectIncrement_EmptyLatestVersion(t *testing.T) {
 		output string
 		err    error
 	}{
-		"git log v..HEAD --pretty=format:%s": {
+		"git log v..HEAD --pretty=format:%h%x1f%B%x1e": {
 			output: "",
 			err:    fmt.Errorf("bad range"),
 		},
@@ -1529,8 +1589,8 @@ func TestRunner_DetermineSemVer_Interactive_SelectVersion(t *testing.T) {
 		output string
 		err    error
 	}{
-		"git log v1.0.0..HEAD --pretty=format:%s": {
-			output: "fix: some fix",
+		"git log v1.0.0..HEAD --pretty=format:%h%x1f%B%x1e": {
+			output: "abc0016\x1ffix: some fix\x1e",
 			err:    nil,
 		},
 	})
@@ -1564,8 +1624,8 @@ func TestRunner_DetermineSemVer_Interactive_SelectVersionError(t *testing.T) {
 		output string
 		err    error
 	}{
-		"git log v1.0.0..HEAD --pretty=format:%s": {
-			output: "fix: some fix",
+		"git log v1.0.0..HEAD --pretty=format:%h%x1f%B%x1e": {
+			output: "abc0017\x1ffix: some fix\x1e",
 			err:    nil,
 		},
 	})
@@ -1596,8 +1656,8 @@ func TestRunner_DetermineSemVer_AutoDetect_Patch(t *testing.T) {
 		output string
 		err    error
 	}{
-		"git log v1.0.0..HEAD --pretty=format:%s": {
-			output: "fix: patch fix",
+		"git log v1.0.0..HEAD --pretty=format:%h%x1f%B%x1e": {
+			output: "abc0018\x1ffix: patch fix\x1e",
 			err:    nil,
 		},
 	})
@@ -1627,8 +1687,8 @@ func TestRunner_DetermineSemVer_AutoDetect_Minor(t *testing.T) {
 		output string
 		err    error
 	}{
-		"git log v1.0.0..HEAD --pretty=format:%s": {
-			output: "feat: new feature",
+		"git log v1.0.0..HEAD --pretty=format:%h%x1f%B%x1e": {
+			output: "abc0019\x1ffeat: new feature\x1e",
 			err:    nil,
 		},
 	})
@@ -1658,8 +1718,8 @@ func TestRunner_DetermineSemVer_AutoDetect_Major(t *testing.T) {
 		output string
 		err    error
 	}{
-		"git log v1.0.0..HEAD --pretty=format:%s": {
-			output: "feat!: breaking change",
+		"git log v1.0.0..HEAD --pretty=format:%h%x1f%B%x1e": {
+			output: "abc001a\x1ffeat!: breaking change\x1e",
 			err:    nil,
 		},
 	})
@@ -2562,15 +2622,15 @@ func TestRunner_Run_FullPipeline_DryRun(t *testing.T) {
 		output string
 		err    error
 	}{
-		"git remote get-url origin":               {output: "https://github.com/testowner/testrepo.git", err: nil},
-		"git rev-parse --abbrev-ref HEAD":         {output: "main", err: nil},
-		"git rev-parse --is-inside-work-tree":     {output: "true", err: nil},
-		"git status --porcelain":                  {output: "", err: nil},
-		"git config user.name":                    {output: "Test User", err: nil},
-		"git config user.email":                   {output: "test@example.com", err: nil},
-		"git describe --tags --abbrev=0":          {output: "v1.0.0", err: nil},
-		"git log v1.0.0..HEAD --pretty=format:%s": {output: "fix: a fix", err: nil},
-		"git tag -l v1.0.1":                       {output: "", err: nil},
+		"git remote get-url origin":                         {output: "https://github.com/testowner/testrepo.git", err: nil},
+		"git rev-parse --abbrev-ref HEAD":                   {output: "main", err: nil},
+		"git rev-parse --is-inside-work-tree":               {output: "true", err: nil},
+		"git status --porcelain":                            {output: "", err: nil},
+		"git config user.name":                              {output: "Test User", err: nil},
+		"git config user.email":                             {output: "test@example.com", err: nil},
+		"git describe --tags --abbrev=0":                    {output: "v1.0.0", err: nil},
+		"git log v1.0.0..HEAD --pretty=format:%h%x1f%B%x1e": {output: "abc001b\x1ffix: a fix\x1e", err: nil},
+		"git tag -l v1.0.1":                                 {output: "", err: nil},
 	})
 
 	err := runner.Run()
@@ -2599,10 +2659,10 @@ func TestRunner_RunChangelogOnly(t *testing.T) {
 		output string
 		err    error
 	}{
-		"git remote get-url origin":               {output: "https://github.com/testowner/testrepo.git", err: nil},
-		"git rev-parse --abbrev-ref HEAD":         {output: "main", err: nil},
-		"git describe --tags --abbrev=0":          {output: "v1.0.0", err: nil},
-		"git log v1.0.0..HEAD --pretty=format:%s": {output: "feat: new feature\nfix: bug fix", err: nil},
+		"git remote get-url origin":                         {output: "https://github.com/testowner/testrepo.git", err: nil},
+		"git rev-parse --abbrev-ref HEAD":                   {output: "main", err: nil},
+		"git describe --tags --abbrev=0":                    {output: "v1.0.0", err: nil},
+		"git log v1.0.0..HEAD --pretty=format:%h%x1f%B%x1e": {output: "abc001c\x1ffeat: new feature\x1e\nabc001d\x1ffix: bug fix\x1e", err: nil},
 	})
 
 	err := runner.RunChangelogOnly()

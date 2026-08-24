@@ -169,6 +169,50 @@ func TestParseCommit_BreakingChangeFooter(t *testing.T) {
 	}
 }
 
+func TestParseCommit_MultilineBreakingChangeFooter(t *testing.T) {
+	raw := "feat: change API\n\nBREAKING CHANGE: the old REST endpoints\nwere removed entirely"
+	c := ParseCommit(raw, "abc1234")
+
+	if c == nil {
+		t.Fatal("ParseCommit() = nil")
+	}
+	if !c.BreakingChange {
+		t.Error("BreakingChange = false, want true (multiline footer value)")
+	}
+	want := "the old REST endpoints\nwere removed entirely"
+	if c.BreakingMessage != want {
+		t.Errorf("BreakingMessage = %q, want %q", c.BreakingMessage, want)
+	}
+}
+
+func TestParseCommit_MultilineFooterAfterBody(t *testing.T) {
+	raw := "fix: harden config\n\nSome body text.\n\nBREAKING CHANGE: dropped support\nfor legacy configs\nReviewed-by: Jane"
+	c := ParseCommit(raw, "abc1234")
+
+	if c == nil {
+		t.Fatal("ParseCommit() = nil")
+	}
+	if c.Body != "Some body text." {
+		t.Errorf("Body = %q, want 'Some body text.'", c.Body)
+	}
+	if len(c.Footers) != 2 {
+		t.Fatalf("len(Footers) = %d, want 2 (BREAKING CHANGE with continuation + Reviewed-by)", len(c.Footers))
+	}
+	if c.Footers[0].Token != "BREAKING CHANGE" {
+		t.Errorf("Footers[0].Token = %q, want 'BREAKING CHANGE'", c.Footers[0].Token)
+	}
+	wantValue := "dropped support\nfor legacy configs"
+	if c.Footers[0].Value != wantValue {
+		t.Errorf("Footers[0].Value = %q, want %q", c.Footers[0].Value, wantValue)
+	}
+	if c.Footers[1].Token != "Reviewed-by" {
+		t.Errorf("Footers[1].Token = %q, want 'Reviewed-by'", c.Footers[1].Token)
+	}
+	if !c.BreakingChange {
+		t.Error("BreakingChange = false, want true")
+	}
+}
+
 func TestParseCommits(t *testing.T) {
 	rawCommits := []RawCommit{
 		{Hash: "aaa", Message: "feat: add feature"},
