@@ -1,10 +1,18 @@
 package release
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/json"
+	"encoding/pem"
+	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -614,6 +622,86 @@ func TestGitLabClient_CreateHTTPClient_SecureMode(t *testing.T) {
 	}
 	if transport.TLSClientConfig.InsecureSkipVerify {
 		t.Error("expected InsecureSkipVerify=false when Secure=true")
+	}
+}
+
+func TestGitLabClient_CreateHTTPClient_DefaultConfig_VerifiesTLS(t *testing.T) {
+	t.Setenv("CI_SERVER_TLS_CA_FILE", "") // keep the default CA ref inert
+	cfg := config.DefaultConfig()
+
+	c := &GitLabClient{
+		config: &cfg.GitLab,
+		logger: applog.NewLogger(0, false),
+	}
+	client := c.createHTTPClient()
+	transport, ok := client.Transport.(*http.Transport)
+	if !ok {
+		t.Fatal("expected *http.Transport")
+	}
+	// Regression guard: the shipped default config must never skip TLS
+	// verification — the token would otherwise travel over unverified TLS.
+	if transport.TLSClientConfig.InsecureSkipVerify {
+		t.Error("default config must not set InsecureSkipVerify")
+	}
+}
+
+// generateTestCAPEM creates a self-signed CA certificate in PEM form.
+func generateTestCAPEM(t *testing.T) []byte {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("generating key: %v", err)
+	}
+	tmpl := &x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		Subject:               pkix.Name{CommonName: "release-it-go test CA"},
+		NotBefore:             time.Now().Add(-time.Hour),
+		NotAfter:              time.Now().Add(time.Hour),
+		IsCA:                  true,
+		KeyUsage:              x509.KeyUsageCertSign,
+		BasicConstraintsValid: true,
+	}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	if err != nil {
+		t.Fatalf("creating certificate: %v", err)
+	}
+	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
+}
+
+func TestGitLabClient_CreateHTTPClient_ValidCAPEM_InstallsRootPool(t *testing.T) {
+	certFile := filepath.Join(t.TempDir(), "ca.pem")
+	if err := os.WriteFile(certFile, generateTestCAPEM(t), 0644); err != nil {
+		t.Fatalf("writing CA file: %v", err)
+	}
+
+	c := &GitLabClient{
+		config: &config.GitLabConfig{CertificateAuthorityFile: certFile, Secure: true},
+		logger: applog.NewLogger(0, false),
+	}
+	client := c.createHTTPClient()
+	transport := client.Transport.(*http.Transport)
+	if transport.TLSClientConfig.RootCAs == nil {
+		t.Error("expected RootCAs pool to be installed for a valid CA file")
+	}
+}
+
+func TestGitLabClient_CreateHTTPClient_InvalidCAPEM_FallsBackToSystemRoots(t *testing.T) {
+	certFile := filepath.Join(t.TempDir(), "ca.pem")
+	invalid := []byte("-----BEGIN CERTIFICATE-----\nnot-a-cert\n-----END CERTIFICATE-----")
+	if err := os.WriteFile(certFile, invalid, 0644); err != nil {
+		t.Fatalf("writing CA file: %v", err)
+	}
+
+	c := &GitLabClient{
+		config: &config.GitLabConfig{CertificateAuthorityFile: certFile, Secure: true},
+		logger: applog.NewLogger(0, false),
+	}
+	client := c.createHTTPClient()
+	transport := client.Transport.(*http.Transport)
+	// An empty root pool would silently break every TLS connection with an
+	// opaque x509 error; invalid PEM must fall back to the system roots.
+	if transport.TLSClientConfig.RootCAs != nil {
+		t.Error("invalid CA PEM must not install an (empty) RootCAs pool")
 	}
 }
 

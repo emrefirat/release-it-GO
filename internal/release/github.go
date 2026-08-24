@@ -75,8 +75,10 @@ func NewGitHubClient(cfg *config.GitHubConfig, repoInfo *git.RepoInfo, logger *a
 }
 
 // resolveGitHubBaseURL determines the API base URL based on the host.
+// "api.github.com" is accepted as an alias for github.com so configs that
+// name the API host directly don't get routed to the Enterprise /api/v3 path.
 func resolveGitHubBaseURL(host string) string {
-	if host == "" || host == "github.com" {
+	if host == "" || host == "github.com" || host == "api.github.com" {
 		return "https://api.github.com"
 	}
 	// GitHub Enterprise

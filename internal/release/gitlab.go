@@ -106,13 +106,18 @@ func (c *GitLabClient) createHTTPClient() *http.Client {
 			c.logger.Warn("failed to load CA certificate %s: %v", caFile, err)
 		} else {
 			caCertPool := x509.NewCertPool()
-			caCertPool.AppendCertsFromPEM(caCert)
-			tlsConfig.RootCAs = caCertPool
+			if !caCertPool.AppendCertsFromPEM(caCert) {
+				// An empty pool would break every TLS connection with an
+				// opaque x509 error; fall back to the system roots instead.
+				c.logger.Warn("no valid certificates found in CA file %s; using system roots", caFile)
+			} else {
+				tlsConfig.RootCAs = caCertPool
+			}
 		}
 	}
 
 	if !c.config.Secure {
-		tlsConfig.InsecureSkipVerify = true //nolint:gosec // User explicitly disabled TLS verification
+		tlsConfig.InsecureSkipVerify = true //nolint:gosec // Explicit opt-out via gitlab.secure=false (default is true)
 	}
 
 	return &http.Client{

@@ -21,7 +21,7 @@ func DefaultConfig() *Config {
 		GitHub: GitHubConfig{
 			ReleaseName: "Release ${version}",
 			MakeLatest:  true,
-			Host:        "api.github.com",
+			Host:        "github.com",
 			TokenRef:    "GITHUB_TOKEN",
 			Comments: GitHubCommentsConfig{
 				Issue: ":rocket: _This issue has been resolved in v${version}._",
@@ -33,6 +33,9 @@ func DefaultConfig() *Config {
 			TokenRef:                    "GITLAB_TOKEN",
 			TokenHeader:                 "Private-Token",
 			CertificateAuthorityFileRef: "CI_SERVER_TLS_CA_FILE",
+			// TLS verification is on by default; secure: false is an explicit
+			// opt-out for self-signed instances without a CA file.
+			Secure: true,
 		},
 		Changelog: ChangelogConfig{
 			Enabled: true,

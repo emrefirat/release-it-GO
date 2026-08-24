@@ -31,6 +31,7 @@
 | 20 | Git Hook Management (install / remove / check-msg) | Complete | 100% |
 | 21 | P0 Test Coverage Completion (QA audit) | Complete | 100% |
 | 22 | Atomic Git Push Default | Complete | 100% |
+| 23 | Critical Correctness & Security Fixes (2026-08 audit P0) | In Progress | 40% |
 
 **Last Updated:** 2026-08-25
 **Active Developer:** Claude
@@ -619,6 +620,32 @@
 
 ---
 
+## Phase 23: Critical Correctness & Security Fixes (2026-08 audit P0)
+
+**Status:** In Progress
+**PRD:** `docs/phase_23.md`
+
+### To Do
+
+- [x] `hooks install` reconciliation — prune managed hooks removed from config (user-reported; committed separately)
+- [x] `github.host` default fix — `"api.github.com"` resolved as Enterprise → all GitHub API calls 404; default now `"github.com"`, alias accepted in resolver
+- [x] GitLab TLS-by-default — `Secure: true` in defaults; `secure: false` stays as explicit opt-out; invalid CA PEM falls back to system roots instead of an empty pool
+- [x] Shipped-defaults regression tests (clients built from `DefaultConfig()`)
+- [ ] Full commit messages (`%B` + hash) into changelog pipeline — `BREAKING CHANGE:` footers currently never trigger major bump
+- [ ] Fire `before:release` / `after:release` lifecycle hooks
+- [ ] Flag precedence via `Flags().Changed()` — config `ci`/`dry-run`/`verbose` currently clobbered
+- [ ] Sanitize webhook errors (secret URL leaks via `*url.Error`)
+- [ ] npm compat `requireBranch` array support
+- [ ] Go toolchain bump ≥1.26.6 (7 stdlib advisories; unblocks `make check` vuln step)
+
+### Notes
+
+- Root cause pattern across the audit: **defaults were never tested as shipped** — two tests even encoded the broken defaults as expected behavior. New regression tests construct clients from `DefaultConfig()` directly.
+- GitLab TLS change is opt-out (Phase 22 `--atomic` model); TROUBLESHOOTING gained an `x509: certificate signed by unknown authority` entry.
+- Full audit findings (~60 items over 4 review streams) are catalogued in the 2026-08-25 session; Phase 24 (distribution/CI trust), 25 (npm parity), 26 (hardening) planned from it.
+
+---
+
 ## Bugs
 
 - [x] BUG: First-release changelog "exit status 128" error (2026-02-16) → When `LatestVersion=0.0.0`, the `v0.0.0` tag was searched but no such tag exists. The `latestVersionToTag()` helper was added: returns empty for `0.0.0` or empty string, so `GetCommitsSinceTag("")` returns all commits. 3 sites affected: `RunChangelogOnly`, `generateChangelog`, `autoDetectIncrement`.
@@ -634,6 +661,8 @@
 - [x] BUG: `latestVersionToTag()` hardcoded a `v` prefix instead of using the `tagName` template from config (2026-03-23) → In environments without a config file (default `tagName: "${version}"`), the tag was created as `0.1.0-main.0` while the changelog searched for `v0.1.0-main.0`. Fix: `latestVersionToTag()` now uses `renderTagName(tagNameTemplate, version)`. The `v` prefix is stripped from the version before applying the template, preventing `vv` duplication.
 - [x] BUG: With changelog disabled, `git commit` produced "nothing to commit" error (2026-03-30) → With changelog and bumper disabled, there are no staged changes, but commit was attempted. Fix: `HasStagedChanges()` check added; if there are no staged changes, the commit is skipped and a verbose log entry is written.
 - [x] BUG: When `tagName` config changed, old-format tags were being found as latest (2026-03-30) → Transitioning from `v${version}` → `${version}`, `GetLatestTag` still found `v1.5.0`, and the changelog searched for the `1.5.0` tag (which doesn't exist). Fix: `matchesTagNameFormat()` added for tag format filtering. A fallback mechanism for version continuity across format transitions, plus a raw tag fallback in changelog.
+- [x] BUG: Default `github.host: "api.github.com"` broke every GitHub API call (2026-08-25) → `resolveGitHubBaseURL` only special-cased `""` and `"github.com"`, so the shipped default fell into the Enterprise branch and produced `https://api.github.com/api/v3` — 404 for release creation, token validation, comments, and uploads. Masked because the project's own config sets `github.release: false` and the unit-test table never covered the shipped default. Fix: default changed to `"github.com"` and `"api.github.com"` added as a public-API alias (protects existing configs that copied the old default). Regression test builds the client from `DefaultConfig()`.
+- [x] BUG: GitLab client skipped TLS verification by default (2026-08-25) → the zero value of `gitlab.secure` is `false` and `createHTTPClient` mapped `!Secure` to `InsecureSkipVerify=true`, so every default-config GitLab release sent the `Private-Token` over unverified TLS; a test even asserted the insecure default as expected behavior. Fix: `Secure: true` in `DefaultConfig()`; `secure: false` remains as an explicit opt-out; docs/example updated. Bonus: an invalid CA file no longer installs an empty root pool (opaque all-connections-fail) — warns and falls back to system roots, with real-certificate coverage via a generated self-signed CA in tests.
 - [x] BUG: `hooks install` never pruned hooks removed from config (2026-08-25) → User report: preCommit was deleted from config, `hooks install` re-run, yet the pre-commit hook kept firing. `Install()` was purely additive — it only wrote configured hooks and never looked at previously installed managed scripts, and with an empty hooks section the CLI returned early before the installer ran at all, so `.hooks/<name>` + `core.hooksPath` stayed active forever. Fix: `Install()` now reconciles — managed hooks missing from config are deleted (`✓ Removed <name> (no longer in config)`), user-created hooks are never touched, hooks are written in deterministic `supportedGitHooks` order, `.hooks/` is no longer created when nothing is configured, and when a prune empties `.hooks/` entirely `core.hooksPath` is reset. CLI early-return removed so pruning runs even with an empty hooks section. 6 new unit tests + 2 new CLI tests.
 - [x] BUG: `TestInstall_SkipsEmptyCommands` mutated the developer's repo git config (2026-08-25) → The test ran `Install()` without the `commandExecutor` mock while one hook (`{""}`) was actually written, so a real `git config core.hooksPath .hooks` executed in the test cwd — the release-it-go repo itself — silently disabling all repo git hooks (no `.hooks/` dir exists here). Found while investigating the prune bug: the repo's local config had the stray `core.hooksPath=.hooks` entry. Fix: `mockGitCommands(t)` added to the test; the polluted config entry was manually unset.
 - [x] BUG: With `push: false`, "no upstream configured" error still appeared (2026-02-18) → `checkUpstream()` only looked at the `requireUpstream` flag, not the `push` state. In manually written configs with `push: false` and `requireUpstream` unspecified, the default `true` triggered the upstream check. The init wizard masked this by setting `requireUpstream = false`, but the actual check function had the bug. Fix: `!g.config.Push` check added inside `checkUpstream()`; when push is disabled, the upstream check is skipped. Test added.
@@ -710,6 +739,7 @@
 | 2026-04-17 | Claude | Phase 21 complete: P0 test coverage gaps closed — runCheckMsg, hooks install/remove, runInit dispatcher, runner github/gitlab dry-run integration; cli 58.8%→84.9%, runner 78.1%→83.5%; zero production code changes |
 | 2026-04-21 | Claude | Phase 22 complete: --atomic added to default git.pushArgs to prevent orphan tags in parallel CI runs; behavior change is opt-out via config; coverage preserved |
 | 2026-08-25 | Claude | fix: `hooks install` now prunes managed hooks removed from config (reconciliation model), resets core.hooksPath when .hooks/ empties, no longer creates .hooks/ with nothing configured; deterministic install order; test isolation fix (TestInstall_SkipsEmptyCommands ran real `git config` against the developer repo) |
+| 2026-08-25 | Claude | Phase 23 (partial): shipped-default fixes — `github.host` no longer resolves to the nonexistent `/api/v3` path (404), GitLab TLS verification on by default (`Secure: true`), invalid CA PEM falls back to system roots; `DefaultConfig()`-based regression tests; docs/phase_23.md PRD created from the 2026-08-25 audit |
 
 ---
 

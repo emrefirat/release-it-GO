@@ -58,8 +58,8 @@ func TestDefaultConfig_GitHubDefaults(t *testing.T) {
 	if !cfg.GitHub.MakeLatest {
 		t.Error("github.makeLatest should be true by default")
 	}
-	if cfg.GitHub.Host != "api.github.com" {
-		t.Errorf("github.host = %q, expected %q", cfg.GitHub.Host, "api.github.com")
+	if cfg.GitHub.Host != "github.com" {
+		t.Errorf("github.host = %q, expected %q", cfg.GitHub.Host, "github.com")
 	}
 	if cfg.GitHub.TokenRef != "GITHUB_TOKEN" {
 		t.Errorf("github.tokenRef = %q, expected %q", cfg.GitHub.TokenRef, "GITHUB_TOKEN")
@@ -77,6 +77,9 @@ func TestDefaultConfig_GitLabDefaults(t *testing.T) {
 	}
 	if cfg.GitLab.TokenHeader != "Private-Token" {
 		t.Errorf("gitlab.tokenHeader = %q, expected %q", cfg.GitLab.TokenHeader, "Private-Token")
+	}
+	if !cfg.GitLab.Secure {
+		t.Error("gitlab.secure should be true by default (TLS verification must be on)")
 	}
 }
 
@@ -161,7 +164,7 @@ func TestLoadConfig_JSONFile(t *testing.T) {
 		t.Error("github.release should be true")
 	}
 	// Defaults should be preserved for unset fields
-	if cfg.GitHub.Host != "api.github.com" {
+	if cfg.GitHub.Host != "github.com" {
 		t.Errorf("github.host should keep default, got %q", cfg.GitHub.Host)
 	}
 	if cfg.ConfigFile != cfgPath {

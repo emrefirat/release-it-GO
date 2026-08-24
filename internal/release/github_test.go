@@ -34,6 +34,7 @@ func TestResolveGitHubBaseURL(t *testing.T) {
 	}{
 		{"", "https://api.github.com"},
 		{"github.com", "https://api.github.com"},
+		{"api.github.com", "https://api.github.com"},
 		{"github.example.com", "https://github.example.com/api/v3"},
 	}
 
@@ -42,6 +43,21 @@ func TestResolveGitHubBaseURL(t *testing.T) {
 		if got != tt.want {
 			t.Errorf("resolveGitHubBaseURL(%q) = %q, want %q", tt.host, got, tt.want)
 		}
+	}
+}
+
+func TestNewGitHubClient_DefaultConfig_UsesPublicAPIBaseURL(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "test-token")
+	cfg := config.DefaultConfig()
+
+	c, err := NewGitHubClient(&cfg.GitHub, testRepoInfo(), testLogger(), false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Regression guard: the shipped default config must target the public
+	// GitHub API, never the Enterprise-style https://.../api/v3 path.
+	if c.baseURL != "https://api.github.com" {
+		t.Errorf("baseURL = %q, want %q", c.baseURL, "https://api.github.com")
 	}
 }
 

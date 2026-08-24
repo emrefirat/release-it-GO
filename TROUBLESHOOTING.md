@@ -204,6 +204,28 @@ Common causes:
 
 ---
 
+### GitLab: `x509: certificate signed by unknown authority`
+
+**Cause**: TLS certificate verification is **on by default**. Self-hosted GitLab instances with a self-signed or private-CA certificate fail verification until the CA is configured.
+
+**Fix** (in order of preference):
+```yaml
+gitlab:
+  # 1. Point at your CA bundle (or use certificateAuthorityFileRef with an env var;
+  #    GitLab CI sets CI_SERVER_TLS_CA_FILE automatically, which is the default ref)
+  certificateAuthorityFile: "/etc/ssl/certs/my-ca.pem"
+
+  # 2. Last resort — explicitly disable verification (token travels over
+  #    unverified TLS; only for isolated/trusted networks)
+  secure: false
+```
+
+Older versions (≤0.3.0) skipped verification unless `secure: true` was set explicitly. If an upgrade surfaced this error, your instance's certificate was never being verified before — configure the CA rather than restoring the old behavior.
+
+If the log warns `no valid certificates found in CA file`, the configured file exists but contains no parseable PEM certificate; the client then falls back to the system trust store.
+
+---
+
 ### Docker: `fatal: detected dubious ownership in repository`
 
 **Cause**: When mounting a host repo into the container, git refuses to operate on a repo owned by a different UID.

@@ -187,8 +187,8 @@ github:
   autoGenerate: false
   # Glob patterns for release assets to upload
   assets: ["dist/*.tar.gz", "dist/*.zip"]
-  # GitHub API host (change for GitHub Enterprise)
-  host: "api.github.com"
+  # GitHub host (change for GitHub Enterprise, e.g. "github.mycompany.com")
+  host: "github.com"
   # Environment variable name containing GitHub token
   tokenRef: "GITHUB_TOKEN"
   # API request timeout in seconds
@@ -226,8 +226,9 @@ gitlab:
   origin: "https://gitlab.example.com"
   # Skip GitLab API pre-flight checks
   skipChecks: false
-  # Use HTTPS for API calls
-  secure: false
+  # Verify TLS certificates (default true; set false only for self-signed
+  # instances without a CA file — the token then travels over unverified TLS)
+  secure: true
 
 # Lifecycle hooks — run shell commands at specific points
 hooks:

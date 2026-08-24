@@ -198,7 +198,7 @@ github:
   makeLatest: true                      # Mark as latest release (default: true)
   autoGenerate: false                   # Auto-generate notes via GitHub API
   assets: []                            # Glob patterns for assets to upload
-  host: "api.github.com"               # API host (change for Enterprise)
+  host: "github.com"                   # GitHub host (change for Enterprise)
   tokenRef: "GITHUB_TOKEN"             # Env var with GitHub token
   timeout: 0                            # API timeout in seconds (0 = default)
   proxy: ""                             # HTTP proxy URL
@@ -230,7 +230,7 @@ gitlab:
   origin: ""                            # GitLab URL (for self-hosted)
   skipChecks: false                     # Skip API pre-flight checks
   certificateAuthorityFile: ""          # CA certificate file path
-  secure: false                         # Use HTTPS for API calls
+  secure: true                          # Verify TLS certificates (false = explicit opt-out)
 ```
 
 **Authentication:** Set `GITLAB_TOKEN` environment variable (or use a custom name via `tokenRef`).
