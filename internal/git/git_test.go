@@ -1,6 +1,7 @@
 package git
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -146,5 +147,55 @@ func TestRunSilent(t *testing.T) {
 	}
 	if out != "output with spaces" {
 		t.Errorf("expected trimmed output, got %q", out)
+	}
+}
+
+func TestRun_ErrorPreservesRootCauseAndStderr(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	rootErr := fmt.Errorf("exit status 128")
+	commandExecutor = func(name string, args ...string) (string, error) {
+		return "fatal: not a git repository", rootErr
+	}
+
+	g := newTestGit(false)
+	_, err := g.run("status")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	// Project convention: errors.Is must reach the root cause (%w), and the
+	// user-facing text must carry git's stderr — the old wrappers each kept
+	// only one half.
+	if !errors.Is(err, rootErr) {
+		t.Errorf("errors.Is cannot reach the root cause: %v", err)
+	}
+	if !strings.Contains(err.Error(), "fatal: not a git repository") {
+		t.Errorf("error text lost git stderr: %v", err)
+	}
+	if !strings.Contains(err.Error(), "git status") {
+		t.Errorf("error text lost the command: %v", err)
+	}
+}
+
+func TestRunSilent_ErrorIncludesStderr(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	rootErr := fmt.Errorf("exit status 1")
+	commandExecutor = func(name string, args ...string) (string, error) {
+		return "error: pathspec 'x' did not match", rootErr
+	}
+
+	g := newTestGit(false)
+	_, err := g.runSilent("checkout", "x")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !errors.Is(err, rootErr) {
+		t.Errorf("errors.Is cannot reach the root cause: %v", err)
+	}
+	if !strings.Contains(err.Error(), "pathspec") {
+		t.Errorf("error text lost git stderr: %v", err)
 	}
 }

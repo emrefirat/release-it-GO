@@ -84,3 +84,14 @@ func TestSpinner_Update(t *testing.T) {
 
 	s.Stop(true)
 }
+
+func TestSpinner_RapidStartStopCycles_NoRace(t *testing.T) {
+	// The animation goroutine used to re-read s.done without the mutex while
+	// Start reassigned it — a data race caught by -race, and a Stop→Start
+	// pair within the frame sleep could leave two animators running.
+	s := NewSpinner(false)
+	for i := 0; i < 50; i++ {
+		s.Start("step")
+		s.Stop(true)
+	}
+}

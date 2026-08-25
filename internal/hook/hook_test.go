@@ -2,6 +2,8 @@ package hook
 
 import (
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"release-it-go/internal/config"
@@ -235,5 +237,70 @@ func TestHookRunner_RunHooks_MultipleCommands(t *testing.T) {
 	}
 	if callCount != 3 {
 		t.Errorf("expected 3 calls, got %d", callCount)
+	}
+}
+
+func TestEnvKey(t *testing.T) {
+	tests := []struct{ in, want string }{
+		{"version", "VERSION"},
+		{"latestVersion", "LATEST_VERSION"},
+		{"tagName", "TAG_NAME"},
+		{"branchName", "BRANCH_NAME"},
+		{"repo.owner", "REPO_OWNER"},
+		{"repo.repository", "REPO_REPOSITORY"},
+		{"changelog", "CHANGELOG"},
+	}
+	for _, tt := range tests {
+		if got := envKey(tt.in); got != tt.want {
+			t.Errorf("envKey(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
+func TestRunCommand_ExportsReleaseEnvVars(t *testing.T) {
+	var captured *exec.Cmd
+	original := execCommand
+	defer func() { execCommand = original }()
+	execCommand = func(name string, arg ...string) *exec.Cmd {
+		captured = exec.Command("true") // never actually runs the hook
+		return captured
+	}
+
+	h := NewHookRunner(&config.HooksConfig{BeforeBump: []string{"echo hi"}}, applog.NewLogger(0, false), false)
+	h.SetVars(map[string]string{"version": "1.2.3", "repo.owner": "acme"})
+
+	if err := h.RunHooks("before:bump"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if captured == nil {
+		t.Fatal("execCommand was not called")
+	}
+
+	env := strings.Join(captured.Env, "\n")
+	if !strings.Contains(env, "RELEASE_VERSION=1.2.3") {
+		t.Errorf("expected RELEASE_VERSION in hook env, got:\n%s", env)
+	}
+	if !strings.Contains(env, "RELEASE_REPO_OWNER=acme") {
+		t.Errorf("expected RELEASE_REPO_OWNER in hook env, got:\n%s", env)
+	}
+	if !strings.Contains(env, "PATH=") {
+		t.Error("hook env must inherit the parent environment")
+	}
+}
+
+func TestShellCommandFor_Platforms(t *testing.T) {
+	c := shellCommandFor("linux", "", "echo hi")
+	if filepath.Base(c.Args[0]) != "sh" || c.Args[1] != "-c" || c.Args[2] != "echo hi" {
+		t.Errorf("linux: args = %v, want sh -c 'echo hi'", c.Args)
+	}
+
+	c = shellCommandFor("windows", "", "echo hi")
+	if filepath.Base(c.Args[0]) != "cmd.exe" || c.Args[1] != "/C" || c.Args[2] != "echo hi" {
+		t.Errorf("windows default: args = %v, want cmd.exe /C 'echo hi'", c.Args)
+	}
+
+	c = shellCommandFor("windows", `C:\Windows\system32\cmd.exe`, "echo hi")
+	if c.Args[0] != `C:\Windows\system32\cmd.exe` || c.Args[1] != "/C" {
+		t.Errorf("windows COMSPEC: args = %v", c.Args)
 	}
 }

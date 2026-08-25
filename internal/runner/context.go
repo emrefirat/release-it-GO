@@ -28,9 +28,12 @@ type ReleaseContext struct {
 	ReleaseURL    string
 	RepoInfo      *git.RepoInfo
 	BranchName    string
-	IsDryRun      bool
-	IsCI          bool
-	noCommits     bool
+	// BumpedFiles lists the files the bump step modified; the git step
+	// stages exactly these (plus the changelog) instead of sweeping the tree.
+	BumpedFiles []string
+	IsDryRun    bool
+	IsCI        bool
+	noCommits   bool
 
 	// Template variables for hooks and config templates
 	Vars map[string]string

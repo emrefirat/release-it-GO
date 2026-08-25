@@ -39,14 +39,24 @@ func (b *Bumper) ReadVersion() (string, error) {
 
 // WriteVersion writes the new version to all configured output files.
 func (b *Bumper) WriteVersion(version string) error {
+	_, err := b.WriteVersionFiles(version)
+	return err
+}
+
+// WriteVersionFiles writes the new version to all configured output files and
+// returns the paths it actually modified, so the caller can stage exactly
+// those files instead of sweeping the whole working tree into the release
+// commit. Dry-run reports no files (nothing was written).
+func (b *Bumper) WriteVersionFiles(version string) ([]string, error) {
 	if b.config == nil || len(b.config.Out) == 0 {
-		return nil
+		return nil, nil
 	}
 
+	var updated []string
 	for _, outFile := range b.config.Out {
 		files, err := resolveGlob(outFile.File)
 		if err != nil {
-			return fmt.Errorf("resolving glob %q: %w", outFile.File, err)
+			return updated, fmt.Errorf("resolving glob %q: %w", outFile.File, err)
 		}
 
 		for _, f := range files {
@@ -60,12 +70,13 @@ func (b *Bumper) WriteVersion(version string) error {
 
 			b.logger.Verbose("Updating version in %s to %s", f, version)
 			if err := WriteVersionToFile(fileCopy, version); err != nil {
-				return err
+				return updated, err
 			}
+			updated = append(updated, f)
 		}
 	}
 
-	return nil
+	return updated, nil
 }
 
 // resolveGlob expands glob patterns in file paths.

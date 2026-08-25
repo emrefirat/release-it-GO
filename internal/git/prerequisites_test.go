@@ -1,6 +1,7 @@
 package git
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -304,5 +305,29 @@ func TestCheckCleanWorkingDir_GitError(t *testing.T) {
 	err := g.checkCleanWorkingDir()
 	if err == nil {
 		t.Error("expected error when git status fails")
+	}
+}
+
+func TestCheckCommits_NoCommits_ErrorIsSentinel(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	commandExecutor = func(name string, args ...string) (string, error) {
+		cmd := strings.Join(args, " ")
+		if strings.Contains(cmd, "describe") {
+			return "v1.0.0", nil
+		}
+		return "", nil // no commits since tag
+	}
+
+	cfg := &config.GitConfig{RequireCommits: true}
+	g := newTestGitWithConfig(cfg, false)
+	err := g.checkCommits()
+	if err == nil {
+		t.Fatal("expected the no-commits error")
+	}
+	// The runner must detect this via errors.Is, not substring matching.
+	if !errors.Is(err, ErrNoCommits) {
+		t.Errorf("errors.Is(err, ErrNoCommits) = false; err = %v", err)
 	}
 }

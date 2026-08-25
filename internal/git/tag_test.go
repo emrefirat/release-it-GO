@@ -704,3 +704,72 @@ func TestTagPointsAtHead_False(t *testing.T) {
 		t.Error("expected false when the tag is on a different commit")
 	}
 }
+
+func TestMatchGlob_RealGlobPatterns(t *testing.T) {
+	tests := []struct {
+		pattern string
+		s       string
+		want    bool
+	}{
+		{"*", "anything/with/slashes", true}, // legacy: bare * matches everything
+		{"v*", "v1.2.3", true},
+		{"*-rc", "1.2.3-rc", true},
+		{"*beta*", "1.0.0-beta.1", true},
+		{"v1.2.3", "v1.2.3", true},
+		{"v1.2.3", "v9.9.9", false},
+		// previously unsupported: mid-pattern wildcards, ?, char classes
+		{"release-*-final", "release-1.2.3-final", true},
+		{"release-*-final", "release-1.2.3", false},
+		{"v1.?.*", "v1.2.3", true},
+		{"v1.?.*", "v2.0.0", false},
+		{"[0-9]*", "1.2.3", true},
+		{"[0-9]*", "v1.2.3", false},
+	}
+	for _, tt := range tests {
+		if got := matchGlob(tt.pattern, tt.s); got != tt.want {
+			t.Errorf("matchGlob(%q, %q) = %v, want %v", tt.pattern, tt.s, got, tt.want)
+		}
+	}
+}
+
+func TestGetLatestTagFromAllRefs_PrefersStableOverSameBasePreRelease(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	commandExecutor = func(name string, args ...string) (string, error) {
+		// git's -v:refname sort puts 1.0.0-rc.1 ABOVE 1.0.0 (versionsort
+		// suffix semantics) — trusting the order returned the rc as latest.
+		return "1.0.0-rc.1\n1.0.0\n0.9.0", nil
+	}
+
+	cfg := &config.GitConfig{TagName: "${version}", GetLatestTagFromAllRefs: true}
+	g := newTestGitWithConfig(cfg, false)
+
+	tag, err := g.GetLatestTag()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if tag != "1.0.0" {
+		t.Errorf("latest = %q, want 1.0.0 (semver: 1.0.0-rc.1 < 1.0.0)", tag)
+	}
+}
+
+func TestGetLatestTagFromAllRefs_NewerPreReleaseStillWins(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	commandExecutor = func(name string, args ...string) (string, error) {
+		return "1.1.0-beta.0\n1.0.0", nil
+	}
+
+	cfg := &config.GitConfig{TagName: "${version}", GetLatestTagFromAllRefs: true}
+	g := newTestGitWithConfig(cfg, false)
+
+	tag, err := g.GetLatestTag()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if tag != "1.1.0-beta.0" {
+		t.Errorf("latest = %q, want 1.1.0-beta.0 (higher base version)", tag)
+	}
+}

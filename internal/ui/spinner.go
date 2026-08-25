@@ -29,32 +29,44 @@ func NewSpinner(isCI bool) *Spinner {
 // Start begins the spinner animation with the given message.
 func (s *Spinner) Start(message string) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+
+	// A previous animator may still be running if Stop was skipped; close its
+	// channel so two goroutines never animate at once.
+	if s.active && s.done != nil {
+		close(s.done)
+	}
 
 	s.message = message
 	s.active = true
-	s.done = make(chan struct{})
+	done := make(chan struct{})
+	s.done = done
+	isCI := s.isCI
+	s.mu.Unlock()
 
 	// In CI mode, don't print start message; only Stop() prints the result line
-	if s.isCI {
+	if isCI {
 		return
 	}
 
+	// The goroutine captures its own done channel — re-reading s.done without
+	// the mutex raced with Start's reassignment.
 	go func() {
+		ticker := time.NewTicker(80 * time.Millisecond)
+		defer ticker.Stop()
 		i := 0
 		for {
-			select {
-			case <-s.done:
-				return
-			default:
-				s.mu.Lock()
-				msg := s.message
-				s.mu.Unlock()
+			s.mu.Lock()
+			msg := s.message
+			s.mu.Unlock()
 
-				frame := spinnerFrames[i%len(spinnerFrames)]
-				fmt.Fprintf(os.Stderr, "\r%s %s...", frame, msg)
-				i++
-				time.Sleep(80 * time.Millisecond)
+			frame := spinnerFrames[i%len(spinnerFrames)]
+			fmt.Fprintf(os.Stderr, "\r%s %s...", frame, msg)
+			i++
+
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
 			}
 		}
 	}()

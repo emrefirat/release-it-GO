@@ -2,7 +2,10 @@ package git
 
 import (
 	"fmt"
+	"path"
 	"strings"
+
+	"github.com/Masterminds/semver/v3"
 
 	"release-it-go/internal/version"
 )
@@ -58,27 +61,44 @@ func (g *Git) GetLatestTag() (string, error) {
 	return tag, nil
 }
 
-// getLatestTagFromAllRefs lists all tags sorted by version and returns the first.
+// getLatestTagFromAllRefs lists all matching tags and returns the highest by
+// semver comparison. Git's -v:refname sort is NOT semver: without a
+// versionsort.suffix config it ranks 1.0.0-rc.1 above 1.0.0, so trusting the
+// output order returned an older pre-release as "latest".
 func (g *Git) getLatestTagFromAllRefs() (string, error) {
 	out, err := g.runSilent("tag", "-l", "--sort=-v:refname")
 	if err != nil {
 		return "", fmt.Errorf("listing git tags: %w", err)
 	}
 
-	tags := strings.Split(strings.TrimSpace(out), "\n")
-	for _, tag := range tags {
+	var bestTag string
+	var bestVer *semver.Version
+	firstMatch := ""
+	for _, tag := range strings.Split(strings.TrimSpace(out), "\n") {
 		tag = strings.TrimSpace(tag)
-		if tag == "" {
+		if tag == "" || !g.matchesEffectiveFilter(tag) {
 			continue
 		}
-
-		if !g.matchesEffectiveFilter(tag) {
+		if firstMatch == "" {
+			firstMatch = tag
+		}
+		ver, parseErr := version.ParseVersion(tag)
+		if parseErr != nil {
 			continue
 		}
-
-		return tag, nil
+		if bestVer == nil || ver.GreaterThan(bestVer) {
+			bestVer = ver
+			bestTag = tag
+		}
 	}
 
+	if bestTag != "" {
+		return bestTag, nil
+	}
+	if firstMatch != "" {
+		// Matching tags exist but none parse as semver — keep git's order.
+		return firstMatch, nil
+	}
 	return "", fmt.Errorf("no matching git tags found")
 }
 
@@ -209,19 +229,20 @@ func (g *Git) matchesEffectiveFilter(tag string) bool {
 	return true
 }
 
-// matchGlob performs simple glob-like pattern matching.
+// matchGlob performs glob pattern matching (*, ?, character classes) via
+// path.Match. The previous hand-rolled version only understood leading and
+// trailing *, so npm-style tagMatch patterns like "[0-9]*" or mid-pattern
+// wildcards silently matched nothing.
 func matchGlob(pattern, s string) bool {
 	if pattern == "*" {
+		// Bare * keeps its legacy meaning: match everything, including tags
+		// containing slashes (path.Match's * stops at separators).
 		return true
 	}
-	if strings.HasPrefix(pattern, "*") && strings.HasSuffix(pattern, "*") {
-		return strings.Contains(s, pattern[1:len(pattern)-1])
+	ok, err := path.Match(pattern, s)
+	if err != nil {
+		// Invalid pattern — fall back to exact comparison
+		return s == pattern
 	}
-	if strings.HasPrefix(pattern, "*") {
-		return strings.HasSuffix(s, pattern[1:])
-	}
-	if strings.HasSuffix(pattern, "*") {
-		return strings.HasPrefix(s, pattern[:len(pattern)-1])
-	}
-	return s == pattern
+	return ok
 }

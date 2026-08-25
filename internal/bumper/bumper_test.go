@@ -251,3 +251,47 @@ func TestResolveGlob_NoMatch(t *testing.T) {
 		t.Error("expected error for no matching files")
 	}
 }
+
+func TestWriteVersionFiles_ReturnsUpdatedPaths(t *testing.T) {
+	dir := t.TempDir()
+	pkg := filepath.Join(dir, "package.json")
+	if err := os.WriteFile(pkg, []byte(`{"version": "1.0.0"}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := &config.BumperConfig{
+		Enabled: true,
+		Out:     []config.BumperFile{{File: pkg, Path: "version"}},
+	}
+	b := NewBumper(cfg, applog.NewLogger(0, false), false)
+
+	files, err := b.WriteVersionFiles("2.0.0")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(files) != 1 || files[0] != pkg {
+		t.Errorf("files = %v, want [%s] — the runner stages exactly these", files, pkg)
+	}
+}
+
+func TestWriteVersionFiles_DryRun_NoPaths(t *testing.T) {
+	dir := t.TempDir()
+	pkg := filepath.Join(dir, "package.json")
+	if err := os.WriteFile(pkg, []byte(`{"version": "1.0.0"}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := &config.BumperConfig{
+		Enabled: true,
+		Out:     []config.BumperFile{{File: pkg, Path: "version"}},
+	}
+	b := NewBumper(cfg, applog.NewLogger(0, false), true)
+
+	files, err := b.WriteVersionFiles("2.0.0")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(files) != 0 {
+		t.Errorf("dry-run must not report written files, got %v", files)
+	}
+}

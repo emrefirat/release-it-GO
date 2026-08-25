@@ -61,16 +61,26 @@ func (g *Git) run(args ...string) (string, error) {
 	g.logger.Debug("exec: %s", cmdStr)
 	out, err := commandExecutor("git", args...)
 	if err != nil {
-		return out, fmt.Errorf("%s: %s", cmdStr, out)
+		// Keep both halves: git's stderr for the user, the root cause for
+		// errors.Is/As (project convention).
+		if strings.TrimSpace(out) == "" {
+			return out, fmt.Errorf("%s: %w", cmdStr, err)
+		}
+		return out, fmt.Errorf("%s: %s: %w", cmdStr, strings.TrimSpace(out), err)
 	}
 	return out, nil
 }
 
 // runSilent executes a git command without logging the output.
+// On failure, git's stderr is folded into the returned error so callers
+// wrapping it don't lose the actual reason.
 func (g *Git) runSilent(args ...string) (string, error) {
 	out, err := commandExecutor("git", args...)
 	if err != nil {
-		return out, err
+		if strings.TrimSpace(out) == "" {
+			return out, err
+		}
+		return out, fmt.Errorf("%s: %w", strings.TrimSpace(out), err)
 	}
 	return strings.TrimSpace(out), nil
 }

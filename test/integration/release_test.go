@@ -2,6 +2,7 @@ package integration
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -1241,4 +1242,52 @@ func TestIntegration_NoIncrement_ExistingTagAtHead_Skips(t *testing.T) {
 	}
 
 	assertTagExists(t, dir, "v0.1.0")
+}
+
+func TestIntegration_ReleaseCommit_DoesNotSweepUnrelatedChanges(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	_ = os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+
+	initGitRepo(t, dir)
+	// A tracked file with uncommitted local edits, unrelated to the release
+	writeFile(t, filepath.Join(dir, "notes.txt"), "original\n")
+	runGit(t, dir, "add", ".")
+	runGit(t, dir, "commit", "-m", "chore: add notes")
+	createTag(t, dir, "v1.0.0")
+	createCommits(t, dir, []string{"feat: real work"})
+	writeFile(t, filepath.Join(dir, "notes.txt"), "UNCOMMITTED local edit\n")
+
+	cfg := newTestConfig(dir)
+	cfg.Git.AddUntrackedFiles = false // default behavior
+	cfg.Git.RequireCleanWorkingDir = false
+	cfg.Increment = "minor"
+
+	r := runner.NewRunner(cfg)
+	if err := r.Run(); err != nil {
+		t.Fatalf("Run() failed: %v", err)
+	}
+
+	// The release commit must contain only the changelog, not notes.txt
+	out, err := exec.Command("git", "-C", dir, "show", "--name-only", "--format=", "HEAD").Output()
+	if err != nil {
+		t.Fatalf("git show: %v", err)
+	}
+	shown := string(out)
+	if strings.Contains(shown, "notes.txt") {
+		t.Errorf("release commit swept an unrelated local edit:\n%s", shown)
+	}
+	if !strings.Contains(shown, "CHANGELOG.md") {
+		t.Errorf("release commit should contain the changelog:\n%s", shown)
+	}
+
+	status, _ := exec.Command("git", "-C", dir, "status", "--porcelain").Output()
+	if !strings.Contains(string(status), "notes.txt") {
+		t.Error("unrelated edit should remain uncommitted in the working tree")
+	}
 }

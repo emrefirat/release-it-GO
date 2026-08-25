@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
+	"unicode"
 
 	"release-it-go/internal/config"
 	applog "release-it-go/internal/log"
@@ -101,10 +103,57 @@ func (h *HookRunner) runCommand(cmd string) error {
 
 	h.logger.Verbose("hook: %s", rendered)
 
-	c := execCommand("sh", "-c", rendered)
+	c := shellCommandFor(runtime.GOOS, os.Getenv("COMSPEC"), rendered)
+	c.Env = append(os.Environ(), h.envVars()...)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	return c.Run()
+}
+
+// shellCommandFor builds the platform shell invocation for a hook command.
+// Unix uses sh -c; Windows uses %COMSPEC% (cmd.exe) /C — the shipped windows
+// binaries previously hard-required an sh on PATH, so every configured hook
+// failed on stock Windows.
+func shellCommandFor(goos string, comspec string, command string) *exec.Cmd {
+	if goos == "windows" {
+		shell := comspec
+		if shell == "" {
+			shell = "cmd.exe"
+		}
+		return execCommand(shell, "/C", command)
+	}
+	return execCommand("sh", "-c", command)
+}
+
+// envVars exposes the template variables as RELEASE_* environment variables
+// (version → RELEASE_VERSION, repo.owner → RELEASE_REPO_OWNER, ...) so hook
+// scripts can read values without ${var} splicing and its quoting pitfalls.
+func (h *HookRunner) envVars() []string {
+	env := make([]string, 0, len(h.vars))
+	for key, value := range h.vars {
+		env = append(env, "RELEASE_"+envKey(key)+"="+value)
+	}
+	return env
+}
+
+// envKey converts a template variable name to SCREAMING_SNAKE_CASE:
+// camelCase humps and dots become underscores.
+func envKey(key string) string {
+	var b strings.Builder
+	for i, r := range key {
+		switch {
+		case r == '.':
+			b.WriteRune('_')
+		case r >= 'A' && r <= 'Z':
+			if i > 0 {
+				b.WriteRune('_')
+			}
+			b.WriteRune(r)
+		default:
+			b.WriteRune(unicode.ToUpper(r))
+		}
+	}
+	return b.String()
 }
 
 // renderTemplate replaces ${var} placeholders in the command string.

@@ -2403,11 +2403,12 @@ func TestRunner_GitRelease_CI_StageError(t *testing.T) {
 	cfg := &config.Config{
 		CI: true,
 		Git: config.GitConfig{
-			Commit:        true,
-			CommitMessage: "Release ${version}",
-			Tag:           false,
-			Push:          false,
-			TagName:       "v${version}",
+			Commit:            true,
+			CommitMessage:     "Release ${version}",
+			Tag:               false,
+			Push:              false,
+			TagName:           "v${version}",
+			AddUntrackedFiles: true, // whole-tree staging path
 		},
 	}
 
@@ -2415,7 +2416,7 @@ func TestRunner_GitRelease_CI_StageError(t *testing.T) {
 		output string
 		err    error
 	}{
-		"git add . --update": {output: "error", err: fmt.Errorf("stage failed")},
+		"git add .": {output: "error", err: fmt.Errorf("stage failed")},
 	})
 
 	runner.ctx.Version = "1.0.0"
@@ -3205,7 +3206,8 @@ func TestRunner_CheckPrerequisites_NoCommits(t *testing.T) {
 		"git config user.name":                {output: "Test", err: nil},
 		"git config user.email":               {output: "test@example.com", err: nil},
 		"git describe --tags --abbrev=0":      {output: "v1.0.0", err: nil},
-		"git log v1.0.0..HEAD --oneline":      {output: "", err: fmt.Errorf("no commits since latest tag")},
+		// empty log output = no commits; checkCommits returns git.ErrNoCommits
+		"git log v1.0.0..HEAD --oneline": {output: "", err: nil},
 	})
 
 	err := runner.checkPrerequisites()
@@ -4206,5 +4208,70 @@ func TestRunner_GitRelease_CommitMessageTemplateVars(t *testing.T) {
 	}
 	if commitMsg != "chore: release 1.1.0 on main" {
 		t.Errorf("commit message = %q, want branchName rendered (npm template var parity)", commitMsg)
+	}
+}
+
+func TestRunner_GitRelease_TargetedStaging_StagesBumpedFilesOnly(t *testing.T) {
+	cfg := &config.Config{
+		CI: true,
+		Git: config.GitConfig{
+			Commit:        true,
+			CommitMessage: "chore: release ${version}",
+			// AddUntrackedFiles=false (default): no whole-tree sweep
+		},
+	}
+
+	var calls []string
+	restore := git.SetCommandExecutorForTest(func(name string, args ...string) (string, error) {
+		call := name + " " + strings.Join(args, " ")
+		calls = append(calls, call)
+		if strings.HasPrefix(call, "git diff --cached") {
+			return "package.json", nil
+		}
+		return "", nil
+	})
+	t.Cleanup(restore)
+
+	runner := NewRunner(cfg)
+	runner.ctx.Version = "1.1.0"
+	runner.ctx.BumpedFiles = []string{"package.json"}
+
+	if err := runner.gitRelease(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	joined := strings.Join(calls, "\n")
+	if !strings.Contains(joined, "git add package.json") {
+		t.Errorf("bumped file must be staged explicitly; calls:\n%s", joined)
+	}
+	if strings.Contains(joined, "git add . --update") || strings.Contains(joined, "git add .\n") {
+		t.Errorf("release commit must not sweep the whole tree by default; calls:\n%s", joined)
+	}
+}
+
+func TestRunner_GitRelease_PushError_SuggestsRecovery(t *testing.T) {
+	cfg := &config.Config{
+		CI:  true,
+		Git: config.GitConfig{Push: true},
+	}
+
+	restore := git.SetCommandExecutorForTest(func(name string, args ...string) (string, error) {
+		if len(args) > 0 && args[0] == "push" {
+			return "! [rejected] main -> main (fetch first)", fmt.Errorf("exit status 1")
+		}
+		return "", nil
+	})
+	t.Cleanup(restore)
+
+	runner := NewRunner(cfg)
+	runner.ctx.Version = "1.1.0"
+	runner.ctx.TagName = "v1.1.0"
+
+	err := runner.gitRelease()
+	if err == nil {
+		t.Fatal("expected push error")
+	}
+	if !strings.Contains(err.Error(), "--no-increment") {
+		t.Errorf("push failure must point at the --no-increment recovery flow, got: %v", err)
 	}
 }

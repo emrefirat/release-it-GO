@@ -1,10 +1,15 @@
 package git
 
 import (
+	"errors"
 	"fmt"
 	"path"
 	"strings"
 )
+
+// ErrNoCommits signals that there are no commits since the latest tag. The
+// runner detects it with errors.Is and turns it into a graceful exit.
+var ErrNoCommits = errors.New("no commits since latest tag")
 
 // CheckPrerequisites runs all prerequisite checks in order.
 // Returns an error on the first failed check.
@@ -151,7 +156,7 @@ func (g *Git) checkCommits() error {
 	}
 
 	if strings.TrimSpace(out) == "" {
-		return fmt.Errorf("no commits since latest tag %s", latestTag)
+		return fmt.Errorf("%w (%s)", ErrNoCommits, latestTag)
 	}
 
 	return nil

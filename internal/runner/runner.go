@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"regexp"
@@ -249,15 +250,12 @@ func (r *Runner) init() error {
 	return nil
 }
 
-// errNoCommits is a sentinel value to detect the "no commits" condition.
-var errNoCommits = "no commits since latest tag"
-
 // checkPrerequisites runs all prerequisite checks.
 func (r *Runner) checkPrerequisites() error {
 	r.ctx.Spinner.Start("Prerequisites checked")
 
 	if err := r.ctx.Git.CheckPrerequisites(); err != nil {
-		if strings.Contains(err.Error(), errNoCommits) {
+		if errors.Is(err, git.ErrNoCommits) {
 			r.ctx.Spinner.Stop(true)
 			r.ctx.Logger.Print("  %s No commits since latest tag. Nothing to release.", ui.IconWarning)
 			r.ctx.noCommits = true
@@ -689,10 +687,12 @@ func (r *Runner) bumpFiles() error {
 	r.ctx.Spinner.Start("Version files updated")
 
 	b := bumper.NewBumper(&r.ctx.Config.Bumper, r.ctx.Logger, r.ctx.IsDryRun)
-	if err := b.WriteVersion(r.ctx.Version); err != nil {
+	updated, err := b.WriteVersionFiles(r.ctx.Version)
+	if err != nil {
 		r.ctx.Spinner.Stop(false)
 		return fmt.Errorf("bumping version files: %w", err)
 	}
+	r.ctx.BumpedFiles = updated
 
 	r.ctx.Spinner.Stop(true)
 	return nil
@@ -830,7 +830,7 @@ func (r *Runner) gitRelease() error {
 	// Stage
 	if cfg.Commit {
 		r.ctx.Spinner.Start("Files staged")
-		if err := r.ctx.Git.Stage(); err != nil {
+		if err := r.stageReleaseFiles(); err != nil {
 			r.ctx.Spinner.Stop(false)
 			return fmt.Errorf("staging: %w", err)
 		}
@@ -881,12 +881,33 @@ func (r *Runner) gitRelease() error {
 			r.ctx.Spinner.Start("Pushed to remote")
 			if err := r.ctx.Git.Push(); err != nil {
 				r.ctx.Spinner.Stop(false)
-				return fmt.Errorf("push: %w", err)
+				return fmt.Errorf("push: %w\n"+
+					"  The release commit/tag may already exist locally. After fixing the push\n"+
+					"  issue (e.g. git pull --rebase), re-run the remaining release steps with:\n"+
+					"  release-it-go --no-increment", err)
 			}
 			r.ctx.Spinner.Stop(true)
 		}
 	}
 
+	return nil
+}
+
+// stageReleaseFiles stages what this release actually changed: the bumper
+// outputs recorded in BumpedFiles (the changelog stages itself right after it
+// is written). addUntrackedFiles keeps the legacy whole-tree sweep for users
+// who want untracked files in the release commit — otherwise unrelated local
+// edits were silently swept into the "chore: release" commit whenever the
+// clean-working-dir check was disabled.
+func (r *Runner) stageReleaseFiles() error {
+	if r.ctx.Config.Git.AddUntrackedFiles {
+		return r.ctx.Git.Stage()
+	}
+	for _, f := range r.ctx.BumpedFiles {
+		if err := r.ctx.Git.StageFile(f); err != nil {
+			return fmt.Errorf("staging %s: %w", f, err)
+		}
+	}
 	return nil
 }
 
