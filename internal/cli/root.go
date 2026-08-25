@@ -13,6 +13,7 @@ import (
 	applog "release-it-go/internal/log"
 	"release-it-go/internal/runner"
 	"release-it-go/internal/ui"
+	"release-it-go/internal/version"
 )
 
 // Build information, set via ldflags.
@@ -46,11 +47,19 @@ var (
 // NewRootCommand creates the root cobra command for release-it-go.
 func NewRootCommand() *cobra.Command {
 	rootCmd := &cobra.Command{
-		Use:   "release-it-go",
+		Use:   "release-it-go [increment]",
 		Short: "Release automation tool for Git projects",
 		Long: `release-it-go is a release automation tool that handles
 Git tagging, changelog generation, and GitHub/GitLab releases.
-It is a Go reimplementation of release-it without Node.js dependencies.`,
+It is a Go reimplementation of release-it without Node.js dependencies.
+
+The optional positional argument sets the version increment
+(major|minor|patch|premajor|preminor|prepatch|prerelease) or an
+explicit target version (e.g. 1.5.0), matching npm release-it:
+
+  release-it-go minor
+  release-it-go 1.5.0 --ci`,
+		Args:          cobra.MaximumNArgs(1),
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE:          runRelease,
@@ -148,6 +157,30 @@ PowerShell:
 	}
 }
 
+// resolveIncrementArg reconciles the positional increment argument with the
+// --increment flag. The positional form (release-it-go minor, release-it-go
+// 1.5.0) is npm release-it's primary documented usage; it must be validated —
+// silently ignoring it would run a full release with an auto-detected
+// increment the user did not ask for.
+func resolveIncrementArg(args []string, flagIncrement string) (string, error) {
+	if len(args) == 0 {
+		return flagIncrement, nil
+	}
+
+	arg := args[0]
+	if !version.IsIncrementType(arg) {
+		if _, err := version.ParseVersion(arg); err != nil {
+			return "", fmt.Errorf("invalid argument %q: expected an increment (major|minor|patch|premajor|preminor|prepatch|prerelease) or an explicit version like 1.5.0", arg)
+		}
+	}
+
+	if flagIncrement != "" && flagIncrement != arg {
+		return "", fmt.Errorf("conflicting increments: positional %q vs --increment %q", arg, flagIncrement)
+	}
+
+	return arg, nil
+}
+
 // buildFlagOverrides collects CLI overrides for config.ApplyFlags. Bool and
 // count flags only override the config when the user actually passed them
 // (Flags().Changed) — otherwise a config-file "ci: true", "dry-run: true",
@@ -189,6 +222,15 @@ func runRelease(cmd *cobra.Command, args []string) error {
 
 	// Apply CLI flag overrides
 	config.ApplyFlags(cfg, buildFlagOverrides(cmd))
+
+	// Positional increment/version argument (release-it-go minor, release-it-go 1.5.0)
+	resolvedIncrement, err := resolveIncrementArg(args, increment)
+	if err != nil {
+		return err
+	}
+	if resolvedIncrement != "" {
+		cfg.Increment = resolvedIncrement
+	}
 
 	// When preRelease is set, auto-mark GitHub/GitLab releases as pre-release
 	if preRelease != "" {

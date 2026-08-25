@@ -3,6 +3,7 @@ package runner
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -194,6 +195,7 @@ func (r *Runner) RunNoIncrement() error {
 	if err != nil {
 		return fmt.Errorf("getting latest tag: %w", err)
 	}
+	r.inferTagNameFormat(latestTag)
 
 	parsed, parseErr := version.ParseVersion(latestTag)
 	if parseErr != nil {
@@ -424,6 +426,47 @@ func formatLintError(failed []changelog.LintResult, total int) error {
 	return fmt.Errorf("%s", b.String())
 }
 
+// inferTagNameFormat replicates npm release-it's tag-prefix inference: with
+// the shipped default tagName template, a repo whose latest tag is v-prefixed
+// keeps the v prefix for new tags. Without this, v-repos got unprefixed new
+// tags AND conventional-commit auto-increment silently degraded to patch
+// (the rendered unprefixed tag doesn't exist, so commit queries failed).
+// A tagName written explicitly in the config file is always respected.
+func (r *Runner) inferTagNameFormat(rawLatestTag string) {
+	if r.ctx.Config.Git.TagNameExplicit || r.ctx.Config.Git.TagName != "${version}" {
+		return
+	}
+	if !strings.HasPrefix(rawLatestTag, "v") {
+		return
+	}
+	if _, err := version.ParseVersion(rawLatestTag); err != nil {
+		return
+	}
+	r.ctx.Config.Git.TagName = "v${version}"
+	r.ctx.Logger.Verbose("Inferred v-prefixed tagName from latest tag %s", rawLatestTag)
+}
+
+// releaseTemplateVarPattern matches ${var} placeholders (dotted keys allowed).
+var releaseTemplateVarPattern = regexp.MustCompile(`\$\{([a-zA-Z][a-zA-Z0-9.]*)\}`)
+
+// renderReleaseTemplate renders ${...} placeholders in user-facing templates
+// (commit message, tag annotation, release names) using the same variable set
+// available to lifecycle hooks (${branchName}, ${latestVersion}, ${repo.*},
+// ...) plus the freshly computed ${version}. Unknown placeholders are kept
+// literal. Single-pass, so substituted values are never re-substituted.
+func (r *Runner) renderReleaseTemplate(tmpl string) string {
+	return releaseTemplateVarPattern.ReplaceAllStringFunc(tmpl, func(m string) string {
+		key := m[2 : len(m)-1]
+		if key == "version" {
+			return r.ctx.Version
+		}
+		if v, ok := r.ctx.Vars[key]; ok {
+			return v
+		}
+		return m
+	})
+}
+
 // determineVersion determines the next version based on config and commits.
 func (r *Runner) determineVersion() error {
 	// Try reading version from bumper input file first
@@ -444,6 +487,8 @@ func (r *Runner) determineVersion() error {
 	if err != nil {
 		r.ctx.Logger.Verbose("No previous tags found, starting from 0.0.0")
 		latestTag = "0.0.0"
+	} else {
+		r.inferTagNameFormat(latestTag)
 	}
 
 	// Use bumper version if available and no git tag
@@ -507,8 +552,23 @@ func (r *Runner) determineCalVer(latestVersion string) error {
 
 // determineSemVer calculates the next semantic version.
 func (r *Runner) determineSemVer(latestVersion string) error {
-	// Determine increment type
+	// Determine increment type. An explicit increment (from the positional
+	// argument, -i, or the config file) is used as-is and never prompts.
 	increment := r.ctx.Config.Increment
+	explicitIncrement := increment != ""
+
+	// Explicit target version (release-it-go 1.5.0 / -i 1.5.0): use it
+	// verbatim, matching npm release-it.
+	if explicitIncrement && !version.IsIncrementType(increment) {
+		if target, err := version.ParseVersion(increment); err == nil {
+			newVersionStr := target.String()
+			r.ctx.Version = newVersionStr
+			r.ctx.TagName = renderTagName(r.ctx.Config.Git.TagName, newVersionStr)
+			r.ctx.Logger.Print("  %s Version: %s → %s", ui.IconVersion, latestVersion, newVersionStr)
+			return nil
+		}
+	}
+
 	if increment == "" {
 		increment = r.autoDetectIncrement()
 	}
@@ -541,9 +601,12 @@ func (r *Runner) determineSemVer(latestVersion string) error {
 	}
 	newVersionStr := newSemver.String()
 
-	// Interactive mode: let user choose
-	if !r.ctx.IsCI && increment == r.autoDetectIncrement() {
-		options := r.buildVersionOptions(latestVersion, increment)
+	// Interactive mode: let user choose — but only when the increment was
+	// auto-detected. An explicit increment (positional/-i/config) never
+	// prompts; the old value-equality check re-ran auto-detection and fired
+	// whenever an explicit choice happened to coincide with it.
+	if !r.ctx.IsCI && !explicitIncrement {
+		options := r.buildVersionOptions(latestVersion, incrementType)
 		if len(options) > 0 {
 			selected, err := r.ctx.Prompter.SelectVersion(latestVersion, newVersionStr, options)
 			if err != nil {
@@ -680,16 +743,29 @@ func (r *Runner) autoDetectIncrement() string {
 }
 
 // buildVersionOptions creates version options for the interactive prompt.
+// With --preRelease, the menu offers pre-release variants (prepatch/preminor/
+// premajor, plus continuing the current series) so the identifier is never
+// silently dropped by picking a plain patch/minor/major.
 func (r *Runner) buildVersionOptions(current string, recommended string) []ui.VersionOption {
-	options := make([]ui.VersionOption, 0, 3)
+	options := make([]ui.VersionOption, 0, 4)
 
 	parsedCurrent, err := version.ParseVersion(current)
 	if err != nil {
 		return options
 	}
 
-	for _, inc := range []string{"patch", "minor", "major"} {
-		ver, err := version.IncrementVersion(parsedCurrent, inc, "")
+	preReleaseID := r.ctx.Config.PreReleaseID
+	increments := []string{"patch", "minor", "major"}
+	if preReleaseID != "" {
+		increments = []string{"prepatch", "preminor", "premajor"}
+		if parsedCurrent.Prerelease() != "" && strings.HasPrefix(parsedCurrent.Prerelease(), preReleaseID+".") {
+			// Continue the current pre-release series (beta.1 → beta.2) first
+			increments = append([]string{"prerelease"}, increments...)
+		}
+	}
+
+	for _, inc := range increments {
+		ver, err := version.IncrementVersion(parsedCurrent, inc, preReleaseID)
 		if err != nil {
 			continue
 		}
@@ -764,73 +840,97 @@ func (r *Runner) gitRelease() error {
 		if !r.ctx.Git.HasStagedChanges() {
 			r.ctx.Logger.Verbose("    ↳ No staged changes, skipping commit")
 		} else {
-			commitMsg := renderTagName(cfg.CommitMessage, r.ctx.Version)
-			if !r.ctx.IsCI {
-				confirmed, err := r.ctx.Prompter.Confirm(
-					fmt.Sprintf("Commit (%s)?", commitMsg), true)
-				if err != nil {
-					return err
-				}
-				if !confirmed {
-					r.ctx.Logger.Print("  %s Skipped commit", ui.IconSkip)
-					return nil
-				}
+			commitMsg := r.renderReleaseTemplate(cfg.CommitMessage)
+			// npm asks commit/tag/push independently: declining one
+			// operation must not cancel the ones after it.
+			doCommit, err := r.confirmStep(fmt.Sprintf("Commit (%s)?", commitMsg), "commit")
+			if err != nil {
+				return err
 			}
-
-			r.ctx.Spinner.Start("Committed")
-			if err := r.ctx.Git.Commit(commitMsg); err != nil {
-				r.ctx.Spinner.Stop(false)
-				return fmt.Errorf("commit: %w", err)
+			if doCommit {
+				r.ctx.Spinner.Start("Committed")
+				if err := r.ctx.Git.Commit(commitMsg); err != nil {
+					r.ctx.Spinner.Stop(false)
+					return fmt.Errorf("commit: %w", err)
+				}
+				r.ctx.Spinner.Stop(true)
 			}
-			r.ctx.Spinner.Stop(true)
 		}
 	}
 
 	// Tag
 	if cfg.Tag {
-		annotation := renderTagName(cfg.TagAnnotation, r.ctx.Version)
-
-		if !r.ctx.IsCI {
-			confirmed, err := r.ctx.Prompter.Confirm(
-				fmt.Sprintf("Tag (%s)?", r.ctx.TagName), true)
-			if err != nil {
+		doTag, err := r.confirmStep(fmt.Sprintf("Tag (%s)?", r.ctx.TagName), "tag")
+		if err != nil {
+			return err
+		}
+		if doTag {
+			if err := r.createReleaseTag(); err != nil {
 				return err
 			}
-			if !confirmed {
-				r.ctx.Logger.Print("  %s Skipped tag", ui.IconSkip)
-				return nil
-			}
 		}
-
-		r.ctx.Spinner.Start(fmt.Sprintf("Tagged %s", r.ctx.TagName))
-		if err := r.ctx.Git.CreateTag(r.ctx.TagName, annotation); err != nil {
-			r.ctx.Spinner.Stop(false)
-			return fmt.Errorf("tag: %w", err)
-		}
-		r.ctx.Spinner.Stop(true)
 	}
 
 	// Push
 	if cfg.Push {
-		if !r.ctx.IsCI {
-			confirmed, err := r.ctx.Prompter.Confirm("Push?", true)
-			if err != nil {
-				return err
-			}
-			if !confirmed {
-				r.ctx.Logger.Print("  %s Skipped push", ui.IconSkip)
-				return nil
-			}
+		doPush, err := r.confirmStep("Push?", "push")
+		if err != nil {
+			return err
 		}
-
-		r.ctx.Spinner.Start("Pushed to remote")
-		if err := r.ctx.Git.Push(); err != nil {
-			r.ctx.Spinner.Stop(false)
-			return fmt.Errorf("push: %w", err)
+		if doPush {
+			r.ctx.Spinner.Start("Pushed to remote")
+			if err := r.ctx.Git.Push(); err != nil {
+				r.ctx.Spinner.Stop(false)
+				return fmt.Errorf("push: %w", err)
+			}
+			r.ctx.Spinner.Stop(true)
 		}
-		r.ctx.Spinner.Stop(true)
 	}
 
+	return nil
+}
+
+// confirmStep asks for interactive confirmation of one git operation.
+// In CI mode it always confirms. A declined prompt skips only this operation
+// (logged), never the operations after it; a prompter error (e.g. Ctrl+C)
+// aborts the release.
+func (r *Runner) confirmStep(question string, name string) (bool, error) {
+	if r.ctx.IsCI {
+		return true, nil
+	}
+	confirmed, err := r.ctx.Prompter.Confirm(question, true)
+	if err != nil {
+		return false, err
+	}
+	if !confirmed {
+		r.ctx.Logger.Print("  %s Skipped %s", ui.IconSkip, name)
+		return false, nil
+	}
+	return true, nil
+}
+
+// createReleaseTag creates the release tag, tolerating a tag that already
+// exists at HEAD — npm release-it's documented recovery flow (--no-increment
+// after a failed push) re-runs the release steps for the current version, and
+// the tag from the previous attempt must not be fatal.
+func (r *Runner) createReleaseTag() error {
+	exists, existsErr := r.ctx.Git.TagExists(r.ctx.TagName)
+	if existsErr == nil && exists {
+		atHead, headErr := r.ctx.Git.TagPointsAtHead(r.ctx.TagName)
+		if headErr == nil && atHead {
+			r.ctx.Logger.Print("  %s Tag %s already exists at HEAD — skipping tag creation", ui.IconSkip, r.ctx.TagName)
+			return nil
+		}
+		return fmt.Errorf("tag: tag %s already exists on a different commit (delete it or choose another version)", r.ctx.TagName)
+	}
+
+	annotation := r.renderReleaseTemplate(r.ctx.Config.Git.TagAnnotation)
+	r.ctx.Spinner.Start(fmt.Sprintf("Tagged %s", r.ctx.TagName))
+	if err := r.ctx.Git.CreateTag(r.ctx.TagName, annotation); err != nil {
+		r.ctx.Spinner.Stop(false)
+		return fmt.Errorf("tag: %w", err)
+	}
+	r.ctx.Spinner.Stop(true)
 	return nil
 }
 
@@ -841,7 +941,7 @@ func (r *Runner) githubRelease() error {
 	}
 
 	if !r.ctx.IsCI {
-		releaseName := renderTagName(r.ctx.Config.GitHub.ReleaseName, r.ctx.Version)
+		releaseName := r.renderReleaseTemplate(r.ctx.Config.GitHub.ReleaseName)
 		confirmed, err := r.ctx.Prompter.Confirm(
 			fmt.Sprintf("Create a release on GitHub (%s)?", releaseName), true)
 		if err != nil {
@@ -861,7 +961,7 @@ func (r *Runner) githubRelease() error {
 		return fmt.Errorf("GitHub client: %w", err)
 	}
 
-	releaseName := renderTagName(r.ctx.Config.GitHub.ReleaseName, r.ctx.Version)
+	releaseName := r.renderReleaseTemplate(r.ctx.Config.GitHub.ReleaseName)
 	releaseNotes := r.ctx.Changelog
 	if releaseNotes == "" {
 		r.ctx.Logger.Verbose("    ↳ Release notes are empty (changelog disabled or no commits parsed)")
@@ -910,7 +1010,7 @@ func (r *Runner) gitlabRelease() error {
 	}
 
 	if !r.ctx.IsCI {
-		releaseName := renderTagName(r.ctx.Config.GitLab.ReleaseName, r.ctx.Version)
+		releaseName := r.renderReleaseTemplate(r.ctx.Config.GitLab.ReleaseName)
 		confirmed, err := r.ctx.Prompter.Confirm(
 			fmt.Sprintf("Create a release on GitLab (%s)?", releaseName), true)
 		if err != nil {
@@ -930,7 +1030,7 @@ func (r *Runner) gitlabRelease() error {
 		return fmt.Errorf("GitLab client: %w", err)
 	}
 
-	releaseName := renderTagName(r.ctx.Config.GitLab.ReleaseName, r.ctx.Version)
+	releaseName := r.renderReleaseTemplate(r.ctx.Config.GitLab.ReleaseName)
 	releaseNotes := r.ctx.Changelog
 	if releaseNotes == "" {
 		r.ctx.Logger.Verbose("    ↳ Release notes are empty (changelog disabled or no commits parsed)")

@@ -379,3 +379,31 @@ func TestConfigSearchFiles_NativeFirst(t *testing.T) {
 		t.Error(".release-it-go.json not found in configSearchFiles")
 	}
 }
+
+func TestLoadConfig_TagNameExplicitFlag(t *testing.T) {
+	dir := t.TempDir()
+
+	withTag := filepath.Join(dir, ".release-it-go.yaml")
+	if err := os.WriteFile(withTag, []byte("git:\n  tagName: \"${version}\"\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := LoadConfig(withTag)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if !cfg.Git.TagNameExplicit {
+		t.Error("TagNameExplicit should be true when tagName is present in the file")
+	}
+
+	withoutTag := filepath.Join(dir, ".release-it-go2.yaml")
+	if err := os.WriteFile(withoutTag, []byte("git:\n  commit: true\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err = LoadConfig(withoutTag)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.Git.TagNameExplicit {
+		t.Error("TagNameExplicit should be false when tagName is absent")
+	}
+}

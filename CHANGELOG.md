@@ -2,7 +2,19 @@
 
 ## Unreleased
 
+### Features
+
+* positional increment and explicit target versions, npm style: `release-it-go minor`, `release-it-go 1.5.0`, `-i 1.5.0` (previously positional args were silently ignored). Invalid arguments are rejected with a clear error.
+* v-prefix tag inference: with the default `tagName`, a repo whose latest tag is v-prefixed keeps the prefix for new tags (and conventional-commit auto-increment now works there). Writing `tagName` in the config file disables the inference.
+* template variables beyond `${version}` (`${branchName}`, `${latestVersion}`, `${repo.*}`, …) now render in `git.commitMessage`, `git.tagAnnotation`, and GitHub/GitLab `releaseName`.
+* the interactive `--preRelease` menu now offers pre-release variants (including continuing the current series) instead of dropping the identifier.
+
 ### Bug Fixes
+
+* an explicit increment (positional, `-i`, or config) no longer opens the interactive version prompt when it coincides with the auto-detected one.
+* declining the Commit or Tag prompt no longer silently cancels the operations after it — commit, tag, and push are confirmed independently.
+* `--no-increment` now completes when the release tag already exists at HEAD (npm's documented recovery flow after a failed push); a tag on a different commit remains a clear error.
+* config migration no longer silently drops the `hooks`, `bumper`, `calver`, and `notification` sections (the writer serialized only 4 of 8 sections).
 
 * `before:release` and `after:release` lifecycle hooks now fire (before the git release step and at pipeline end, matching npm release-it). They were accepted in config and documented, but the pipeline never emitted them.
 * `ci`, `dry-run`, and `verbose` set in the config file are no longer overwritten by unset CLI flags — flag values only override the config when actually passed.

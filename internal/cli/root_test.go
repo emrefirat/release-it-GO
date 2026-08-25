@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -453,5 +454,46 @@ func TestReasonDescription(t *testing.T) {
 				t.Errorf("reasonDescription(%q) = %q, want %q", tt.reason, got, tt.expected)
 			}
 		})
+	}
+}
+
+func TestResolveIncrementArg(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    []string
+		flag    string
+		want    string
+		wantErr bool
+	}{
+		{"no arg, flag only", nil, "minor", "minor", false},
+		{"increment keyword arg", []string{"major"}, "", "major", false},
+		{"prerelease keyword arg", []string{"prerelease"}, "", "prerelease", false},
+		{"explicit version arg", []string{"1.5.0"}, "", "1.5.0", false},
+		{"v-prefixed version arg", []string{"v1.5.0"}, "", "v1.5.0", false},
+		{"invalid arg", []string{"bogus"}, "", "", true},
+		{"conflicting arg and flag", []string{"minor"}, "patch", "", true},
+		{"agreeing arg and flag", []string{"minor"}, "minor", "minor", false},
+		{"empty everything", nil, "", "", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := resolveIncrementArg(tt.args, tt.flag)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !tt.wantErr && got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNewRootCommand_RejectsMultipleArgs(t *testing.T) {
+	cmd := NewRootCommand()
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+	cmd.SetArgs([]string{"minor", "extra"})
+	if err := cmd.Execute(); err == nil {
+		t.Error("expected error for two positional args")
 	}
 }

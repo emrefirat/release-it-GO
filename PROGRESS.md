@@ -32,8 +32,9 @@
 | 21 | P0 Test Coverage Completion (QA audit) | Complete | 100% |
 | 22 | Atomic Git Push Default | Complete | 100% |
 | 23 | Critical Correctness & Security Fixes (2026-08 audit P0) | Complete | 100% |
+| 25 | npm Parity Batch | Complete | 100% |
 
-**Last Updated:** 2026-08-25
+**Last Updated:** 2026-08-26
 **Active Developer:** Claude
 **Current Version:** v0.1.3 (Phase 22 complete — production-ready)
 
@@ -646,6 +647,30 @@
 
 ---
 
+## Phase 25: npm Parity Batch
+
+**Status:** Complete
+**PRD:** `docs/phase_25.md`
+
+### To Do
+
+- [x] Positional increment/version args (`release-it-go minor`, `release-it-go 1.5.0`) + explicit `-i 1.5.0`; invalid args rejected loudly
+- [x] Explicit increment never prompts (removed the value-equality condition + duplicate auto-detect call)
+- [x] v-prefix tagName inference from the latest tag (default template only; `TagNameExplicit` loader flag protects explicit user templates)
+- [x] `--no-increment` recovery: existing tag at HEAD is skipped, different-commit tag is a clear error (`TagPointsAtHead`)
+- [x] Template variables (`${branchName}`, `${latestVersion}`, `${repo.*}`) in commitMessage/tagAnnotation/releaseName via single-pass `renderReleaseTemplate`
+- [x] Interactive `--preRelease` menu offers pre-release variants (identifier never dropped)
+- [x] Independent commit/tag/push confirmations (`confirmStep`); declining one no longer cancels the rest
+- [x] Migration serializes all 8 config sections + top-level scalars (`toConfigMap`)
+
+### Notes
+
+- npm semantics source: audit Part B (verified against release-it docs via Context7).
+- `tagName` deliberately stays `${version}`-only for template vars: historical-tag lookups must render symmetrically.
+- E2E verified with a real binary: `rig major` → v2.0.0, `rig 5.0.0` → v5.0.0 (v prefix inferred with no config), `rig bogus` → clear error.
+
+---
+
 ## Bugs
 
 - [x] BUG: First-release changelog "exit status 128" error (2026-02-16) → When `LatestVersion=0.0.0`, the `v0.0.0` tag was searched but no such tag exists. The `latestVersionToTag()` helper was added: returns empty for `0.0.0` or empty string, so `GetCommitsSinceTag("")` returns all commits. 3 sites affected: `RunChangelogOnly`, `generateChangelog`, `autoDetectIncrement`.
@@ -661,6 +686,11 @@
 - [x] BUG: `latestVersionToTag()` hardcoded a `v` prefix instead of using the `tagName` template from config (2026-03-23) → In environments without a config file (default `tagName: "${version}"`), the tag was created as `0.1.0-main.0` while the changelog searched for `v0.1.0-main.0`. Fix: `latestVersionToTag()` now uses `renderTagName(tagNameTemplate, version)`. The `v` prefix is stripped from the version before applying the template, preventing `vv` duplication.
 - [x] BUG: With changelog disabled, `git commit` produced "nothing to commit" error (2026-03-30) → With changelog and bumper disabled, there are no staged changes, but commit was attempted. Fix: `HasStagedChanges()` check added; if there are no staged changes, the commit is skipped and a verbose log entry is written.
 - [x] BUG: When `tagName` config changed, old-format tags were being found as latest (2026-03-30) → Transitioning from `v${version}` → `${version}`, `GetLatestTag` still found `v1.5.0`, and the changelog searched for the `1.5.0` tag (which doesn't exist). Fix: `matchesTagNameFormat()` added for tag format filtering. A fallback mechanism for version continuity across format transitions, plus a raw tag fallback in changelog.
+- [x] BUG: interactive `--preRelease` dropped the identifier (2026-08-26) → the version menu offered only plain patch/minor/major built with an empty preReleaseID, so any selection produced a stable version while the GitHub/GitLab release was still flagged pre-release. Fix: pre-release variants (+ series continuation) in `buildVersionOptions`.
+- [x] BUG: declining the Commit prompt silently cancelled tag and push (2026-08-26) → `return nil` exited gitRelease entirely; npm asks each operation independently. Fix: `confirmStep` skips only the declined operation.
+- [x] BUG: `--no-increment` could never complete with default config (2026-08-26) → re-running release steps for the current version died on `tag already exists` even when the tag pointed at HEAD (npm's documented recovery flow). Fix: existing tag at HEAD is skipped; a tag on a different commit is a clear error.
+- [x] BUG: positional args were silently discarded (2026-08-26) → `release-it-go minor` ran a full release with an auto-detected increment. Fix: positional increment/version parsed and validated; unknown args error out.
+- [x] BUG: v-prefixed repos got unprefixed new tags and always-patch auto-increment with the default config (2026-08-26) → no tagName inference existed; the rendered unprefixed tag didn't exist so commit queries failed and `autoDetectIncrement` swallowed the error. Fix: npm-style v-prefix inference from the latest tag, disabled when tagName is written explicitly.
 - [x] BUG: `before:release` / `after:release` hooks were documented but never fired (2026-08-25) → the runner only emitted per-step events and no step is named "release", so npm release-it's most-used hook was silently ignored for migrating configs. Fix: shared `runSteps()` fires before:release ahead of the git:release step and after:release after all steps; skipped when the release aborts with no commits. Integration tests assert order and the skip.
 - [x] BUG: config-file `ci`, `dry-run`, `verbose` were clobbered by unset CLI flags (2026-08-25) → `runRelease` always passed `&dryRun`/`&ciMode`/`&verboseCount`, so their flag defaults overwrote the config on every run — three documented fields were dead. Fix: `buildFlagOverrides` consults `cmd.Flags().Changed()` before passing bool/count pointers.
 - [x] BUG: webhook secret URLs leaked into error messages (2026-08-25) → a failed POST returned a `*url.Error` whose text embeds the full webhook URL (a bearer credential for Slack/Teams), and the runner logs that error. Fix: unwrap `*url.Error` and report only the underlying cause; type + urlRef still identify the webhook.
@@ -747,6 +777,7 @@
 | 2026-08-25 | Claude | Phase 23 (partial): shipped-default fixes — `github.host` no longer resolves to the nonexistent `/api/v3` path (404), GitLab TLS verification on by default (`Secure: true`), invalid CA PEM falls back to system roots; `DefaultConfig()`-based regression tests; docs/phase_23.md PRD created from the 2026-08-25 audit |
 | 2026-08-25 | Claude | Phase 23: BREAKING CHANGE footers now drive major bumps — full commit messages (`%h%x1f%B%x1e`) flow through the changelog pipeline via shared `commitsSinceLatestRelease()`; changelog entries gain commit hashes; multiline footer values parsed; auto-increment gains the raw-tag fallback; dead `GetCommitsSinceTag` removed |
 | 2026-08-25 | Claude | Phase 23 complete: before/after:release hooks fired via unified `runSteps()`, flag precedence fixed (`Flags().Changed`), webhook errors sanitized (no secret URLs), `requireBranch` comma-separated any-of matching, Go toolchain 1.26.7 (all stdlib advisories closed — `make check` fully green) |
+| 2026-08-26 | Claude | Phase 25 complete (npm parity): positional/explicit versions, no prompt on explicit increment, v-prefix inference (+TagNameExplicit loader flag), --no-increment recovery via TagPointsAtHead, template vars in commit/tag/release names, pre-release prompt menu, independent commit/tag/push confirmations, migration serializes all sections |
 
 ---
 

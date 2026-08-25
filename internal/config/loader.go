@@ -81,6 +81,10 @@ func loadFromFile(cfg *Config, path string) (*Config, error) {
 		return nil, fmt.Errorf("unmarshaling config file %s: %w", path, err)
 	}
 
+	// Record whether tagName was written by the user — the runner's v-prefix
+	// inference only applies to the shipped default template.
+	cfg.Git.TagNameExplicit = v.IsSet("git.tagname")
+
 	// Apply backward compatibility for release-it npm plugin settings
 	applyPluginCompat(cfg, originalData, format)
 

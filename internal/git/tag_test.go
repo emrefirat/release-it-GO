@@ -662,3 +662,45 @@ func TestGetLatestTag_BareFormatRejectsVPrefix(t *testing.T) {
 		t.Errorf("expected '0.9.0', got %q", tag)
 	}
 }
+
+func TestTagPointsAtHead_True(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	var capturedArgs []string
+	commandExecutor = func(name string, args ...string) (string, error) {
+		capturedArgs = args
+		return "v1.0.0", nil
+	}
+
+	g := newTestGit(false)
+	atHead, err := g.TagPointsAtHead("v1.0.0")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !atHead {
+		t.Error("expected true when git lists the tag at HEAD")
+	}
+	want := "tag -l v1.0.0 --points-at HEAD"
+	if got := strings.Join(capturedArgs, " "); got != want {
+		t.Errorf("args = %q, want %q", got, want)
+	}
+}
+
+func TestTagPointsAtHead_False(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	commandExecutor = func(name string, args ...string) (string, error) {
+		return "", nil
+	}
+
+	g := newTestGit(false)
+	atHead, err := g.TagPointsAtHead("v1.0.0")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if atHead {
+		t.Error("expected false when the tag is on a different commit")
+	}
+}

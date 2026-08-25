@@ -23,11 +23,15 @@ type Config struct {
 
 // GitConfig holds all git-related configuration.
 type GitConfig struct {
-	Commit                     bool     `json:"commit" yaml:"commit" toml:"commit" mapstructure:"commit"`
-	CommitMessage              string   `json:"commitMessage" yaml:"commitMessage" toml:"commitMessage" mapstructure:"commitMessage"`
-	CommitArgs                 []string `json:"commitArgs" yaml:"commitArgs" toml:"commitArgs" mapstructure:"commitArgs"`
-	Tag                        bool     `json:"tag" yaml:"tag" toml:"tag" mapstructure:"tag"`
-	TagName                    string   `json:"tagName" yaml:"tagName" toml:"tagName" mapstructure:"tagName"`
+	Commit        bool     `json:"commit" yaml:"commit" toml:"commit" mapstructure:"commit"`
+	CommitMessage string   `json:"commitMessage" yaml:"commitMessage" toml:"commitMessage" mapstructure:"commitMessage"`
+	CommitArgs    []string `json:"commitArgs" yaml:"commitArgs" toml:"commitArgs" mapstructure:"commitArgs"`
+	Tag           bool     `json:"tag" yaml:"tag" toml:"tag" mapstructure:"tag"`
+	TagName       string   `json:"tagName" yaml:"tagName" toml:"tagName" mapstructure:"tagName"`
+	// TagNameExplicit is set by the loader when tagName appears in the config
+	// file. With the default template the runner infers a v prefix from the
+	// repo's existing tags (npm parity); an explicit template disables that.
+	TagNameExplicit            bool     `json:"-" yaml:"-" toml:"-" mapstructure:"-"`
 	TagMatch                   string   `json:"tagMatch" yaml:"tagMatch" toml:"tagMatch" mapstructure:"tagMatch"`
 	TagExclude                 string   `json:"tagExclude" yaml:"tagExclude" toml:"tagExclude" mapstructure:"tagExclude"`
 	TagAnnotation              string   `json:"tagAnnotation" yaml:"tagAnnotation" toml:"tagAnnotation" mapstructure:"tagAnnotation"`

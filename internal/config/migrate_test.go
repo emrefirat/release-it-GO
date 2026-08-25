@@ -346,3 +346,47 @@ func TestMigrateLegacyConfig_InvalidJSON(t *testing.T) {
 		t.Error("backup should be created even on parse error")
 	}
 }
+
+func TestMigrateLegacyConfig_PreservesHooksAndNotification(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	defer func() { _ = os.Chdir(origDir) }()
+	_ = os.Chdir(dir)
+
+	legacyContent := `{
+		"git": {"commit": false},
+		"hooks": {
+			"after:release": ["echo Released ${version}"],
+			"pre-commit": ["go vet ./..."]
+		},
+		"notification": {
+			"enabled": true,
+			"webhooks": [{"type": "slack", "urlRef": "SLACK_WEBHOOK_URL"}]
+		}
+	}`
+	if err := os.WriteFile(".release-it.json", []byte(legacyContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := MigrateLegacyConfig(".release-it.json"); err != nil {
+		t.Fatalf("MigrateLegacyConfig: %v", err)
+	}
+
+	migrated, err := LoadConfig(NativeConfigFile)
+	if err != nil {
+		t.Fatalf("loading migrated config: %v", err)
+	}
+
+	if len(migrated.Hooks.AfterRelease) != 1 || migrated.Hooks.AfterRelease[0] != "echo Released ${version}" {
+		t.Errorf("hooks.after:release lost in migration: %+v", migrated.Hooks.AfterRelease)
+	}
+	if len(migrated.Hooks.PreCommit) != 1 {
+		t.Errorf("hooks.pre-commit lost in migration: %+v", migrated.Hooks.PreCommit)
+	}
+	if !migrated.Notification.Enabled || len(migrated.Notification.Webhooks) != 1 {
+		t.Errorf("notification section lost in migration: %+v", migrated.Notification)
+	}
+	if migrated.Git.Commit {
+		t.Error("git.commit=false lost in migration")
+	}
+}

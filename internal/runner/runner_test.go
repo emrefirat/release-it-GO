@@ -1184,8 +1184,10 @@ func TestRunner_GitRelease_Interactive_CommitConfirmed_TagDeclined(t *testing.T)
 	runner.ctx.IsCI = false
 	runner.ctx.Spinner = ui.NewSpinner(true) // Use CI spinner to avoid race
 	runner.ctx.Prompter = &sequentialMockPrompter{
-		confirmResults: []bool{true, false}, // commit yes, tag no
-		confirmErrors:  []error{nil, nil},
+		// commit yes, tag no, push no — declining the tag no longer cancels
+		// the push prompt (each operation is confirmed independently)
+		confirmResults: []bool{true, false, false},
+		confirmErrors:  []error{nil, nil, nil},
 	}
 	_ = confirmCallCount
 
@@ -3824,3 +3826,385 @@ func TestFilterContributors_EmptyContributors(t *testing.T) {
 
 // Ensure imports are used
 var _ = errors.New
+
+func TestRunner_DetermineSemVer_ExplicitVersion(t *testing.T) {
+	cfg := &config.Config{
+		CI:        true,
+		Increment: "2.5.0", // -i 1.5.0 / positional "2.5.0": explicit target version
+		Git:       config.GitConfig{TagName: "v${version}"},
+	}
+
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{})
+
+	if err := runner.determineSemVer("1.0.0"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if runner.ctx.Version != "2.5.0" {
+		t.Errorf("Version = %q, want 2.5.0", runner.ctx.Version)
+	}
+	if runner.ctx.TagName != "v2.5.0" {
+		t.Errorf("TagName = %q, want v2.5.0", runner.ctx.TagName)
+	}
+}
+
+func TestRunner_DetermineSemVer_ExplicitVersionWithVPrefix(t *testing.T) {
+	cfg := &config.Config{
+		CI:        true,
+		Increment: "v3.0.0",
+		Git:       config.GitConfig{TagName: "v${version}"},
+	}
+
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{})
+
+	if err := runner.determineSemVer("1.0.0"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if runner.ctx.Version != "3.0.0" {
+		t.Errorf("Version = %q, want 3.0.0 (v prefix stripped)", runner.ctx.Version)
+	}
+}
+
+func TestRunner_DetermineSemVer_ExplicitIncrement_DoesNotPrompt(t *testing.T) {
+	cfg := &config.Config{
+		Increment: "minor", // explicitly chosen — npm never prompts here
+		Git:       config.GitConfig{TagName: "v${version}"},
+	}
+
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{
+		// auto-detect would also say "minor" — the old prompt condition
+		// (increment == autoDetect) fired exactly in this coincidence
+		"git log v1.0.0..HEAD --pretty=format:%h%x1f%B%x1e": {
+			output: "abc1234\x1ffeat: something\x1e",
+			err:    nil,
+		},
+	})
+	runner.ctx.IsCI = false // force the interactive branch
+	runner.ctx.LatestVersion = "1.0.0"
+	runner.ctx.Prompter = &mockPrompter{
+		selectVersionErr: fmt.Errorf("prompt must not be shown for an explicit increment"),
+	}
+
+	if err := runner.determineSemVer("1.0.0"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if runner.ctx.Version != "1.1.0" {
+		t.Errorf("Version = %q, want 1.1.0", runner.ctx.Version)
+	}
+}
+
+func TestRunner_DetermineVersion_InfersVPrefixFromLatestTag(t *testing.T) {
+	cfg := &config.Config{
+		CI:  true,
+		Git: config.GitConfig{TagName: "${version}"}, // shipped default, not user-set
+	}
+
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{
+		"git describe --tags --abbrev=0": {output: "v1.2.2", err: nil},
+		// Inference must make the pipeline query the REAL v-prefixed tag —
+		// previously "1.2.2..HEAD" failed and auto-increment fell to patch.
+		"git log v1.2.2..HEAD --pretty=format:%h%x1f%B%x1e": {
+			output: "abc1234\x1ffeat: new capability\x1e",
+			err:    nil,
+		},
+	})
+
+	if err := runner.determineVersion(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if runner.ctx.Version != "1.3.0" {
+		t.Errorf("Version = %q, want 1.3.0 (feat → minor)", runner.ctx.Version)
+	}
+	if runner.ctx.TagName != "v1.3.0" {
+		t.Errorf("TagName = %q, want v1.3.0 (v prefix inferred from history)", runner.ctx.TagName)
+	}
+}
+
+func TestRunner_DetermineVersion_ExplicitTagName_NoInference(t *testing.T) {
+	cfg := &config.Config{
+		CI: true,
+		Git: config.GitConfig{
+			TagName:         "${version}",
+			TagNameExplicit: true, // user wrote tagName in the config file
+		},
+	}
+
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{
+		"git describe --tags --abbrev=0": {output: "v1.2.2", err: nil},
+		"git log 1.2.2..HEAD --pretty=format:%h%x1f%B%x1e": {
+			output: "",
+			err:    fmt.Errorf("unknown revision"),
+		},
+		// raw-tag fallback path
+		"git log v1.2.2..HEAD --pretty=format:%h%x1f%B%x1e": {
+			output: "abc1234\x1ffeat: new capability\x1e",
+			err:    nil,
+		},
+	})
+
+	if err := runner.determineVersion(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if runner.ctx.TagName != "1.3.0" {
+		t.Errorf("TagName = %q, want 1.3.0 (explicit template must be respected)", runner.ctx.TagName)
+	}
+}
+
+func TestRunner_GitRelease_DeclineCommit_StillTagsAndPushes(t *testing.T) {
+	cfg := &config.Config{
+		Git: config.GitConfig{
+			Commit: true, Tag: true, Push: true,
+			TagName: "v${version}", TagAnnotation: "Release ${version}",
+			CommitMessage: "chore: release v${version}",
+		},
+	}
+
+	var calls []string
+	restore := git.SetCommandExecutorForTest(func(name string, args ...string) (string, error) {
+		call := name + " " + strings.Join(args, " ")
+		calls = append(calls, call)
+		if strings.HasPrefix(call, "git diff --cached") {
+			return "staged.txt", nil // there ARE staged changes
+		}
+		return "", nil
+	})
+	t.Cleanup(restore)
+
+	runner := NewRunner(cfg)
+	runner.ctx.IsCI = false
+	runner.ctx.Version = "1.1.0"
+	runner.ctx.TagName = "v1.1.0"
+	// npm asks commit/tag/push independently: declining the commit must not
+	// silently cancel the tag and push prompts.
+	runner.ctx.Prompter = &sequentialMockPrompter{confirmResults: []bool{false, true, true}}
+
+	if err := runner.gitRelease(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	joined := strings.Join(calls, "\n")
+	if strings.Contains(joined, "git commit") {
+		t.Error("declined commit must not run git commit")
+	}
+	if !strings.Contains(joined, "--annotate") {
+		t.Errorf("tag must still be created after a declined commit; calls:\n%s", joined)
+	}
+	if !strings.Contains(joined, "git push") {
+		t.Errorf("push must still run after a declined commit; calls:\n%s", joined)
+	}
+}
+
+func TestRunner_GitRelease_DeclineTag_StillPushes(t *testing.T) {
+	cfg := &config.Config{
+		Git: config.GitConfig{
+			Commit: false, Tag: true, Push: true,
+			TagName: "v${version}", TagAnnotation: "Release ${version}",
+		},
+	}
+
+	var calls []string
+	restore := git.SetCommandExecutorForTest(func(name string, args ...string) (string, error) {
+		calls = append(calls, name+" "+strings.Join(args, " "))
+		return "", nil
+	})
+	t.Cleanup(restore)
+
+	runner := NewRunner(cfg)
+	runner.ctx.IsCI = false
+	runner.ctx.Version = "1.1.0"
+	runner.ctx.TagName = "v1.1.0"
+	runner.ctx.Prompter = &sequentialMockPrompter{confirmResults: []bool{false, true}} // tag: no, push: yes
+
+	if err := runner.gitRelease(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	joined := strings.Join(calls, "\n")
+	if strings.Contains(joined, "--annotate") {
+		t.Error("declined tag must not be created")
+	}
+	if !strings.Contains(joined, "git push") {
+		t.Errorf("push must still run after a declined tag; calls:\n%s", joined)
+	}
+}
+
+func TestRunner_BuildVersionOptions_PreRelease(t *testing.T) {
+	cfg := &config.Config{
+		CI:           true,
+		PreReleaseID: "beta",
+		Git:          config.GitConfig{TagName: "v${version}"},
+	}
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{})
+
+	options := runner.buildVersionOptions("1.2.3", "preminor")
+
+	if len(options) != 3 {
+		t.Fatalf("expected 3 pre-release options, got %d: %+v", len(options), options)
+	}
+	want := []string{"1.2.4-beta.0", "1.3.0-beta.0", "2.0.0-beta.0"}
+	for i, w := range want {
+		if options[i].Version != w {
+			t.Errorf("options[%d].Version = %q, want %q", i, options[i].Version, w)
+		}
+	}
+	for _, o := range options {
+		if !strings.Contains(o.Version, "-beta.") {
+			t.Errorf("pre-release menu must never offer a stable version, got %q", o.Version)
+		}
+	}
+}
+
+func TestRunner_BuildVersionOptions_PreRelease_ContinueSeries(t *testing.T) {
+	cfg := &config.Config{
+		CI:           true,
+		PreReleaseID: "beta",
+		Git:          config.GitConfig{TagName: "v${version}"},
+	}
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{})
+
+	options := runner.buildVersionOptions("1.3.0-beta.1", "prerelease")
+
+	if len(options) == 0 {
+		t.Fatal("expected options")
+	}
+	if options[0].Version != "1.3.0-beta.2" {
+		t.Errorf("first option = %q, want 1.3.0-beta.2 (continue current series)", options[0].Version)
+	}
+	if !options[0].Recommended {
+		t.Error("continue-series option should carry the recommendation")
+	}
+}
+
+// optionCapturingPrompter records the options offered to the user.
+type optionCapturingPrompter struct {
+	capturedOptions []ui.VersionOption
+	returnVersion   string
+}
+
+func (m *optionCapturingPrompter) SelectVersion(current string, recommended string, options []ui.VersionOption) (string, error) {
+	m.capturedOptions = options
+	if m.returnVersion != "" {
+		return m.returnVersion, nil
+	}
+	return recommended, nil
+}
+func (m *optionCapturingPrompter) Confirm(message string, defaultYes bool) (bool, error) {
+	return true, nil
+}
+func (m *optionCapturingPrompter) Input(message string, defaultValue string) (string, error) {
+	return "", nil
+}
+func (m *optionCapturingPrompter) Select(question string, options []string, defaultIndex int) (int, error) {
+	return defaultIndex, nil
+}
+
+func TestRunner_DetermineSemVer_PreRelease_PromptKeepsIdentifier(t *testing.T) {
+	cfg := &config.Config{
+		PreReleaseID: "beta",
+		Git:          config.GitConfig{TagName: "v${version}"},
+	}
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{
+		"git log v1.2.3..HEAD --pretty=format:%h%x1f%B%x1e": {
+			output: "abc1234\x1ffeat: something\x1e",
+			err:    nil,
+		},
+	})
+	runner.ctx.IsCI = false
+	runner.ctx.LatestVersion = "1.2.3"
+	prompter := &optionCapturingPrompter{returnVersion: "1.3.0-beta.0"}
+	runner.ctx.Prompter = prompter
+
+	if err := runner.determineSemVer("1.2.3"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(prompter.capturedOptions) == 0 {
+		t.Fatal("expected the prompt to be shown with options")
+	}
+	for _, o := range prompter.capturedOptions {
+		if !strings.Contains(o.Version, "-beta.") {
+			t.Errorf("prompt offered a stable version %q — the pre-release identifier was dropped", o.Version)
+		}
+	}
+	if runner.ctx.Version != "1.3.0-beta.0" {
+		t.Errorf("Version = %q, want 1.3.0-beta.0", runner.ctx.Version)
+	}
+}
+
+func TestRunner_RenderReleaseTemplate_AllVars(t *testing.T) {
+	cfg := &config.Config{CI: true, Git: config.GitConfig{TagName: "v${version}"}}
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{})
+	runner.ctx.Version = "1.2.0"
+	runner.ctx.Vars = map[string]string{
+		"latestVersion":   "1.1.0",
+		"branchName":      "main",
+		"repo.repository": "my-repo",
+	}
+
+	got := runner.renderReleaseTemplate("release ${version} (was ${latestVersion}) on ${branchName} of ${repo.repository}, keep ${unknown}")
+	want := "release 1.2.0 (was 1.1.0) on main of my-repo, keep ${unknown}"
+	if got != want {
+		t.Errorf("renderReleaseTemplate:\ngot:  %q\nwant: %q", got, want)
+	}
+}
+
+func TestRunner_GitRelease_CommitMessageTemplateVars(t *testing.T) {
+	cfg := &config.Config{
+		CI: true,
+		Git: config.GitConfig{
+			Commit:        true,
+			CommitMessage: "chore: release ${version} on ${branchName}",
+		},
+	}
+
+	var commitMsg string
+	restore := git.SetCommandExecutorForTest(func(name string, args ...string) (string, error) {
+		call := name + " " + strings.Join(args, " ")
+		if strings.HasPrefix(call, "git diff --cached") {
+			return "staged.txt", nil
+		}
+		if len(args) > 2 && args[0] == "commit" && args[1] == "--message" {
+			commitMsg = args[2]
+		}
+		return "", nil
+	})
+	t.Cleanup(restore)
+
+	runner := NewRunner(cfg)
+	runner.ctx.Version = "1.1.0"
+	runner.ctx.BranchName = "main"
+	runner.ctx.UpdateVars()
+
+	if err := runner.gitRelease(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if commitMsg != "chore: release 1.1.0 on main" {
+		t.Errorf("commit message = %q, want branchName rendered (npm template var parity)", commitMsg)
+	}
+}

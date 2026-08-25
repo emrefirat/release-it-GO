@@ -92,6 +92,16 @@ func (g *Git) TagExists(tagName string) (bool, error) {
 	return strings.TrimSpace(out) == tagName, nil
 }
 
+// TagPointsAtHead reports whether the given tag references the current HEAD
+// commit. Read-only, so it runs the real command even in dry-run mode.
+func (g *Git) TagPointsAtHead(tagName string) (bool, error) {
+	out, err := commandExecutor("git", "tag", "-l", tagName, "--points-at", "HEAD")
+	if err != nil {
+		return false, fmt.Errorf("checking tag %s against HEAD: %w", tagName, err)
+	}
+	return strings.TrimSpace(out) == tagName, nil
+}
+
 // GetLatestPreReleaseTagMerged returns the latest pre-release tag merged into HEAD
 // that matches the given preReleaseID. This ensures only tags reachable from the
 // current branch are considered, preventing cross-branch tag pollution.

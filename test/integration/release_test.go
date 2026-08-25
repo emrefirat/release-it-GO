@@ -879,10 +879,12 @@ func TestIntegration_TagFormatChange_VPrefixRemoved(t *testing.T) {
 	createCommits(t, dir, []string{"feat: feature one"})
 	createTag(t, dir, "v1.1.0")
 
-	// Phase 2: Developer changes tagName to "${version}" (no v prefix)
+	// Phase 2: Developer explicitly changes tagName to "${version}" (no v
+	// prefix). Explicit user templates disable the v-prefix inference.
 	createCommits(t, dir, []string{"feat: feature two"})
 	cfg := newTestConfig(dir)
 	cfg.Git.TagName = "${version}" // No more v prefix
+	cfg.Git.TagNameExplicit = true // written in the config file
 	cfg.Git.Commit = false
 	cfg.Increment = "minor"
 
@@ -898,6 +900,7 @@ func TestIntegration_TagFormatChange_VPrefixRemoved(t *testing.T) {
 	createCommits(t, dir, []string{"fix: bugfix"})
 	cfg2 := newTestConfig(dir)
 	cfg2.Git.TagName = "${version}"
+	cfg2.Git.TagNameExplicit = true
 	cfg2.Git.Commit = false
 	cfg2.Increment = "patch"
 
@@ -1158,4 +1161,84 @@ func TestIntegration_SequentialReleases(t *testing.T) {
 		t.Fatalf("Second Run() failed: %v", err)
 	}
 	assertTagExists(t, dir, "v1.1.0")
+}
+
+func TestIntegration_ExplicitVersionIncrement(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	_ = os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+
+	initGitRepo(t, dir)
+	createTag(t, dir, "v1.0.0")
+	createCommits(t, dir, []string{"feat: something"})
+
+	cfg := newTestConfig(dir)
+	cfg.Increment = "2.5.0" // explicit target version, npm style
+
+	r := runner.NewRunner(cfg)
+	if err := r.Run(); err != nil {
+		t.Fatalf("Run() failed: %v", err)
+	}
+
+	assertTagExists(t, dir, "v2.5.0")
+}
+
+func TestIntegration_VPrefixInference(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	_ = os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+
+	initGitRepo(t, dir)
+	createTag(t, dir, "v1.0.0")
+	createCommits(t, dir, []string{"feat: new capability"})
+
+	cfg := newTestConfig(dir)
+	cfg.Git.TagName = "${version}" // shipped default — not user-set
+
+	r := runner.NewRunner(cfg)
+	if err := r.Run(); err != nil {
+		t.Fatalf("Run() failed: %v", err)
+	}
+
+	// npm parity: the latest tag is v-prefixed, so the new tag keeps the
+	// prefix AND the feat commit yields minor (previously always patch,
+	// because the unprefixed tag lookup failed).
+	assertTagExists(t, dir, "v1.1.0")
+}
+
+func TestIntegration_NoIncrement_ExistingTagAtHead_Skips(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	_ = os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+
+	initGitRepo(t, dir)
+	createCommits(t, dir, []string{"feat: shipped work"})
+	createTag(t, dir, "v0.1.0") // release already tagged at HEAD (e.g. push failed)
+
+	cfg := newTestConfig(dir)
+	cfg.Changelog.Enabled = false // recovery re-run: nothing new to generate
+
+	r := runner.NewRunner(cfg)
+	// npm's documented recovery flow: re-run release steps for the current
+	// version. The existing tag at HEAD must be tolerated, not fatal.
+	if err := r.RunNoIncrement(); err != nil {
+		t.Fatalf("RunNoIncrement() failed: %v", err)
+	}
+
+	assertTagExists(t, dir, "v0.1.0")
 }

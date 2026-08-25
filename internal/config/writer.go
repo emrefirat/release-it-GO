@@ -45,25 +45,48 @@ func toMinimalMap(cfg *Config) map[string]interface{} {
 }
 
 // toConfigMap converts a Config to a map. Fields matching defaults are omitted
-// unless they appear in the force set for their section.
+// unless they appear in the force set for their section. Every config section
+// must be serialized here — a missing section silently disappears during
+// config migration.
 func toConfigMap(cfg *Config, force ForceFields) map[string]interface{} {
 	defaults := DefaultConfig()
 	result := make(map[string]interface{})
 
-	if gitMap := diffStructForce(&cfg.Git, &defaults.Git, force["git"]); len(gitMap) > 0 {
-		result["git"] = gitMap
+	sections := []struct {
+		key      string
+		value    interface{}
+		defaults interface{}
+	}{
+		{"git", &cfg.Git, &defaults.Git},
+		{"github", &cfg.GitHub, &defaults.GitHub},
+		{"gitlab", &cfg.GitLab, &defaults.GitLab},
+		{"hooks", &cfg.Hooks, &defaults.Hooks},
+		{"changelog", &cfg.Changelog, &defaults.Changelog},
+		{"bumper", &cfg.Bumper, &defaults.Bumper},
+		{"calver", &cfg.CalVer, &defaults.CalVer},
+		{"notification", &cfg.Notification, &defaults.Notification},
+	}
+	for _, s := range sections {
+		if m := diffStructForce(s.value, s.defaults, force[s.key]); len(m) > 0 {
+			result[s.key] = m
+		}
 	}
 
-	if ghMap := diffStructForce(&cfg.GitHub, &defaults.GitHub, force["github"]); len(ghMap) > 0 {
-		result["github"] = ghMap
+	// Top-level scalars
+	if cfg.Increment != defaults.Increment {
+		result["increment"] = cfg.Increment
 	}
-
-	if glMap := diffStructForce(&cfg.GitLab, &defaults.GitLab, force["gitlab"]); len(glMap) > 0 {
-		result["gitlab"] = glMap
+	if cfg.PreReleaseID != defaults.PreReleaseID {
+		result["preReleaseId"] = cfg.PreReleaseID
 	}
-
-	if clMap := diffStructForce(&cfg.Changelog, &defaults.Changelog, force["changelog"]); len(clMap) > 0 {
-		result["changelog"] = clMap
+	if cfg.CI != defaults.CI {
+		result["ci"] = cfg.CI
+	}
+	if cfg.DryRun != defaults.DryRun {
+		result["dry-run"] = cfg.DryRun
+	}
+	if cfg.Verbose != defaults.Verbose {
+		result["verbose"] = cfg.Verbose
 	}
 
 	return result

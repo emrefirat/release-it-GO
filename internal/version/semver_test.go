@@ -207,3 +207,28 @@ func TestParsePreRelease_DottedID(t *testing.T) {
 		t.Errorf("expected num=5, got %d", num)
 	}
 }
+
+func TestIsIncrementType(t *testing.T) {
+	tests := []struct {
+		input string
+		want  bool
+	}{
+		{"patch", true},
+		{"minor", true},
+		{"major", true},
+		{"prepatch", true},
+		{"preminor", true},
+		{"premajor", true},
+		{"prerelease", true},
+		{"1.5.0", false},
+		{"v1.5.0", false},
+		{"bogus", false},
+		{"", false},
+		{"Minor", false}, // case-sensitive like npm
+	}
+	for _, tt := range tests {
+		if got := IsIncrementType(tt.input); got != tt.want {
+			t.Errorf("IsIncrementType(%q) = %v, want %v", tt.input, got, tt.want)
+		}
+	}
+}

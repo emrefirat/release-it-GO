@@ -325,3 +325,25 @@ func TestToConfigMap_ForceFieldsIncludesDefaults(t *testing.T) {
 		t.Error("github section should not appear without force or diff")
 	}
 }
+
+func TestToConfigMap_IncludesAllSections(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Hooks.AfterRelease = []string{"echo done"}
+	cfg.Bumper.Enabled = true
+	cfg.Bumper.Out = []BumperFile{{File: "package.json", Path: "version"}}
+	cfg.CalVer.Enabled = true
+	cfg.Notification.Enabled = true
+	cfg.Notification.Webhooks = []WebhookConfig{{Type: "slack", URLRef: "SLACK_URL"}}
+	cfg.Increment = "minor"
+	cfg.PreReleaseID = "beta"
+
+	m := toConfigMap(cfg, nil)
+
+	// The writer previously serialized only git/github/gitlab/changelog,
+	// silently dropping these sections during config migration.
+	for _, key := range []string{"hooks", "bumper", "calver", "notification", "increment", "preReleaseId"} {
+		if _, ok := m[key]; !ok {
+			t.Errorf("toConfigMap dropped %q — migration would silently lose it", key)
+		}
+	}
+}

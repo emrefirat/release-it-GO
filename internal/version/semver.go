@@ -30,6 +30,25 @@ func ParseVersion(v string) (*semver.Version, error) {
 	return parsed, nil
 }
 
+// incrementTypes lists the accepted increment keywords (npm release-it set).
+var incrementTypes = map[string]bool{
+	"patch":      true,
+	"minor":      true,
+	"major":      true,
+	"prepatch":   true,
+	"preminor":   true,
+	"premajor":   true,
+	"prerelease": true,
+}
+
+// IsIncrementType reports whether s is one of the increment keywords
+// (patch, minor, major, prepatch, preminor, premajor, prerelease).
+// Anything else — e.g. an explicit version like "1.5.0" — is not an
+// increment type. Matching is case-sensitive, like npm release-it.
+func IsIncrementType(s string) bool {
+	return incrementTypes[s]
+}
+
 // IncrementVersion increments the version based on the given type.
 // Supported types: "major", "minor", "patch", "premajor", "preminor", "prepatch", "prerelease".
 func IncrementVersion(current *semver.Version, incrementType string, preReleaseID string) (*semver.Version, error) {
