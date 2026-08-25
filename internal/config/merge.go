@@ -1,7 +1,10 @@
 package config
 
-// MergeFlags applies CLI flag overrides to the config.
-// Only non-zero values are applied (zero values are treated as "not set").
+// FlagOverrides carries CLI flag values into ApplyFlags. A nil pointer means
+// the flag was not provided on the command line, so the config-file value is
+// kept. Callers must only set a pointer for flags the user actually passed
+// (cobra's Flags().Changed) — bool/count zero values are indistinguishable
+// from "unset" otherwise.
 type FlagOverrides struct {
 	DryRun       *bool
 	CI           *bool

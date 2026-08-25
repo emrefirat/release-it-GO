@@ -369,6 +369,56 @@ func bytesContains(haystack []byte, needle string) bool {
 	return bytes.Contains(haystack, []byte(needle))
 }
 
+// saveFlagGlobals snapshots the package-level flag variables mutated by
+// ParseFlags and restores them via t.Cleanup.
+func saveFlagGlobals(t *testing.T) {
+	t.Helper()
+	origDryRun, origCI, origVerbose := dryRun, ciMode, verboseCount
+	t.Cleanup(func() {
+		dryRun, ciMode, verboseCount = origDryRun, origCI, origVerbose
+	})
+}
+
+func TestBuildFlagOverrides_UnsetFlags_AreNil(t *testing.T) {
+	saveFlagGlobals(t)
+	cmd := NewRootCommand()
+	if err := cmd.ParseFlags([]string{}); err != nil {
+		t.Fatalf("ParseFlags: %v", err)
+	}
+
+	o := buildFlagOverrides(cmd)
+	// Nil means "keep the config-file value" — passing the flag defaults
+	// here clobbered config ci/dry-run/verbose on every run.
+	if o.DryRun != nil {
+		t.Error("DryRun must be nil when --dry-run is not given")
+	}
+	if o.CI != nil {
+		t.Error("CI must be nil when --ci is not given")
+	}
+	if o.Verbose != nil {
+		t.Error("Verbose must be nil when -V is not given")
+	}
+}
+
+func TestBuildFlagOverrides_SetFlags_ArePresent(t *testing.T) {
+	saveFlagGlobals(t)
+	cmd := NewRootCommand()
+	if err := cmd.ParseFlags([]string{"--ci", "--dry-run", "-VV"}); err != nil {
+		t.Fatalf("ParseFlags: %v", err)
+	}
+
+	o := buildFlagOverrides(cmd)
+	if o.DryRun == nil || !*o.DryRun {
+		t.Error("expected DryRun override when --dry-run given")
+	}
+	if o.CI == nil || !*o.CI {
+		t.Error("expected CI override when --ci given")
+	}
+	if o.Verbose == nil || *o.Verbose != 2 {
+		t.Error("expected Verbose=2 override when -VV given")
+	}
+}
+
 func TestReasonDescription(t *testing.T) {
 	tests := []struct {
 		name     string

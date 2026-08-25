@@ -148,6 +148,32 @@ PowerShell:
 	}
 }
 
+// buildFlagOverrides collects CLI overrides for config.ApplyFlags. Bool and
+// count flags only override the config when the user actually passed them
+// (Flags().Changed) — otherwise a config-file "ci: true", "dry-run: true",
+// or "verbose: N" would be clobbered by the flag defaults on every run.
+// String flags and the --no-* disables carry their own "unset" sentinels
+// (empty string / false), so their pointers are always passed.
+func buildFlagOverrides(cmd *cobra.Command) config.FlagOverrides {
+	overrides := config.FlagOverrides{
+		Increment:    &increment,
+		PreReleaseID: &preReleaseID,
+		NoCommit:     &noCommit,
+		NoTag:        &noTag,
+		NoPush:       &noPush,
+	}
+	if cmd.Flags().Changed("dry-run") {
+		overrides.DryRun = &dryRun
+	}
+	if cmd.Flags().Changed("ci") {
+		overrides.CI = &ciMode
+	}
+	if cmd.Flags().Changed("verbose") {
+		overrides.Verbose = &verboseCount
+	}
+	return overrides
+}
+
 // runRelease is the main entry point for the release command.
 func runRelease(cmd *cobra.Command, args []string) error {
 	// Load config
@@ -162,16 +188,7 @@ func runRelease(cmd *cobra.Command, args []string) error {
 	}
 
 	// Apply CLI flag overrides
-	config.ApplyFlags(cfg, config.FlagOverrides{
-		DryRun:       &dryRun,
-		CI:           &ciMode,
-		Verbose:      &verboseCount,
-		Increment:    &increment,
-		PreReleaseID: &preReleaseID,
-		NoCommit:     &noCommit,
-		NoTag:        &noTag,
-		NoPush:       &noPush,
-	})
+	config.ApplyFlags(cfg, buildFlagOverrides(cmd))
 
 	// When preRelease is set, auto-mark GitHub/GitLab releases as pre-release
 	if preRelease != "" {

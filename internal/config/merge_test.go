@@ -118,3 +118,24 @@ func TestApplyFlags_PreReleaseID(t *testing.T) {
 		t.Errorf("PreReleaseID = %q, expected %q", cfg.PreReleaseID, "beta")
 	}
 }
+
+func TestApplyFlags_NilPointers_KeepConfigFileValues(t *testing.T) {
+	// A config file may set ci/dry-run/verbose; nil overrides (flag not
+	// passed) must never reset them.
+	cfg := DefaultConfig()
+	cfg.CI = true
+	cfg.DryRun = true
+	cfg.Verbose = 2
+
+	ApplyFlags(cfg, FlagOverrides{})
+
+	if !cfg.CI {
+		t.Error("CI from config file was reset by empty overrides")
+	}
+	if !cfg.DryRun {
+		t.Error("DryRun from config file was reset by empty overrides")
+	}
+	if cfg.Verbose != 2 {
+		t.Errorf("Verbose from config file = %d, expected 2", cfg.Verbose)
+	}
+}
