@@ -13,11 +13,11 @@
 | 3 | GitLab `secure` sıfır değeri → `InsecureSkipVerify=true` (varsayılanda TLS doğrulaması kapalı) | KRİTİK | ✅ Bu faz |
 | 4 | Geçersiz CA dosyası boş root pool kuruyor (tüm bağlantılar opak x509 hatasıyla düşer) | ORTA (3'e bağlı) | ✅ Bu faz |
 | 5 | `BREAKING CHANGE:` footer'ları işlenmiyor (git log yalnız `%s` çekiyor) → major bump çalışmıyor | KRİTİK | ✅ Bu faz |
-| 6 | `before:release` / `after:release` hook'ları hiç tetiklenmiyor | YÜKSEK | ⬜ |
-| 7 | Config `ci`/`dry-run`/`verbose` alanları unset flag'lerce eziliyor (`Flags().Changed` yok) | YÜKSEK | ⬜ |
-| 8 | Webhook gizli URL'leri hata mesajlarına sızıyor (`*url.Error`) | YÜKSEK | ⬜ |
-| 9 | npm compat `requireBranch: [...]` → `"main,master"` stringi hiçbir dala eşleşmiyor | YÜKSEK | ⬜ |
-| 10 | Go toolchain 1.26.3 → ≥1.26.6 (7 stdlib zafiyeti; `make check` vuln adımında kırılıyor) | YÜKSEK | ⬜ |
+| 6 | `before:release` / `after:release` hook'ları hiç tetiklenmiyor | YÜKSEK | ✅ Bu faz |
+| 7 | Config `ci`/`dry-run`/`verbose` alanları unset flag'lerce eziliyor (`Flags().Changed` yok) | YÜKSEK | ✅ Bu faz |
+| 8 | Webhook gizli URL'leri hata mesajlarına sızıyor (`*url.Error`) | YÜKSEK | ✅ Bu faz |
+| 9 | npm compat `requireBranch: [...]` → `"main,master"` stringi hiçbir dala eşleşmiyor | YÜKSEK | ✅ Bu faz |
+| 10 | Go toolchain 1.26.3 → 1.26.7 (7 stdlib zafiyeti; `make check` vuln adımında kırılıyordu) | YÜKSEK | ✅ Bu faz |
 
 Bumper format kaybı (KRİTİK ama büyük iş) Faz 26'ya; dağıtım/CI bulguları (go install imkânsız, CI security job, CHANGELOG bayatlığı, release.yml orphan-tag yarışı) Faz 24'e planlandı.
 
@@ -70,3 +70,11 @@ if host == "" || host == "github.com" || host == "api.github.com" {
 - GHE asset upload (`upload_url` kullanılmıyor) — denetim F5, Faz 25/26.
 - HTTP retry/backoff ve ortak HTTP helper — Faz 26.
 - `github.web`, `gitlab.preRelease` gibi ölü config alanları — Faz 25.
+
+## Tamamlanma Notları (madde 6-10)
+
+- **Release hook'ları**: üç pipeline döngüsü ortak `runSteps()` helper'ına toplandı (denetimin mimari önerisi); `before:release` git:release adımından (kendi before hook'undan da) önce, `after:release` tüm adımlar bittikten sonra tetikleniyor. "No commits" graceful çıkışında release hook'ları bilinçli olarak atlanıyor. Entegrasyon testleri sıralamayı ve atlama davranışını kanıtlıyor.
+- **Flag önceliği**: `buildFlagOverrides(cmd)` yalnızca `Flags().Changed()` olan bool/count flag'leri için pointer geçiriyor; config dosyasındaki `ci`/`dry-run`/`verbose` artık korunuyor.
+- **Webhook sızıntısı**: `sendOne` `*url.Error`'ı açıp yalnızca alt nedeni raporluyor; hata metni tip + urlRef adı taşıyor, URL asla. Regresyon testi "SECRET asla hata metninde görünmez" assert'i içeriyor.
+- **requireBranch**: virgülle ayrılmış çoklu desen, herhangi biri eşleşirse geçer; `path.Match` ile platform-bağımsız glob (denetim L5 de kapandı).
+- **Toolchain**: go.mod `go 1.26.7`, Dockerfile `golang:1.26.7-alpine`; CI `go-version-file: go.mod` kullandığından otomatik uyum. `make check` vuln adımı ilk kez yeşil.

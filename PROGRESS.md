@@ -31,7 +31,7 @@
 | 20 | Git Hook Management (install / remove / check-msg) | Complete | 100% |
 | 21 | P0 Test Coverage Completion (QA audit) | Complete | 100% |
 | 22 | Atomic Git Push Default | Complete | 100% |
-| 23 | Critical Correctness & Security Fixes (2026-08 audit P0) | In Progress | 50% |
+| 23 | Critical Correctness & Security Fixes (2026-08 audit P0) | Complete | 100% |
 
 **Last Updated:** 2026-08-25
 **Active Developer:** Claude
@@ -622,7 +622,7 @@
 
 ## Phase 23: Critical Correctness & Security Fixes (2026-08 audit P0)
 
-**Status:** In Progress
+**Status:** Complete
 **PRD:** `docs/phase_23.md`
 
 ### To Do
@@ -632,11 +632,11 @@
 - [x] GitLab TLS-by-default — `Secure: true` in defaults; `secure: false` stays as explicit opt-out; invalid CA PEM falls back to system roots instead of an empty pool
 - [x] Shipped-defaults regression tests (clients built from `DefaultConfig()`)
 - [x] Full commit messages (`%B` + hash) into changelog pipeline — `BREAKING CHANGE:` footers now trigger major bump, BREAKING CHANGES section renders, commit hashes appear in changelog entries; multiline footer values supported; shared `commitsSinceLatestRelease()` helper gives all three call sites the raw-tag fallback; dead `GetCommitsSinceTag` removed
-- [ ] Fire `before:release` / `after:release` lifecycle hooks
-- [ ] Flag precedence via `Flags().Changed()` — config `ci`/`dry-run`/`verbose` currently clobbered
-- [ ] Sanitize webhook errors (secret URL leaks via `*url.Error`)
-- [ ] npm compat `requireBranch` array support
-- [ ] Go toolchain bump ≥1.26.6 (7 stdlib advisories; unblocks `make check` vuln step)
+- [x] Fire `before:release` / `after:release` lifecycle hooks — three pipeline loops unified into one `runSteps()` helper; before:release fires ahead of git:release, after:release once at pipeline end; skipped on the no-commits graceful abort
+- [x] Flag precedence via `Flags().Changed()` — `buildFlagOverrides` passes bool/count pointers only for flags the user set; config-file `ci`/`dry-run`/`verbose` finally work
+- [x] Sanitize webhook errors — `sendOne` unwraps `*url.Error` and reports only the underlying cause; regression test asserts the secret path never appears
+- [x] npm compat `requireBranch` array support — comma-separated patterns match any-of via `path.Match` (platform-independent globs)
+- [x] Go toolchain bump to 1.26.7 (closes all 7 stdlib advisories; `make check` fully green for the first time); Dockerfile builder + CLAUDE.md updated, CI follows via go-version-file
 
 ### Notes
 
@@ -661,6 +661,10 @@
 - [x] BUG: `latestVersionToTag()` hardcoded a `v` prefix instead of using the `tagName` template from config (2026-03-23) → In environments without a config file (default `tagName: "${version}"`), the tag was created as `0.1.0-main.0` while the changelog searched for `v0.1.0-main.0`. Fix: `latestVersionToTag()` now uses `renderTagName(tagNameTemplate, version)`. The `v` prefix is stripped from the version before applying the template, preventing `vv` duplication.
 - [x] BUG: With changelog disabled, `git commit` produced "nothing to commit" error (2026-03-30) → With changelog and bumper disabled, there are no staged changes, but commit was attempted. Fix: `HasStagedChanges()` check added; if there are no staged changes, the commit is skipped and a verbose log entry is written.
 - [x] BUG: When `tagName` config changed, old-format tags were being found as latest (2026-03-30) → Transitioning from `v${version}` → `${version}`, `GetLatestTag` still found `v1.5.0`, and the changelog searched for the `1.5.0` tag (which doesn't exist). Fix: `matchesTagNameFormat()` added for tag format filtering. A fallback mechanism for version continuity across format transitions, plus a raw tag fallback in changelog.
+- [x] BUG: `before:release` / `after:release` hooks were documented but never fired (2026-08-25) → the runner only emitted per-step events and no step is named "release", so npm release-it's most-used hook was silently ignored for migrating configs. Fix: shared `runSteps()` fires before:release ahead of the git:release step and after:release after all steps; skipped when the release aborts with no commits. Integration tests assert order and the skip.
+- [x] BUG: config-file `ci`, `dry-run`, `verbose` were clobbered by unset CLI flags (2026-08-25) → `runRelease` always passed `&dryRun`/`&ciMode`/`&verboseCount`, so their flag defaults overwrote the config on every run — three documented fields were dead. Fix: `buildFlagOverrides` consults `cmd.Flags().Changed()` before passing bool/count pointers.
+- [x] BUG: webhook secret URLs leaked into error messages (2026-08-25) → a failed POST returned a `*url.Error` whose text embeds the full webhook URL (a bearer credential for Slack/Teams), and the runner logs that error. Fix: unwrap `*url.Error` and report only the underlying cause; type + urlRef still identify the webhook.
+- [x] BUG: npm-compat `requireBranch` arrays could never match (2026-08-25) → `["main","master"]` was joined to the single pattern "main,master", which matches no branch — migrated configs were hard-blocked. Fix: comma-separated patterns now match any-of; `path.Match` replaces `filepath.Match` for platform-independent glob semantics.
 - [x] BUG: `BREAKING CHANGE:` footers never triggered a major bump (2026-08-25) → `GetCommitsSinceTag` fetched only subject lines (`--pretty=format:%s`) and the runner passed `Hash: ""`, so the parser's entire body/footer machinery was dead in the live pipeline: a spec-canonical `feat: x` + `BREAKING CHANGE:` body bumped **minor**, the BREAKING CHANGES changelog section was always empty, and commit hashes never rendered. Only the `feat!:` subject marker worked. Fix: new `GetFullCommitsSinceTag` (`%h%x1f%B%x1e` with ASCII separators) + shared `commitsSinceLatestRelease()` runner helper (also gives auto-increment the raw-tag fallback it lacked); parser now folds multiline footer continuation lines into the preceding footer (a second latent bug that would have surfaced immediately). Dead `GetCommitsSinceTag` removed; 21 runner test mocks migrated to the new git-log format.
 - [x] BUG: Default `github.host: "api.github.com"` broke every GitHub API call (2026-08-25) → `resolveGitHubBaseURL` only special-cased `""` and `"github.com"`, so the shipped default fell into the Enterprise branch and produced `https://api.github.com/api/v3` — 404 for release creation, token validation, comments, and uploads. Masked because the project's own config sets `github.release: false` and the unit-test table never covered the shipped default. Fix: default changed to `"github.com"` and `"api.github.com"` added as a public-API alias (protects existing configs that copied the old default). Regression test builds the client from `DefaultConfig()`.
 - [x] BUG: GitLab client skipped TLS verification by default (2026-08-25) → the zero value of `gitlab.secure` is `false` and `createHTTPClient` mapped `!Secure` to `InsecureSkipVerify=true`, so every default-config GitLab release sent the `Private-Token` over unverified TLS; a test even asserted the insecure default as expected behavior. Fix: `Secure: true` in `DefaultConfig()`; `secure: false` remains as an explicit opt-out; docs/example updated. Bonus: an invalid CA file no longer installs an empty root pool (opaque all-connections-fail) — warns and falls back to system roots, with real-certificate coverage via a generated self-signed CA in tests.
@@ -742,6 +746,7 @@
 | 2026-08-25 | Claude | fix: `hooks install` now prunes managed hooks removed from config (reconciliation model), resets core.hooksPath when .hooks/ empties, no longer creates .hooks/ with nothing configured; deterministic install order; test isolation fix (TestInstall_SkipsEmptyCommands ran real `git config` against the developer repo) |
 | 2026-08-25 | Claude | Phase 23 (partial): shipped-default fixes — `github.host` no longer resolves to the nonexistent `/api/v3` path (404), GitLab TLS verification on by default (`Secure: true`), invalid CA PEM falls back to system roots; `DefaultConfig()`-based regression tests; docs/phase_23.md PRD created from the 2026-08-25 audit |
 | 2026-08-25 | Claude | Phase 23: BREAKING CHANGE footers now drive major bumps — full commit messages (`%h%x1f%B%x1e`) flow through the changelog pipeline via shared `commitsSinceLatestRelease()`; changelog entries gain commit hashes; multiline footer values parsed; auto-increment gains the raw-tag fallback; dead `GetCommitsSinceTag` removed |
+| 2026-08-25 | Claude | Phase 23 complete: before/after:release hooks fired via unified `runSteps()`, flag precedence fixed (`Flags().Changed`), webhook errors sanitized (no secret URLs), `requireBranch` comma-separated any-of matching, Go toolchain 1.26.7 (all stdlib advisories closed — `make check` fully green) |
 
 ---
 
