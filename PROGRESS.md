@@ -33,6 +33,7 @@
 | 22 | Atomic Git Push Default | Complete | 100% |
 | 23 | Critical Correctness & Security Fixes (2026-08 audit P0) | Complete | 100% |
 | 25 | npm Parity Batch | Complete | 100% |
+| 26 | Hardening (audit structural findings) | Complete | 100% |
 
 **Last Updated:** 2026-08-26
 **Active Developer:** Claude
@@ -671,6 +672,29 @@
 
 ---
 
+## Phase 26: Hardening (audit structural findings)
+
+**Status:** Complete
+**PRD:** `docs/phase_26.md`
+
+### To Do
+
+- [x] `git.ErrNoCommits` sentinel + unified exec wrappers (stderr AND root cause in every git error)
+- [x] Spinner data race fixed (captured done channel, previous-animator close, ticker select)
+- [x] Windows lifecycle hooks (`%COMSPEC% /C`) + `RELEASE_*` env vars for hook scripts
+- [x] Real glob tag matching (`path.Match`) + semver-based latest-tag selection (git's -v:refname ranked rc above stable)
+- [x] Targeted release staging via `WriteVersionFiles` — no more whole-tree sweep by default
+- [x] Shared HTTP retry helper (`internal/httputil`): backoff + Retry-After on 429/5xx; conn errors replayed only for idempotent methods; wired into GitHub/GitLab/notifications
+- [x] Format-preserving bumper: targeted splice proven by re-parse + full-tree compare, full re-marshal as fallback
+- [x] Push failure prints the `--no-increment` recovery flow
+
+### Notes
+
+- Retry deliberately skips asset uploads (file bodies aren't replayable) and never replays an unanswered POST (duplicate-release risk).
+- Bumper preservation is proof-based: an edit that can't be proven correct falls back to the old behavior instead of risking file corruption.
+
+---
+
 ## Bugs
 
 - [x] BUG: First-release changelog "exit status 128" error (2026-02-16) → When `LatestVersion=0.0.0`, the `v0.0.0` tag was searched but no such tag exists. The `latestVersionToTag()` helper was added: returns empty for `0.0.0` or empty string, so `GetCommitsSinceTag("")` returns all commits. 3 sites affected: `RunChangelogOnly`, `generateChangelog`, `autoDetectIncrement`.
@@ -686,6 +710,10 @@
 - [x] BUG: `latestVersionToTag()` hardcoded a `v` prefix instead of using the `tagName` template from config (2026-03-23) → In environments without a config file (default `tagName: "${version}"`), the tag was created as `0.1.0-main.0` while the changelog searched for `v0.1.0-main.0`. Fix: `latestVersionToTag()` now uses `renderTagName(tagNameTemplate, version)`. The `v` prefix is stripped from the version before applying the template, preventing `vv` duplication.
 - [x] BUG: With changelog disabled, `git commit` produced "nothing to commit" error (2026-03-30) → With changelog and bumper disabled, there are no staged changes, but commit was attempted. Fix: `HasStagedChanges()` check added; if there are no staged changes, the commit is skipped and a verbose log entry is written.
 - [x] BUG: When `tagName` config changed, old-format tags were being found as latest (2026-03-30) → Transitioning from `v${version}` → `${version}`, `GetLatestTag` still found `v1.5.0`, and the changelog searched for the `1.5.0` tag (which doesn't exist). Fix: `matchesTagNameFormat()` added for tag format filtering. A fallback mechanism for version continuity across format transitions, plus a raw tag fallback in changelog.
+- [x] BUG: bumper rewrites destroyed file formatting (2026-08-26) → JSON keys were alphabetized with forced 2-space indent and HTML-escaped &, YAML lost every comment, TOML lost layout — each release commit carried a massive unrelated diff on package.json/Chart.yaml/Cargo.toml. Fix: targeted single-value splice, proven by re-parse + whole-tree comparison; unprovable edits fall back to the old full re-marshal.
+- [x] BUG: spinner had a data race and could leak a second animator (2026-08-26) → the goroutine re-read `s.done` unlocked while Start reassigned it; a Stop→Start pair within the 80ms sleep left two animators printing. Fix: channel captured at spawn, previous animator closed by Start, ticker-based select exits immediately.
+- [x] BUG: `git tag --sort=-v:refname` returned a pre-release as "latest" over the same-base stable (2026-08-26) → git's versionsort ranks 1.0.0-rc.1 above 1.0.0 without a suffix config. Fix: semver comparison picks the highest matching tag.
+- [x] BUG: release commit swept unrelated local edits (2026-08-26) → `git add .`/`--update` staged everything whenever requireCleanWorkingDir was disabled. Fix: only bumper outputs + changelog are staged by default; addUntrackedFiles keeps the sweep.
 - [x] BUG: interactive `--preRelease` dropped the identifier (2026-08-26) → the version menu offered only plain patch/minor/major built with an empty preReleaseID, so any selection produced a stable version while the GitHub/GitLab release was still flagged pre-release. Fix: pre-release variants (+ series continuation) in `buildVersionOptions`.
 - [x] BUG: declining the Commit prompt silently cancelled tag and push (2026-08-26) → `return nil` exited gitRelease entirely; npm asks each operation independently. Fix: `confirmStep` skips only the declined operation.
 - [x] BUG: `--no-increment` could never complete with default config (2026-08-26) → re-running release steps for the current version died on `tag already exists` even when the tag pointed at HEAD (npm's documented recovery flow). Fix: existing tag at HEAD is skipped; a tag on a different commit is a clear error.
@@ -778,6 +806,7 @@
 | 2026-08-25 | Claude | Phase 23: BREAKING CHANGE footers now drive major bumps — full commit messages (`%h%x1f%B%x1e`) flow through the changelog pipeline via shared `commitsSinceLatestRelease()`; changelog entries gain commit hashes; multiline footer values parsed; auto-increment gains the raw-tag fallback; dead `GetCommitsSinceTag` removed |
 | 2026-08-25 | Claude | Phase 23 complete: before/after:release hooks fired via unified `runSteps()`, flag precedence fixed (`Flags().Changed`), webhook errors sanitized (no secret URLs), `requireBranch` comma-separated any-of matching, Go toolchain 1.26.7 (all stdlib advisories closed — `make check` fully green) |
 | 2026-08-26 | Claude | Phase 25 complete (npm parity): positional/explicit versions, no prompt on explicit increment, v-prefix inference (+TagNameExplicit loader flag), --no-increment recovery via TagPointsAtHead, template vars in commit/tag/release names, pre-release prompt menu, independent commit/tag/push confirmations, migration serializes all sections |
+| 2026-08-26 | Claude | Phase 26 complete (hardening): ErrNoCommits sentinel + unified git error wrappers, spinner race fix, Windows hooks + RELEASE_* env vars, real glob + semver tag selection, targeted staging, shared HTTP retry (httputil), format-preserving bumper with proof-based splice, push recovery guidance |
 
 ---
 

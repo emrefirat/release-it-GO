@@ -11,6 +11,12 @@
 
 ### Bug Fixes
 
+* the bumper no longer destroys file formatting: version updates in JSON/YAML/TOML now replace only the version value (preserving key order, indentation, and comments), with the old full rewrite kept as a verified fallback.
+* transient GitHub/GitLab/webhook failures (429/502/503/504) are retried with exponential backoff, honoring `Retry-After`; connection errors are replayed only for idempotent requests.
+* lifecycle hooks now work on Windows (`%COMSPEC% /C` instead of requiring `sh`), and hook scripts receive `RELEASE_*` environment variables (`RELEASE_VERSION`, `RELEASE_TAG_NAME`, `RELEASE_REPO_OWNER`, ...).
+* `tagMatch`/`tagExclude` support real glob patterns (`?`, character classes, mid-pattern `*`); the latest tag is picked by semver comparison, so a same-base pre-release no longer shadows the stable release.
+* the release commit stages only what the release changed (bumper outputs + changelog); unrelated local edits are no longer swept in when `requireCleanWorkingDir` is disabled (`addUntrackedFiles: true` keeps the old sweep).
+* git errors now carry both git's stderr and the root cause; a failed push prints the `--no-increment` recovery steps.
 * an explicit increment (positional, `-i`, or config) no longer opens the interactive version prompt when it coincides with the auto-detected one.
 * declining the Commit or Tag prompt no longer silently cancels the operations after it — commit, tag, and push are confirmed independently.
 * `--no-increment` now completes when the release tag already exists at HEAD (npm's documented recovery flow after a failed push); a tag on a different commit remains a clear error.
