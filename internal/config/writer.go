@@ -156,7 +156,8 @@ git:
   pushArgs: ["--follow-tags", "--atomic"]
   # Remote repository name for push
   pushRepo: "origin"
-  # Only allow releases from this branch (empty = any branch)
+  # Only allow releases from this branch (empty = any branch).
+  # Comma-separated patterns allow any-of matching: "main,master", "main,release/*"
   requireBranch: "main"
   # Require clean working directory before release
   requireCleanWorkingDir: true

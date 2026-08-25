@@ -52,6 +52,12 @@ func TestCheckBranch(t *testing.T) {
 		{"non-matching branch", "main", "develop", true},
 		{"wildcard pattern", "release/*", "release/1.0", false},
 		{"wildcard no match", "release/*", "main", true},
+		// npm compat: requireBranch: ["main","master"] arrives as "main,master"
+		{"multiple branches: first matches", "main,master", "main", false},
+		{"multiple branches: second matches", "main,master", "master", false},
+		{"multiple branches: none match", "main,master", "develop", true},
+		{"multiple branches with spaces", "main, master", "master", false},
+		{"multiple branches with glob", "main,release/*", "release/2.0", false},
 	}
 
 	for _, tt := range tests {

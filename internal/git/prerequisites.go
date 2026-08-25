@@ -2,7 +2,7 @@ package git
 
 import (
 	"fmt"
-	"path/filepath"
+	"path"
 	"strings"
 )
 
@@ -48,10 +48,26 @@ func (g *Git) checkBranch() error {
 
 	branch = strings.TrimSpace(branch)
 
-	matched, err := filepath.Match(g.config.RequireBranch, branch)
-	if err != nil {
-		// Pattern error, fall back to exact match
-		matched = branch == g.config.RequireBranch
+	// Multiple patterns are comma-separated ("main,master") — npm release-it
+	// accepts requireBranch as an array, which the compat layer joins with
+	// commas. The branch passes when ANY pattern matches. path.Match (not
+	// filepath.Match) keeps glob semantics identical across platforms:
+	// branch names always use forward slashes.
+	matched := false
+	for _, pattern := range strings.Split(g.config.RequireBranch, ",") {
+		pattern = strings.TrimSpace(pattern)
+		if pattern == "" {
+			continue
+		}
+		ok, matchErr := path.Match(pattern, branch)
+		if matchErr != nil {
+			// Pattern error, fall back to exact match
+			ok = branch == pattern
+		}
+		if ok {
+			matched = true
+			break
+		}
 	}
 
 	if !matched {
