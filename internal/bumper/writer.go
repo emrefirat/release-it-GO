@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"reflect"
+	"regexp"
 	"strings"
 
 	toml "github.com/pelletier/go-toml/v2"
@@ -50,8 +52,81 @@ func WriteVersionToFile(file config.BumperFile, version string) error {
 	return os.WriteFile(file.File, updated, 0644)
 }
 
+// updateVersionTargeted attempts a formatting-preserving update: it replaces
+// only the old value at the path's final key in the raw bytes, then PROVES
+// the edit correct by re-parsing and comparing the whole tree against the
+// expected result. Ambiguous or unprovable edits return ok=false and the
+// caller falls back to the full re-marshal (which loses comments, key order,
+// and custom indentation — the very diff noise this path avoids).
+func updateVersionTargeted(data []byte, path string, version string, parse func([]byte, interface{}) error) ([]byte, bool) {
+	var current map[string]interface{}
+	if err := parse(data, &current); err != nil {
+		return nil, false
+	}
+
+	oldValue, isString := getNestedString(current, path)
+	if !isString {
+		return nil, false
+	}
+	if oldValue == version {
+		return data, true // already up to date; keep the file byte-identical
+	}
+
+	var expected map[string]interface{}
+	if err := parse(data, &expected); err != nil {
+		return nil, false
+	}
+	if err := setNestedValue(expected, path, version); err != nil {
+		return nil, false
+	}
+
+	keys := strings.Split(path, ".")
+	lastKey := keys[len(keys)-1]
+	// Matches `"key": "old`, `key: old`, `key = "old` across JSON/YAML/TOML.
+	pattern := regexp.MustCompile(`("?` + regexp.QuoteMeta(lastKey) + `"?\s*[:=]\s*["']?)` + regexp.QuoteMeta(oldValue))
+
+	for _, loc := range pattern.FindAllSubmatchIndex(data, -1) {
+		prefixEnd := loc[3] // end of the key+separator group; old value follows
+		candidate := make([]byte, 0, len(data)+len(version))
+		candidate = append(candidate, data[:prefixEnd]...)
+		candidate = append(candidate, version...)
+		candidate = append(candidate, data[loc[1]:]...)
+
+		var got map[string]interface{}
+		if err := parse(candidate, &got); err != nil {
+			continue
+		}
+		if reflect.DeepEqual(got, expected) {
+			return candidate, true
+		}
+	}
+
+	return nil, false
+}
+
+// getNestedString reads a string value at a dot-separated path.
+func getNestedString(obj map[string]interface{}, path string) (string, bool) {
+	current := interface{}(obj)
+	for _, key := range strings.Split(path, ".") {
+		m, ok := current.(map[string]interface{})
+		if !ok {
+			return "", false
+		}
+		current, ok = m[key]
+		if !ok {
+			return "", false
+		}
+	}
+	s, ok := current.(string)
+	return s, ok
+}
+
 // writeJSON updates a version in JSON data at the given dot-separated path.
 func writeJSON(data []byte, path string, version string) ([]byte, error) {
+	if updated, ok := updateVersionTargeted(data, path, version, jsonParse); ok {
+		return updated, nil
+	}
+
 	var obj map[string]interface{}
 	if err := json.Unmarshal(data, &obj); err != nil {
 		return nil, fmt.Errorf("parsing JSON: %w", err)
@@ -71,6 +146,10 @@ func writeJSON(data []byte, path string, version string) ([]byte, error) {
 
 // writeYAML updates a version in YAML data at the given dot-separated path.
 func writeYAML(data []byte, path string, version string) ([]byte, error) {
+	if updated, ok := updateVersionTargeted(data, path, version, yamlParse); ok {
+		return updated, nil
+	}
+
 	var obj map[string]interface{}
 	if err := yaml.Unmarshal(data, &obj); err != nil {
 		return nil, fmt.Errorf("parsing YAML: %w", err)
@@ -90,6 +169,10 @@ func writeYAML(data []byte, path string, version string) ([]byte, error) {
 
 // writeTOML updates a version in TOML data at the given dot-separated path.
 func writeTOML(data []byte, path string, version string) ([]byte, error) {
+	if updated, ok := updateVersionTargeted(data, path, version, tomlParse); ok {
+		return updated, nil
+	}
+
 	var obj map[string]interface{}
 	if err := toml.Unmarshal(data, &obj); err != nil {
 		return nil, fmt.Errorf("parsing TOML: %w", err)
@@ -106,6 +189,10 @@ func writeTOML(data []byte, path string, version string) ([]byte, error) {
 
 	return result, nil
 }
+
+func jsonParse(data []byte, v interface{}) error { return json.Unmarshal(data, v) }
+func yamlParse(data []byte, v interface{}) error { return yaml.Unmarshal(data, v) }
+func tomlParse(data []byte, v interface{}) error { return toml.Unmarshal(data, v) }
 
 // writeINI updates a version in INI data at the given [section].key path.
 func writeINI(data []byte, path string, version string) ([]byte, error) {
