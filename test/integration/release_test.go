@@ -465,6 +465,75 @@ func TestIntegration_KeepAChangelog(t *testing.T) {
 	assertChangelogContains(t, dir, "Added")
 }
 
+func TestIntegration_ReleaseHooks_FireInOrder(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	_ = os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+
+	logFile := filepath.Join(dir, "hook_order.txt")
+
+	initGitRepo(t, dir)
+	createTag(t, dir, "v1.0.0")
+	createCommits(t, dir, []string{"feat: new feature"})
+
+	cfg := newTestConfig(dir)
+	cfg.Increment = "patch"
+	// before:release must span the release steps (fire ahead of
+	// before:git:release), after:release must fire once at pipeline end.
+	cfg.Hooks.BeforeRelease = []string{"echo before-release >> " + logFile}
+	cfg.Hooks.BeforeGitRelease = []string{"echo before-git-release >> " + logFile}
+	cfg.Hooks.AfterRelease = []string{"echo after-release ${version} >> " + logFile}
+
+	r := runner.NewRunner(cfg)
+	if err := r.Run(); err != nil {
+		t.Fatalf("Run() failed: %v", err)
+	}
+
+	content, err := os.ReadFile(logFile)
+	if err != nil {
+		t.Fatalf("expected release hooks to write the marker file: %v", err)
+	}
+	got := strings.TrimSpace(string(content))
+	want := "before-release\nbefore-git-release\nafter-release 1.0.1"
+	if got != want {
+		t.Errorf("hook order/content mismatch:\ngot:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestIntegration_ReleaseHooks_SkippedWhenNoCommits(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	_ = os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+
+	markerFile := filepath.Join(dir, "after_release.txt")
+
+	initGitRepo(t, dir)
+	createTag(t, dir, "v1.0.0")
+	// No commits after the tag — pipeline exits gracefully at prerequisites
+
+	cfg := newTestConfig(dir)
+	cfg.Hooks.AfterRelease = []string{"echo ran > " + markerFile}
+
+	r := runner.NewRunner(cfg)
+	if err := r.Run(); err != nil {
+		t.Fatalf("Run() failed: %v", err)
+	}
+
+	if _, err := os.Stat(markerFile); !os.IsNotExist(err) {
+		t.Error("after:release must NOT fire when the release aborts with no commits")
+	}
+}
+
 func TestIntegration_HookExecution(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")

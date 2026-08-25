@@ -60,7 +60,31 @@ func (r *Runner) Run() error {
 		{"notification", r.sendNotification},
 	}
 
+	if err := r.runSteps(steps); err != nil {
+		return err
+	}
+	if r.ctx.noCommits {
+		return nil
+	}
+
+	r.printSummary(time.Since(start))
+	return nil
+}
+
+// runSteps executes pipeline steps in order, firing before:/after: hooks for
+// each. The aggregate release-spanning events match npm release-it semantics:
+// before:release fires ahead of the git:release step (before its own
+// before:git:release hook) and after:release fires once every step has
+// completed. On the graceful "no commits" abort, remaining hooks — including
+// after:release — are intentionally skipped: the release did not happen.
+func (r *Runner) runSteps(steps []pipelineStep) error {
 	for _, step := range steps {
+		if step.name == "git:release" {
+			if err := r.ctx.HookRunner.RunHooks("before:release"); err != nil {
+				return fmt.Errorf("before:release hook: %w", err)
+			}
+		}
+
 		if err := r.ctx.HookRunner.RunHooks("before:" + step.name); err != nil {
 			return fmt.Errorf("before:%s hook: %w", step.name, err)
 		}
@@ -83,7 +107,9 @@ func (r *Runner) Run() error {
 		}
 	}
 
-	r.printSummary(time.Since(start))
+	if err := r.ctx.HookRunner.RunHooks("after:release"); err != nil {
+		return fmt.Errorf("after:release hook: %w", err)
+	}
 	return nil
 }
 
@@ -147,17 +173,8 @@ func (r *Runner) RunOnlyVersion() error {
 	}
 
 	start := time.Now()
-	for _, step := range steps {
-		if err := r.ctx.HookRunner.RunHooks("before:" + step.name); err != nil {
-			return fmt.Errorf("before:%s hook: %w", step.name, err)
-		}
-		if err := step.fn(); err != nil {
-			return fmt.Errorf("%s: %w", step.name, err)
-		}
-		r.ctx.UpdateVars()
-		if err := r.ctx.HookRunner.RunHooks("after:" + step.name); err != nil {
-			return fmt.Errorf("after:%s hook: %w", step.name, err)
-		}
+	if err := r.runSteps(steps); err != nil {
+		return err
 	}
 
 	r.printSummary(time.Since(start))
@@ -198,17 +215,8 @@ func (r *Runner) RunNoIncrement() error {
 		{"notification", r.sendNotification},
 	}
 
-	for _, step := range steps {
-		if err := r.ctx.HookRunner.RunHooks("before:" + step.name); err != nil {
-			return fmt.Errorf("before:%s hook: %w", step.name, err)
-		}
-		if err := step.fn(); err != nil {
-			return fmt.Errorf("%s: %w", step.name, err)
-		}
-		r.ctx.UpdateVars()
-		if err := r.ctx.HookRunner.RunHooks("after:" + step.name); err != nil {
-			return fmt.Errorf("after:%s hook: %w", step.name, err)
-		}
+	if err := r.runSteps(steps); err != nil {
+		return err
 	}
 
 	r.printSummary(time.Since(start))
