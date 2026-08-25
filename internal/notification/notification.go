@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"release-it-go/internal/config"
+	"release-it-go/internal/httputil"
 	applog "release-it-go/internal/log"
 )
 
@@ -118,7 +119,15 @@ func (c *Client) sendOne(wh config.WebhookConfig) error {
 	}
 	c.httpClient.Timeout = time.Duration(timeout) * time.Second
 
-	resp, err := c.httpClient.Post(url, "application/json", bytes.NewReader(payload))
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(payload))
+	if err != nil {
+		return fmt.Errorf("building request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	// Retries transient 429/5xx webhook responses; connection errors are not
+	// replayed (the POST may have been delivered).
+	resp, err := httputil.Do(c.httpClient, req, httputil.Options{})
 	if err != nil {
 		// A *url.Error's message contains the full webhook URL, which is a
 		// bearer credential (Slack/Teams embed the secret in the path) and

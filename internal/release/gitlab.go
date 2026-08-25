@@ -16,6 +16,7 @@ import (
 
 	"release-it-go/internal/config"
 	"release-it-go/internal/git"
+	"release-it-go/internal/httputil"
 	applog "release-it-go/internal/log"
 )
 
@@ -346,7 +347,9 @@ func (c *GitLabClient) doRequest(method, reqURL string, body io.Reader) (*http.R
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	return c.client.Do(req)
+	// Transient 429/5xx responses are retried with backoff (Retry-After
+	// honored); connection errors are replayed only for idempotent methods.
+	return httputil.Do(c.client, req, httputil.Options{})
 }
 
 // setAuthHeader sets the authentication header based on config.

@@ -15,6 +15,7 @@ import (
 
 	"release-it-go/internal/config"
 	"release-it-go/internal/git"
+	"release-it-go/internal/httputil"
 	applog "release-it-go/internal/log"
 )
 
@@ -303,7 +304,9 @@ func (c *GitHubClient) doRequest(method, url string, body io.Reader) (*http.Resp
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	return c.client.Do(req)
+	// Transient 429/5xx responses are retried with backoff (Retry-After
+	// honored); connection errors are replayed only for idempotent methods.
+	return httputil.Do(c.client, req, httputil.Options{})
 }
 
 // handleErrorResponse creates a descriptive error from an HTTP response.

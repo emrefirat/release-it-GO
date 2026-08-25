@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -564,5 +565,33 @@ func TestGitHubClient_CreateHTTPClient_InvalidProxy(t *testing.T) {
 	client := c.createHTTPClient()
 	if client == nil {
 		t.Fatal("expected non-nil client even with invalid proxy")
+	}
+}
+
+func TestGitHubClient_ValidateToken_RetriesTransient503(t *testing.T) {
+	var attempts int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if atomic.AddInt32(&attempts, 1) == 1 {
+			w.Header().Set("Retry-After", "0")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	c := &GitHubClient{
+		config:  &config.GitHubConfig{},
+		client:  server.Client(),
+		baseURL: server.URL,
+		token:   "test-token",
+		logger:  testLogger(),
+	}
+
+	if err := c.ValidateToken(); err != nil {
+		t.Fatalf("expected transient 503 to be retried, got: %v", err)
+	}
+	if atomic.LoadInt32(&attempts) != 2 {
+		t.Errorf("attempts = %d, want 2", attempts)
 	}
 }
