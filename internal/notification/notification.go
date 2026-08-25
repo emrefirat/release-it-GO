@@ -4,9 +4,11 @@ package notification
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
 	"os"
 	"strings"
 	"time"
@@ -118,6 +120,14 @@ func (c *Client) sendOne(wh config.WebhookConfig) error {
 
 	resp, err := c.httpClient.Post(url, "application/json", bytes.NewReader(payload))
 	if err != nil {
+		// A *url.Error's message contains the full webhook URL, which is a
+		// bearer credential (Slack/Teams embed the secret in the path) and
+		// would end up in terminal/CI logs. Report only the underlying
+		// cause; SendAll already names the webhook type and urlRef.
+		var urlErr *neturl.Error
+		if errors.As(err, &urlErr) {
+			return fmt.Errorf("HTTP POST: %w", urlErr.Err)
+		}
 		return fmt.Errorf("HTTP POST: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()

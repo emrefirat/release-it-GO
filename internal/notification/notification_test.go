@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,6 +19,35 @@ func newTestLogger() *applog.Logger {
 
 func newDryRunLogger() *applog.Logger {
 	return applog.NewLoggerWithWriter(0, true, io.Discard)
+}
+
+func TestSendAll_NetworkError_DoesNotLeakWebhookURL(t *testing.T) {
+	// Slack/Teams webhook URLs are bearer credentials: the secret lives in
+	// the URL path. A *url.Error prints the full URL, and SendAll's combined
+	// error is logged by the runner — the secret must never appear there.
+	secretPath := "/services/T0SECRET/B0SECRET/xoxb-super-secret"
+	t.Setenv("TEST_LEAK_URL", "http://127.0.0.1:1"+secretPath) // port 1: connection refused
+
+	webhooks := []config.WebhookConfig{
+		{Type: "slack", URLRef: "TEST_LEAK_URL", Timeout: 1},
+	}
+
+	client := NewClient(webhooks, map[string]string{}, newTestLogger(), false)
+	err := client.SendAll()
+	if err == nil {
+		t.Fatal("expected an error from unreachable webhook")
+	}
+
+	msg := err.Error()
+	if strings.Contains(msg, "SECRET") || strings.Contains(msg, secretPath) {
+		t.Errorf("error message leaks the webhook URL secret:\n%s", msg)
+	}
+	if !strings.Contains(msg, "TEST_LEAK_URL") {
+		t.Errorf("error should name the urlRef for diagnosis, got:\n%s", msg)
+	}
+	if !strings.Contains(msg, "slack") {
+		t.Errorf("error should name the webhook type, got:\n%s", msg)
+	}
 }
 
 func TestSendAll_SlackSuccess(t *testing.T) {
