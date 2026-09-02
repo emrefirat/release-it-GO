@@ -4443,3 +4443,57 @@ func TestRunner_RunChangelogOnly_NeverPrompts(t *testing.T) {
 		t.Errorf("Version = %q, want auto-detected 1.1.0", runner.ctx.Version)
 	}
 }
+
+func TestRunner_DetermineSemVer_PreIncrementWithPreRelease(t *testing.T) {
+	tests := []struct {
+		name, increment, current, want string
+	}{
+		{"preminor keyword", "preminor", "1.0.0", "1.1.0-beta.0"},
+		{"prepatch keyword", "prepatch", "1.0.0", "1.0.1-beta.0"},
+		{"premajor keyword", "premajor", "1.0.0", "2.0.0-beta.0"},
+		{"prerelease continues series", "prerelease", "1.1.0-beta.0", "1.1.0-beta.1"},
+		{"plain minor gets pre prefix", "minor", "1.0.0", "1.1.0-beta.0"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &config.Config{
+				CI:           true,
+				Increment:    tt.increment,
+				PreReleaseID: "beta",
+				Git:          config.GitConfig{TagName: "v${version}"},
+			}
+			runner := setupMockedRunner(t, cfg, map[string]struct {
+				output string
+				err    error
+			}{})
+			if err := runner.determineSemVer(tt.current); err != nil {
+				t.Fatalf("unexpected error (these are the keywords the menu itself offers): %v", err)
+			}
+			if runner.ctx.Version != tt.want {
+				t.Errorf("Version = %q, want %q", runner.ctx.Version, tt.want)
+			}
+		})
+	}
+}
+
+func TestRunner_DetermineSemVer_ExplicitVersionNotGreater_Errors(t *testing.T) {
+	for _, explicit := range []string{"0.5.0", "1.0.0"} {
+		cfg := &config.Config{
+			CI:        true,
+			Increment: explicit,
+			Git:       config.GitConfig{TagName: "v${version}"},
+		}
+		runner := setupMockedRunner(t, cfg, map[string]struct {
+			output string
+			err    error
+		}{})
+		err := runner.determineSemVer("1.0.0")
+		if err == nil {
+			t.Errorf("explicit %s on top of 1.0.0 must be rejected (npm requires a greater version)", explicit)
+			continue
+		}
+		if !strings.Contains(err.Error(), "greater") {
+			t.Errorf("error should explain the ordering rule, got: %v", err)
+		}
+	}
+}

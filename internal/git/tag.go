@@ -32,7 +32,18 @@ func (g *Git) CreateTag(tagName string, annotation string) error {
 // version continuity during format transitions (e.g., "v${version}" → "${version}").
 func (g *Git) GetLatestTag() (string, error) {
 	if g.config.GetLatestTagFromAllRefs {
-		return g.getLatestTagFromAllRefs()
+		tag, err := g.getLatestTagFromAllRefs()
+		if err == nil {
+			return tag, nil
+		}
+		if g.config.TagMatch != "" {
+			// An explicit filter is a user decision: no match means first release.
+			return "", err
+		}
+		// The derived (tagName) filter matched nothing — a format transition
+		// or a v-prefixed repo with the default template. Keep version
+		// continuity, exactly like the describe path below.
+		return g.highestRawTag()
 	}
 
 	out, err := g.runSilent("describe", "--tags", "--abbrev=0")
@@ -55,10 +66,69 @@ func (g *Git) GetLatestTag() (string, error) {
 		return matchedTag, nil
 	}
 
+	if g.config.TagMatch != "" {
+		// Never hand another package's tag to an explicitly filtered release.
+		return "", fmt.Errorf("no git tags match tagMatch %q", g.config.TagMatch)
+	}
+
 	// No matching tag found — this is a format transition scenario.
 	// Return the original tag so version number is preserved.
 	g.logger.Debug("no matching tags found for current format, using %q for version continuity", tag)
 	return tag, nil
+}
+
+// highestRawTag returns the highest tag by semver comparison, ignoring the
+// tag filters. Used only as the version-continuity fallback when a derived
+// filter matches nothing.
+func (g *Git) highestRawTag() (string, error) {
+	out, err := g.runSilent("tag", "-l", "--sort=-v:refname")
+	if err != nil {
+		return "", fmt.Errorf("listing git tags: %w", err)
+	}
+
+	var bestTag string
+	var bestVer *semver.Version
+	first := ""
+	for _, tag := range strings.Split(strings.TrimSpace(out), "\n") {
+		tag = strings.TrimSpace(tag)
+		if tag == "" {
+			continue
+		}
+		if first == "" {
+			first = tag
+		}
+		ver, parseErr := version.ParseVersion(tag)
+		if parseErr != nil {
+			continue
+		}
+		if bestVer == nil || ver.GreaterThan(bestVer) {
+			bestVer, bestTag = ver, tag
+		}
+	}
+	if bestTag != "" {
+		return bestTag, nil
+	}
+	if first != "" {
+		return first, nil
+	}
+	return "", fmt.Errorf("no git tags found")
+}
+
+// VersionFromTag strips the literal text around ${version} in the tagName
+// template from a tag, e.g. "release-1.2.3" with "release-${version}" →
+// "1.2.3". Tags the template does not apply to are returned unchanged
+// (ParseVersion tolerates a bare "v" prefix on its own).
+func VersionFromTag(tag string, template string) string {
+	idx := strings.Index(template, "${version}")
+	if idx < 0 {
+		return tag
+	}
+	prefix := template[:idx]
+	suffix := template[idx+len("${version}"):]
+	if len(tag) < len(prefix)+len(suffix) || !strings.HasPrefix(tag, prefix) || !strings.HasSuffix(tag, suffix) {
+		return tag
+	}
+	return tag[len(prefix) : len(tag)-len(suffix)]
 }
 
 // getLatestTagFromAllRefs lists all matching tags and returns the highest by
@@ -82,7 +152,7 @@ func (g *Git) getLatestTagFromAllRefs() (string, error) {
 		if firstMatch == "" {
 			firstMatch = tag
 		}
-		ver, parseErr := version.ParseVersion(tag)
+		ver, parseErr := version.ParseVersion(VersionFromTag(tag, g.config.TagName))
 		if parseErr != nil {
 			continue
 		}
@@ -147,14 +217,15 @@ func (g *Git) GetLatestPreReleaseTagMerged(preReleaseID string) (string, error) 
 			continue
 		}
 
-		// Match exact preReleaseID: find first "-" (semver pre-release separator),
-		// then check that the pre-release section starts with "preReleaseID."
-		// This prevents "beta" from matching "betafix" tags.
-		if idx := strings.Index(tag, "-"); idx >= 0 {
-			preReleasePart := tag[idx+1:]
-			if strings.HasPrefix(preReleasePart, preReleaseID+".") {
-				return tag, nil
-			}
+		// Match exact preReleaseID on the PARSED pre-release component: the
+		// template's own hyphens (release-${version}) must not be mistaken
+		// for the semver separator. "beta." prevents "beta" matching "betafix".
+		parsed, parseErr := version.ParseVersion(VersionFromTag(tag, g.config.TagName))
+		if parseErr != nil {
+			continue
+		}
+		if strings.HasPrefix(parsed.Prerelease(), preReleaseID+".") {
+			return tag, nil
 		}
 	}
 
@@ -181,7 +252,7 @@ func (g *Git) GetLatestStableTagMerged() (string, error) {
 			continue
 		}
 
-		parsed, parseErr := version.ParseVersion(tag)
+		parsed, parseErr := version.ParseVersion(VersionFromTag(tag, g.config.TagName))
 		if parseErr != nil {
 			continue
 		}

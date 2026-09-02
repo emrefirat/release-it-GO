@@ -1417,3 +1417,54 @@ func TestIntegration_BumperTextTarget_VersionMissing_FailsBeforeCommit(t *testin
 		t.Errorf("README must be untouched, got %q", got)
 	}
 }
+
+func TestIntegration_CustomTagTemplate_SecondRelease(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	_ = os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+
+	initGitRepo(t, dir)
+	createTag(t, dir, "release-1.0.0")
+	createCommits(t, dir, []string{"feat: second"})
+
+	cfg := newTestConfig(dir)
+	cfg.Git.TagName = "release-${version}"
+	cfg.Git.TagNameExplicit = true
+
+	if err := runner.NewRunner(cfg).Run(); err != nil {
+		t.Fatalf("Run() failed (prefixed tags must parse): %v", err)
+	}
+	assertTagExists(t, dir, "release-1.1.0")
+	assertTagNotExists(t, dir, "release-0.1.0")
+}
+
+func TestIntegration_AllRefs_VTags_NoTemplateConfigured(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	_ = os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+
+	initGitRepo(t, dir)
+	createTag(t, dir, "v1.0.0")
+	createCommits(t, dir, []string{"feat: second"})
+
+	cfg := newTestConfig(dir)
+	cfg.Git.TagName = "${version}" // shipped default, not user-set
+	cfg.Git.GetLatestTagFromAllRefs = true
+
+	if err := runner.NewRunner(cfg).Run(); err != nil {
+		t.Fatalf("Run() failed: %v", err)
+	}
+	// Previously: "no matching tags" → first release → bare 0.1.0 next to v1.0.0
+	assertTagExists(t, dir, "v1.1.0")
+	assertTagNotExists(t, dir, "0.1.0")
+}

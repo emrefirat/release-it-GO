@@ -194,7 +194,7 @@ func (r *Runner) determineNoIncrementVersion() error {
 	}
 	r.inferTagNameFormat(latestTag)
 
-	parsed, parseErr := version.ParseVersion(latestTag)
+	parsed, parseErr := version.ParseVersion(git.VersionFromTag(latestTag, r.ctx.Config.Git.TagName))
 	if parseErr != nil {
 		return fmt.Errorf("parsing version %q: %w", latestTag, parseErr)
 	}
@@ -509,9 +509,11 @@ func (r *Runner) determineVersion() error {
 		}
 	}
 
-	latestVersion := latestTag
-	parsed, parseErr := version.ParseVersion(latestTag)
-	if parseErr == nil {
+	// Strip the tagName template's literal prefix/suffix (release-${version})
+	// before parsing — otherwise any template beyond ${version}/v${version}
+	// failed with "invalid version" on the second release.
+	latestVersion := git.VersionFromTag(latestTag, r.ctx.Config.Git.TagName)
+	if parsed, parseErr := version.ParseVersion(latestVersion); parseErr == nil {
 		latestVersion = parsed.String()
 	}
 	r.ctx.LatestVersion = latestVersion
@@ -558,10 +560,19 @@ func (r *Runner) determineSemVer(latestVersion string) error {
 	increment := r.ctx.Config.Increment
 	explicitIncrement := increment != ""
 
+	parsedCurrent, parseErr := version.ParseVersion(latestVersion)
+	if parseErr != nil {
+		return fmt.Errorf("parsing current version %q: %w", latestVersion, parseErr)
+	}
+
 	// Explicit target version (release-it-go 1.5.0 / -i 1.5.0): use it
-	// verbatim, matching npm release-it.
+	// verbatim, matching npm release-it — which also requires it to be
+	// greater than the latest version.
 	if explicitIncrement && !version.IsIncrementType(increment) {
 		if target, err := version.ParseVersion(increment); err == nil {
+			if !target.GreaterThan(parsedCurrent) {
+				return fmt.Errorf("explicit version %s must be greater than the latest version %s", target, parsedCurrent)
+			}
 			newVersionStr := target.String()
 			r.ctx.Version = newVersionStr
 			r.ctx.TagName = renderTagName(r.ctx.Config.Git.TagName, newVersionStr)
@@ -578,20 +589,19 @@ func (r *Runner) determineSemVer(latestVersion string) error {
 		increment = "patch"
 	}
 
-	parsedCurrent, parseErr := version.ParseVersion(latestVersion)
-	if parseErr != nil {
-		return fmt.Errorf("parsing current version %q: %w", latestVersion, parseErr)
-	}
-
 	preReleaseID := r.ctx.Config.PreReleaseID
 	incrementType := increment
 	if preReleaseID != "" {
-		// If current version is already a pre-release with the same ID,
-		// use "prerelease" to increment the number (e.g. beta.0 → beta.1).
-		// Otherwise use "pre+increment" to start a new pre-release series.
-		if parsedCurrent.Prerelease() != "" && strings.HasPrefix(parsedCurrent.Prerelease(), preReleaseID+".") {
+		switch {
+		case strings.HasPrefix(increment, "pre"):
+			// Explicit pre* keyword — the same words the interactive menu
+			// offers; prefixing again produced "prepreminor".
+			incrementType = increment
+		case parsedCurrent.Prerelease() != "" && strings.HasPrefix(parsedCurrent.Prerelease(), preReleaseID+"."):
+			// Same series: bump the pre-release number (beta.0 → beta.1)
 			incrementType = "prerelease"
-		} else {
+		default:
+			// Start a new pre-release series
 			incrementType = "pre" + increment
 		}
 	}

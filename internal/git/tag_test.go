@@ -773,3 +773,106 @@ func TestGetLatestTagFromAllRefs_NewerPreReleaseStillWins(t *testing.T) {
 		t.Errorf("latest = %q, want 1.1.0-beta.0 (higher base version)", tag)
 	}
 }
+
+// --- tag templates beyond ${version} / v${version} ---
+
+func TestVersionFromTag(t *testing.T) {
+	tests := []struct{ tag, template, want string }{
+		{"1.2.3", "${version}", "1.2.3"},
+		{"v1.2.3", "v${version}", "1.2.3"},
+		{"release-1.2.3", "release-${version}", "1.2.3"},
+		{"app-1.2.3-final", "app-${version}-final", "1.2.3"},
+		{"release-1.2.3-beta.1", "release-${version}", "1.2.3-beta.1"},
+		{"other-1.2.3", "release-${version}", "other-1.2.3"}, // template does not apply
+		{"1.2.3", "", "1.2.3"},
+		{"v1.2.3", "${version}", "v1.2.3"}, // ParseVersion strips the v itself
+	}
+	for _, tt := range tests {
+		if got := VersionFromTag(tt.tag, tt.template); got != tt.want {
+			t.Errorf("VersionFromTag(%q, %q) = %q, want %q", tt.tag, tt.template, got, tt.want)
+		}
+	}
+}
+
+func TestGetLatestPreReleaseTagMerged_CustomTemplate(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	commandExecutor = func(name string, args ...string) (string, error) {
+		return "release-1.1.0-beta.1\nrelease-1.0.0", nil
+	}
+
+	cfg := &config.GitConfig{TagName: "release-${version}"}
+	g := newTestGitWithConfig(cfg, false)
+
+	tag, err := g.GetLatestPreReleaseTagMerged("beta")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// The old code split on the FIRST "-" (the template's own hyphen), so
+	// the pre-release part became "1.1.0-beta.1" and never matched "beta."
+	if tag != "release-1.1.0-beta.1" {
+		t.Errorf("got %q, want release-1.1.0-beta.1", tag)
+	}
+}
+
+func TestGetLatestStableTagMerged_CustomTemplate(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	commandExecutor = func(name string, args ...string) (string, error) {
+		return "release-1.1.0-beta.1\nrelease-1.0.0", nil
+	}
+
+	cfg := &config.GitConfig{TagName: "release-${version}"}
+	g := newTestGitWithConfig(cfg, false)
+
+	tag, err := g.GetLatestStableTagMerged()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if tag != "release-1.0.0" {
+		t.Errorf("got %q, want release-1.0.0 (prefixed tags must still parse)", tag)
+	}
+}
+
+func TestGetLatestTag_AllRefs_VTags_DefaultTemplate_FallsBackToRawTag(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	commandExecutor = func(name string, args ...string) (string, error) {
+		return "v1.0.0\nv0.9.0", nil
+	}
+
+	// Shipped default template rejects v* tags; with getLatestTagFromAllRefs
+	// the describe-path continuity fallback never ran, so a v-prefixed repo
+	// was treated as having no tags and got a bare 0.1.0.
+	cfg := &config.GitConfig{TagName: "${version}", GetLatestTagFromAllRefs: true}
+	g := newTestGitWithConfig(cfg, false)
+
+	tag, err := g.GetLatestTag()
+	if err != nil {
+		t.Fatalf("expected the raw v1.0.0 for version continuity, got error: %v", err)
+	}
+	if tag != "v1.0.0" {
+		t.Errorf("got %q, want v1.0.0", tag)
+	}
+}
+
+func TestGetLatestTag_ExplicitTagMatch_NoMatch_IsAnError(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	commandExecutor = func(name string, args ...string) (string, error) {
+		return "lib-1.4.0", nil // describe and tag -l both only know lib-* tags
+	}
+
+	// An explicit tagMatch is a user decision: another package's tag must
+	// never be returned "for continuity" — that is a first release.
+	cfg := &config.GitConfig{TagName: "app-${version}", TagMatch: "app-*"}
+	g := newTestGitWithConfig(cfg, false)
+
+	if tag, err := g.GetLatestTag(); err == nil {
+		t.Errorf("expected no-match error with explicit tagMatch, got tag %q", tag)
+	}
+}
