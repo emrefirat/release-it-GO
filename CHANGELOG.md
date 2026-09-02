@@ -14,6 +14,7 @@
 
 ### Bug Fixes
 
+* the documented `go install github.com/emrefirat/release-it-GO/cmd/release-it-go@latest` now resolves (the module path was a placeholder); the full-example `commit-msg` hook validates the message git passes in `$1` instead of linting history; release packages declare their `git` dependency.
 * conflicting mode flags (`--check-msg` with `--dry-run`, `--changelog` with `--release-version`, `minor --no-increment`, …) are an error instead of a silent priority order; `-i bogus` fails before the pipeline starts; `--dry-run` is honored by `init`, `hooks install` and `hooks remove` (they wrote files and set `core.hooksPath`).
 * removed configuration keys that no code path ever read — `git.changelog`, `github.releaseNotes`, `github.web`, `github.comments`, `gitlab.releaseNotes`, `gitlab.preRelease`, `changelog.addUnreleased`, `changelog.keepUnreleased`, `calver.increment`, `calver.fallbackIncrement`, `bumper.out[].versionPrefix`. Existing config files keep loading; each of these keys now prints a warning instead of being silently ignored.
 * the bumper no longer truncates plain-text targets (README.md, scripts) to the bare version: the current version is replaced in place, and the release fails before any commit when it cannot be found (`consumeWholeFile: true` remains the explicit whole-file opt-in).

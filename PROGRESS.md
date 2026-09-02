@@ -36,7 +36,7 @@
 | 26 | Hardening (audit structural findings) | Complete | 100% |
 | 27 | Stability Fixes (2026-09-02 second audit) | Complete | 100% |
 | 28 | Parameter Validation & Dead-Field Cleanup | Complete | 100% |
-| 29 | Test Hygiene & Distribution/CI Trust (absorbs planned Phase 24) | Not Started | 0% |
+| 29 | Test Hygiene & Distribution/CI Trust (absorbs planned Phase 24) | Complete | 100% |
 | 30 | Documentation Sync | Not Started | 0% |
 
 **Last Updated:** 2026-09-02
@@ -751,6 +751,35 @@
 
 ---
 
+## Phase 29: Test Hygiene & Distribution/CI Trust
+
+**Status:** Complete
+**PRD:** `docs/phase_29.md`
+
+### To Do
+
+- [x] Real-git tests isolated from the developer's git config (`internal/testutil.IsolateGit` via TestMain in cli, githook, integration): global/system config ignored, `init.defaultBranch=main`, no prompts
+- [x] 78 `os.Chdir`/`Getwd` blocks with swallowed errors replaced by `t.Chdir`; package-level `commitCounter` removed (`os.CreateTemp`)
+- [x] Stale/tautological tests: `reasonDescription` deleted with its test, flag-surface test asserts the full set in both directions, tag-exists test asserts the real message
+- [x] End-to-end: commit-msg hook through the real binary (`hooks install` → git rejects/accepts), `RELEASE_*` env observed from a shell hook, bumper byte-fidelity through the pipeline, positional args through cobra `Execute`
+- [x] Client-level retry tests (GitLab release POST, webhooks) with a `retryOptions` sleep seam; 502 is never replayed
+- [x] Module path `github.com/emrefirat/release-it-GO` so `go install .../cmd/release-it-go@latest` resolves; README/Dockerfile updated
+- [x] `.gitignore` anchored (`/release-it-go` hid new files under `cmd/release-it-go/`), coverage artifacts, scratch dir
+- [x] GoReleaser: v2.6 `formats`, `go mod verify` instead of `go mod tidy` at release time, `git` as nfpm dependency (`goreleaser check` passes)
+- [x] Makefile: govulncheck last in `check`; `docker-run` forwards `GIT_USER_NAME`/`GIT_USER_EMAIL`
+- [x] CI: 70% coverage gate, pinned govulncheck job re-enabled, `go mod verify`, macOS (blocking) + Windows (advisory) build/unit matrix, dependabot (gomod + actions)
+- [x] release.yml runs the suite before tagging and pushes HEAD + tag with one `--atomic` push
+- [x] CHANGELOG: 0.2.0 / 0.3.0 entries added, compare links use the real tag names
+- [x] Full-example `commit-msg` hook validates `$1` (`--check-msg`) instead of linting history (`--check-commits`)
+
+### Notes
+
+- No LICENSE file exists in the repository, so the nfpm `license` field was left out rather than inventing one — add the file first.
+- Windows unit tests are `continue-on-error` on purpose: the hook code paths were written for Windows but have never run there; promote the job to blocking once it is green.
+- Integration tests now build the binary once per run (`releaseItBinary`) for hook end-to-end coverage; the temp dir is removed by TestMain.
+
+---
+
 ## Bugs
 
 - [x] BUG: First-release changelog "exit status 128" error (2026-02-16) → When `LatestVersion=0.0.0`, the `v0.0.0` tag was searched but no such tag exists. The `latestVersionToTag()` helper was added: returns empty for `0.0.0` or empty string, so `GetCommitsSinceTag("")` returns all commits. 3 sites affected: `RunChangelogOnly`, `generateChangelog`, `autoDetectIncrement`.
@@ -805,6 +834,12 @@
 - [x] BUG: Mode flags combined silently by if-order (2026-09-02) → `--check-msg` with `--dry-run`, `--changelog` with `--release-version`, `minor --no-increment` ran whichever branch came first. Fix: `checkModeFlagConflicts` errors with both flag names.
 - [x] BUG: `--dry-run` ignored by `init` and `hooks install` (2026-09-02) → both wrote files and set `core.hooksPath`. Fix: `Installer.DryRun` + dry-run guards in the init writer paths, state-asserting tests (nothing on disk, git config untouched).
 - [x] BUG: `git.commitsPath`, `changelog.addVersionUrl`, `gitlab.useGenericPackageRepositoryForAssets` were documented no-ops (2026-09-02) → history queries never received a pathspec, compare links were always emitted, uploads always used the Generic Package Registry. Fix: wired (see Phase 28); 11 further keys that nothing read were removed and now warn on load.
+
+- [x] BUG: `.gitignore` pattern `release-it-go` ignored every path with that name (2026-09-02) → new files under `cmd/release-it-go/` were invisible to `git status`. Fix: anchored to `/release-it-go` (the built binary at the repo root).
+- [x] BUG: documented `go install release-it-go/cmd/release-it-go@latest` could never work (2026-09-02) → the module path was the placeholder `release-it-go`. Fix: module renamed to `github.com/emrefirat/release-it-GO` (82 files), README/Dockerfile aligned.
+- [x] BUG: release workflow pushed branch and tag in two steps (2026-09-02) → a rejected branch push left an orphan tag on the remote, and the tag was created without running the tests. Fix: `go test` before tagging, single `git push --atomic origin HEAD "$TAG"`.
+- [x] BUG: full-example `commit-msg` hook ran `--check-commits` (2026-09-02) → that lints the existing history, not the message being committed, so a bad message passed. Fix: `release-it-go --check-msg "$1"`; covered end-to-end through the real binary.
+- [x] BUG: real-git tests inherited the developer's git configuration (2026-09-02) → `commit.gpgsign`, `core.hooksPath`, or `init.defaultBranch` could break or skew the suite; 78 `os.Chdir` blocks swallowed errors and one leaked cwd could point a test at the real repo. Fix: `testutil.IsolateGit` in TestMain + `t.Chdir` everywhere.
 
 ---
 
@@ -887,6 +922,7 @@
 | 2026-09-02 | Claude | Second full audit (4 review streams) after Phases 23-26; 15 commits pushed; PRDs for Phases 27-30 created from the findings (5 critical: bumper text overwrite, --no-increment recovery, test foot-gun, no config validation, only-version prerequisite bypass) |
 | 2026-09-02 | Claude | Phase 27 complete: 19 stability items (bumper text in-place, unified runPipeline entry points, --no-increment recovery with defaults, tag templates via VersionFromTag, pre* increments, explicit version ordering, safer retries, proxy env, explicit make_latest, tag-based compare links, git add -u staging, remote/pushRepo checks, auto-detect logging, cli test foot-gun removed) |
 | 2026-09-02 | Claude | Phase 28 complete: strict config loading with unknown-key suggestions, `Validate()` rules, legacy-key normalization for all formats, hook fields for every step, mode-flag conflict errors, `--dry-run` in init/hooks, `commitsPath` / `addVersionUrl` / project-uploads wiring, 11 dead keys removed with load-time warnings, docs aligned |
+| 2026-09-02 | Claude | Phase 29 complete: git-isolated tests + t.Chdir, end-to-end hook/env/bumper/positional/retry coverage, real module path for `go install`, goreleaser v2.6 syntax, gitignore anchor, CI coverage gate + pinned govulncheck + OS matrix + dependabot, atomic release push, CHANGELOG 0.2.0/0.3.0 entries |
 
 ---
 
