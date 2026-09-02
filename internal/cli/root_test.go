@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -43,52 +44,218 @@ func TestNewRootCommand_VersionSubcommand(t *testing.T) {
 	}
 }
 
-func TestNewRootCommand_DryRunFlag(t *testing.T) {
+// captureStdout mirrors captureStderr for fmt.Println output.
+func captureStdout(t *testing.T, fn func()) []byte {
+	t.Helper()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	oldStdout := os.Stdout
+	os.Stdout = w
+	done := make(chan []byte, 1)
+	go func() {
+		var buf bytes.Buffer
+		_, _ = buf.ReadFrom(r)
+		done <- buf.Bytes()
+	}()
+	fn()
+	_ = w.Close()
+	os.Stdout = oldStdout
+	return <-done
+}
+
+// setupReleaseRepo creates a temp git repo (cwd switched) with a v1.0.0 tag,
+// one feat commit on top, and a config that never pushes. Every Execute test
+// below MUST run inside such a repo: the previous versions of these tests ran
+// `--ci` from the package directory inside the real repository, where the
+// project's push:false config is not found — on a clean tree they performed
+// an actual release (internal/cli/CHANGELOG.md was committed that way).
+func setupReleaseRepo(t *testing.T) string {
+	t.Helper()
+	dir := setupGitRepo(t)
+	writeConfig(t, dir, "git:\n  push: false\n  requireUpstream: false\n  tagName: \"v${version}\"\n")
+	cfgFile = "" // Execute must find the config via cwd search like a real run
+	mustRun(t, dir, "git", "add", ".")
+	mustRun(t, dir, "git", "commit", "-q", "-m", "chore: init")
+	mustRun(t, dir, "git", "tag", "v1.0.0")
+	if err := os.WriteFile(filepath.Join(dir, "feature.txt"), []byte("x\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	mustRun(t, dir, "git", "add", ".")
+	mustRun(t, dir, "git", "commit", "-q", "-m", "feat: add feature")
+	return dir
+}
+
+func tagExists(t *testing.T, dir, tag string) bool {
+	t.Helper()
+	out, err := exec.Command("git", "-C", dir, "tag", "-l", tag).Output()
+	if err != nil {
+		t.Fatalf("git tag -l: %v", err)
+	}
+	return strings.TrimSpace(string(out)) == tag
+}
+
+func TestExecute_DryRun_CreatesNothing(t *testing.T) {
+	saveFlagGlobals(t)
+	dir := setupReleaseRepo(t)
+
 	cmd := NewRootCommand()
 	cmd.SetArgs([]string{"--dry-run", "--ci"})
+	stderr := captureStderr(t, func() {
+		if err := cmd.Execute(); err != nil {
+			t.Errorf("dry-run release failed: %v", err)
+		}
+	})
 
-	// May fail without git repo, but should not crash
-	_ = cmd.Execute()
+	if tagExists(t, dir, "v1.1.0") {
+		t.Error("dry-run must not create a tag")
+	}
+	if !strings.Contains(string(stderr), "dry-run") {
+		t.Errorf("expected dry-run banner in output, got:\n%s", stderr)
+	}
 }
 
-func TestNewRootCommand_CIFlag(t *testing.T) {
+func TestExecute_CI_PerformsReleaseInTempRepo(t *testing.T) {
+	saveFlagGlobals(t)
+	dir := setupReleaseRepo(t)
+
 	cmd := NewRootCommand()
 	cmd.SetArgs([]string{"--ci"})
+	_ = captureStderr(t, func() {
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("release failed: %v", err)
+		}
+	})
 
-	// May fail without git repo, but should not crash
-	_ = cmd.Execute()
+	// feat commit → minor bump, v-prefixed template
+	if !tagExists(t, dir, "v1.1.0") {
+		t.Error("expected v1.1.0 tag after a --ci release")
+	}
 }
 
-func TestNewRootCommand_VerboseFlag(t *testing.T) {
+func TestExecute_PositionalIncrement_EndToEnd(t *testing.T) {
+	saveFlagGlobals(t)
+	dir := setupReleaseRepo(t)
+
 	cmd := NewRootCommand()
-	cmd.SetArgs([]string{"-V", "--ci"})
+	cmd.SetArgs([]string{"major", "--ci"})
+	_ = captureStderr(t, func() {
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("release failed: %v", err)
+		}
+	})
 
-	// May fail without git repo, but should not crash
-	_ = cmd.Execute()
+	if !tagExists(t, dir, "v2.0.0") {
+		t.Error("positional 'major' through cobra should create v2.0.0")
+	}
+	if tagExists(t, dir, "v1.1.0") {
+		t.Error("auto-detected minor must not win over the positional increment")
+	}
 }
 
-func TestNewRootCommand_IncrementFlag(t *testing.T) {
+func TestExecute_IncrementFlag_DryRun(t *testing.T) {
+	saveFlagGlobals(t)
+	dir := setupReleaseRepo(t)
+
 	cmd := NewRootCommand()
-	cmd.SetArgs([]string{"--increment", "major", "--ci"})
+	cmd.SetArgs([]string{"--increment", "major", "--ci", "--dry-run"})
+	stderr := captureStderr(t, func() {
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("dry-run failed: %v", err)
+		}
+	})
 
-	// May fail without git repo, but should not crash
-	_ = cmd.Execute()
+	if !strings.Contains(string(stderr), "1.0.0 → 2.0.0") {
+		t.Errorf("expected the major bump to be announced, got:\n%s", stderr)
+	}
+	if tagExists(t, dir, "v2.0.0") {
+		t.Error("dry-run must not create the tag")
+	}
 }
 
-func TestNewRootCommand_ChangelogFlag(t *testing.T) {
+func TestExecute_VerboseFlag_DryRun(t *testing.T) {
+	saveFlagGlobals(t)
+	setupReleaseRepo(t)
+
+	cmd := NewRootCommand()
+	cmd.SetArgs([]string{"-V", "--ci", "--dry-run"})
+	stderr := captureStderr(t, func() {
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("verbose dry-run failed: %v", err)
+		}
+	})
+	// -V shows the ↳ detail lines (e.g. hook/git commands)
+	if !strings.Contains(string(stderr), "↳") {
+		t.Errorf("expected verbose detail lines, got:\n%s", stderr)
+	}
+}
+
+func TestExecute_ChangelogFlag_PrintsWithoutReleasing(t *testing.T) {
+	saveFlagGlobals(t)
+	dir := setupReleaseRepo(t)
+
 	cmd := NewRootCommand()
 	cmd.SetArgs([]string{"--changelog", "--ci"})
+	var stdout []byte
+	_ = captureStderr(t, func() {
+		stdout = captureStdout(t, func() {
+			if err := cmd.Execute(); err != nil {
+				t.Fatalf("--changelog failed: %v", err)
+			}
+		})
+	})
 
-	// This will fail in test environment (no git repo), which is expected
-	_ = cmd.Execute()
+	if !strings.Contains(string(stdout), "add feature") {
+		t.Errorf("expected the feat commit in the changelog output, got:\n%s", stdout)
+	}
+	if tagExists(t, dir, "v1.1.0") {
+		t.Error("--changelog must not create a tag")
+	}
 }
 
-func TestNewRootCommand_ReleaseVersionFlag(t *testing.T) {
+func TestExecute_ReleaseVersionFlag_PrintsNextVersion(t *testing.T) {
+	saveFlagGlobals(t)
+	dir := setupReleaseRepo(t)
+
 	cmd := NewRootCommand()
 	cmd.SetArgs([]string{"--release-version", "--ci"})
+	var stdout []byte
+	_ = captureStderr(t, func() {
+		stdout = captureStdout(t, func() {
+			if err := cmd.Execute(); err != nil {
+				t.Fatalf("--release-version failed: %v", err)
+			}
+		})
+	})
 
-	// This will fail in test environment (no git repo), which is expected
-	_ = cmd.Execute()
+	if strings.TrimSpace(string(stdout)) != "1.1.0" {
+		t.Errorf("stdout = %q, want exactly \"1.1.0\" (scripting mode)", stdout)
+	}
+	if tagExists(t, dir, "v1.1.0") {
+		t.Error("--release-version must not create a tag")
+	}
+}
+
+func TestExecute_OutsideGitRepo_ReturnsError(t *testing.T) {
+	saveFlagGlobals(t)
+	dir := t.TempDir()
+	origCwd, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(origCwd) })
+
+	cmd := NewRootCommand()
+	cmd.SetArgs([]string{"--ci", "--dry-run"})
+	var err error
+	_ = captureStderr(t, func() { err = cmd.Execute() })
+	if err == nil {
+		t.Fatal("expected an error outside a git repository, got nil")
+	}
+	if !strings.Contains(err.Error(), "git") {
+		t.Errorf("error should explain the git precondition, got: %v", err)
+	}
 }
 
 func TestNewRootCommand_HasExpectedFlags(t *testing.T) {
