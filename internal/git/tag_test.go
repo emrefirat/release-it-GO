@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"release-it-go/internal/config"
+	"github.com/emrefirat/release-it-GO/internal/config"
 )
 
 func TestCreateTag(t *testing.T) {

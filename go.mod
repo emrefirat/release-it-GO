@@ -1,4 +1,4 @@
-module release-it-go
+module github.com/emrefirat/release-it-GO
 
 go 1.26.7
 

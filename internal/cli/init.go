@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"release-it-go/internal/config"
-	"release-it-go/internal/ui"
+	"github.com/emrefirat/release-it-GO/internal/config"
+	"github.com/emrefirat/release-it-GO/internal/ui"
 
 	"github.com/spf13/cobra"
 )

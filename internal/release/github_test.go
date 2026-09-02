@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"release-it-go/internal/config"
-	"release-it-go/internal/git"
-	applog "release-it-go/internal/log"
+	"github.com/emrefirat/release-it-GO/internal/config"
+	"github.com/emrefirat/release-it-GO/internal/git"
+	applog "github.com/emrefirat/release-it-GO/internal/log"
 )
 
 func testRepoInfo() *git.RepoInfo {

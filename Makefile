@@ -43,7 +43,7 @@ coverage:
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report: coverage.html"
 
-check: fmt vet lint vuln test build
+check: fmt vet lint test build vuln
 	@echo "All checks passed."
 
 clean:
@@ -59,4 +59,4 @@ docker-build:
 		-t $(BINARY_NAME):latest .
 
 docker-run:
-	docker run --rm -v $(PWD):/workspace -e GITHUB_TOKEN $(BINARY_NAME):latest --ci
+	docker run --rm -v $(PWD):/workspace -e GITHUB_TOKEN -e GIT_USER_NAME -e GIT_USER_EMAIL $(BINARY_NAME):latest --ci

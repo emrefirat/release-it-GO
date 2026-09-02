@@ -3,8 +3,8 @@ package cli
 import (
 	"fmt"
 
-	"release-it-go/internal/config"
-	"release-it-go/internal/githook"
+	"github.com/emrefirat/release-it-GO/internal/config"
+	"github.com/emrefirat/release-it-GO/internal/githook"
 
 	"github.com/spf13/cobra"
 )

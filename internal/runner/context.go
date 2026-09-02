@@ -4,11 +4,11 @@
 package runner
 
 import (
-	"release-it-go/internal/config"
-	"release-it-go/internal/git"
-	"release-it-go/internal/hook"
-	applog "release-it-go/internal/log"
-	"release-it-go/internal/ui"
+	"github.com/emrefirat/release-it-GO/internal/config"
+	"github.com/emrefirat/release-it-GO/internal/git"
+	"github.com/emrefirat/release-it-GO/internal/hook"
+	applog "github.com/emrefirat/release-it-GO/internal/log"
+	"github.com/emrefirat/release-it-GO/internal/ui"
 )
 
 // ReleaseContext holds shared state throughout the release pipeline.

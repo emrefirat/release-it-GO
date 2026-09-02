@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"release-it-go/internal/config"
+	"github.com/emrefirat/release-it-GO/internal/config"
 )
 
 func TestPush_Default(t *testing.T) {

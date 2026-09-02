@@ -10,8 +10,8 @@ import (
 	"strings"
 	"unicode"
 
-	"release-it-go/internal/config"
-	applog "release-it-go/internal/log"
+	"github.com/emrefirat/release-it-GO/internal/config"
+	applog "github.com/emrefirat/release-it-GO/internal/log"
 )
 
 // execCommand is a function variable for creating exec.Cmd, allowing test mocking.

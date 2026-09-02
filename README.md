@@ -25,7 +25,7 @@ Automate versioning and release workflows — **without npm or Node.js**.
 ### Install
 
 ```bash
-go install release-it-go/cmd/release-it-go@latest
+go install github.com/emrefirat/release-it-GO/cmd/release-it-go@latest
 ```
 
 Or download a binary from [GitHub Releases](https://github.com/user/release-it-go/releases).
@@ -503,7 +503,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.22+"
-      - run: go install release-it-go/cmd/release-it-go@latest
+      - run: go install github.com/emrefirat/release-it-GO/cmd/release-it-go@latest
       - run: release-it-go --ci
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -517,7 +517,7 @@ release:
   only:
     - main
   script:
-    - go install release-it-go/cmd/release-it-go@latest
+    - go install github.com/emrefirat/release-it-GO/cmd/release-it-go@latest
     - release-it-go --ci
   variables:
     GITLAB_TOKEN: $GITLAB_TOKEN

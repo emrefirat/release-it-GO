@@ -8,14 +8,14 @@ import (
 	"strings"
 	"time"
 
-	"release-it-go/internal/bumper"
-	"release-it-go/internal/changelog"
-	"release-it-go/internal/config"
-	"release-it-go/internal/git"
-	"release-it-go/internal/notification"
-	"release-it-go/internal/release"
-	"release-it-go/internal/ui"
-	"release-it-go/internal/version"
+	"github.com/emrefirat/release-it-GO/internal/bumper"
+	"github.com/emrefirat/release-it-GO/internal/changelog"
+	"github.com/emrefirat/release-it-GO/internal/config"
+	"github.com/emrefirat/release-it-GO/internal/git"
+	"github.com/emrefirat/release-it-GO/internal/notification"
+	"github.com/emrefirat/release-it-GO/internal/release"
+	"github.com/emrefirat/release-it-GO/internal/ui"
+	"github.com/emrefirat/release-it-GO/internal/version"
 )
 
 // Runner orchestrates the release pipeline.

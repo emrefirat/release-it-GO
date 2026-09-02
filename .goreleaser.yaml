@@ -4,7 +4,8 @@ project_name: release-it-go
 
 before:
   hooks:
-    - go mod tidy
+    # No `go mod tidy` here: a release must build from the committed go.mod/go.sum.
+    - go mod verify
     - go vet ./...
     - go test ./...
 
@@ -27,11 +28,11 @@ builds:
       - -X main.date={{.Date}}
 
 archives:
-  - format: tar.gz
+  - formats: [tar.gz]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     format_overrides:
       - goos: windows
-        format: zip
+        formats: [zip]
 
 checksum:
   name_template: "checksums.txt"
@@ -59,6 +60,9 @@ nfpms:
     homepage: "https://github.com/emrefirat/release-it-GO"
     maintainer: "emrefirat"
     description: "Release automation tool for Git projects"
+    # The binary shells out to git for every operation.
+    dependencies:
+      - git
     formats:
       - deb
       - rpm

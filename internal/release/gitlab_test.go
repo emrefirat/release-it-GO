@@ -17,10 +17,10 @@ import (
 	"testing"
 	"time"
 
-	"release-it-go/internal/config"
-	"release-it-go/internal/git"
-	"release-it-go/internal/httputil"
-	applog "release-it-go/internal/log"
+	"github.com/emrefirat/release-it-GO/internal/config"
+	"github.com/emrefirat/release-it-GO/internal/git"
+	"github.com/emrefirat/release-it-GO/internal/httputil"
+	applog "github.com/emrefirat/release-it-GO/internal/log"
 	"sync/atomic"
 )
 

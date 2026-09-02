@@ -1,9 +1,9 @@
 package changelog
 
 import (
+	"github.com/emrefirat/release-it-GO/internal/git"
 	"os"
 	"path/filepath"
-	"release-it-go/internal/git"
 	"strings"
 	"testing"
 )

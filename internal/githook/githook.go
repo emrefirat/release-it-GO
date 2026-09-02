@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"release-it-go/internal/config"
+	"github.com/emrefirat/release-it-GO/internal/config"
 )
 
 // managedHeader is the marker comment in generated hook scripts.

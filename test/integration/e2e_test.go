@@ -11,8 +11,8 @@ import (
 	"sync"
 	"testing"
 
-	"release-it-go/internal/config"
-	"release-it-go/internal/runner"
+	"github.com/emrefirat/release-it-GO/internal/config"
+	"github.com/emrefirat/release-it-GO/internal/runner"
 )
 
 var (

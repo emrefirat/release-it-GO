@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"release-it-go/internal/config"
-	applog "release-it-go/internal/log"
+	"github.com/emrefirat/release-it-GO/internal/config"
+	applog "github.com/emrefirat/release-it-GO/internal/log"
 )
 
 func newTestGitWithConfig(cfg *config.GitConfig, dryRun bool) *Git {

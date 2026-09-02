@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"release-it-go/internal/version"
+	"github.com/emrefirat/release-it-GO/internal/version"
 )
 
 // preReleaseIDPattern: dot-separated semver identifiers (beta, rc.1, alpha-2).

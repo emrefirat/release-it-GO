@@ -2,7 +2,7 @@
 // It handles Git tagging, changelog generation, and GitHub/GitLab releases.
 package main
 
-import "release-it-go/internal/cli"
+import "github.com/emrefirat/release-it-GO/internal/cli"
 
 // Build information, injected via ldflags at build time.
 var (

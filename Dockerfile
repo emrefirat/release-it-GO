@@ -35,7 +35,7 @@ ARG USER_GID=1000
 # OCI metadata labels
 LABEL org.opencontainers.image.title="release-it-go" \
       org.opencontainers.image.description="Release automation tool for Git projects" \
-      org.opencontainers.image.source="https://github.com/user/release-it-go" \
+      org.opencontainers.image.source="https://github.com/emrefirat/release-it-GO" \
       org.opencontainers.image.licenses="MIT"
 
 # Install runtime dependencies

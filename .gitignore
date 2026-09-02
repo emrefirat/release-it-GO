@@ -1,6 +1,6 @@
 bin/
 tools/
-release-it-go
+/release-it-go
 *.exe
 *.dll
 *.so
@@ -12,3 +12,10 @@ release-it-go
 # Generated config files (init --full-example output)
 .release-it-go-full.json
 .release-it-go-full.yaml
+
+# Coverage artifacts (make coverage)
+coverage.out
+coverage.html
+
+# Local scratch
+/deneme4/

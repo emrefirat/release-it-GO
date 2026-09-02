@@ -9,13 +9,13 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/emrefirat/release-it-GO/internal/changelog"
+	"github.com/emrefirat/release-it-GO/internal/config"
+	applog "github.com/emrefirat/release-it-GO/internal/log"
+	"github.com/emrefirat/release-it-GO/internal/runner"
+	"github.com/emrefirat/release-it-GO/internal/ui"
+	"github.com/emrefirat/release-it-GO/internal/version"
 	"github.com/spf13/cobra"
-	"release-it-go/internal/changelog"
-	"release-it-go/internal/config"
-	applog "release-it-go/internal/log"
-	"release-it-go/internal/runner"
-	"release-it-go/internal/ui"
-	"release-it-go/internal/version"
 )
 
 // Build information, set via ldflags.

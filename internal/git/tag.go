@@ -7,7 +7,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 
-	"release-it-go/internal/version"
+	"github.com/emrefirat/release-it-GO/internal/version"
 )
 
 // CreateTag creates an annotated tag with the given name and message.

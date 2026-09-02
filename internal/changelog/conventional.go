@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"release-it-go/internal/git"
+	"github.com/emrefirat/release-it-GO/internal/git"
 )
 
 // RenderConventional generates changelog content in conventional-changelog format.

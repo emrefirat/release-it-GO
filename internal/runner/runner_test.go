@@ -7,11 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	"release-it-go/internal/changelog"
-	"release-it-go/internal/config"
-	"release-it-go/internal/git"
-	applog "release-it-go/internal/log"
-	"release-it-go/internal/ui"
+	"github.com/emrefirat/release-it-GO/internal/changelog"
+	"github.com/emrefirat/release-it-GO/internal/config"
+	"github.com/emrefirat/release-it-GO/internal/git"
+	applog "github.com/emrefirat/release-it-GO/internal/log"
+	"github.com/emrefirat/release-it-GO/internal/ui"
 )
 
 func TestRenderTagName(t *testing.T) {

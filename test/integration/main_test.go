@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"release-it-go/internal/testutil"
+	"github.com/emrefirat/release-it-GO/internal/testutil"
 )
 
 // TestMain isolates every integration test from the developer's git

@@ -10,8 +10,8 @@ import (
 	"fmt"
 	"time"
 
-	"release-it-go/internal/config"
-	"release-it-go/internal/runner"
+	"github.com/emrefirat/release-it-GO/internal/config"
+	"github.com/emrefirat/release-it-GO/internal/runner"
 )
 
 // newTestConfig creates a config suitable for integration tests.

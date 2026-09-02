@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"release-it-go/internal/git"
+	"github.com/emrefirat/release-it-GO/internal/git"
 )
 
 func TestRenderConventional_SingleFeat(t *testing.T) {

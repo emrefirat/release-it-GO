@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"release-it-go/internal/config"
-	applog "release-it-go/internal/log"
+	"github.com/emrefirat/release-it-GO/internal/config"
+	applog "github.com/emrefirat/release-it-GO/internal/log"
 )
 
 func TestNewBumper(t *testing.T) {
