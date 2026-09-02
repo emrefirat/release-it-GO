@@ -792,3 +792,62 @@ func TestExecute_CheckMsg_NoConfigWarningSuppressed(t *testing.T) {
 		t.Errorf("no-config warning must be suppressed in --check-msg mode, got:\n%s", stderr)
 	}
 }
+
+// --- mode flags: silent if-order precedence replaced by explicit errors ---
+
+func TestExecute_ConflictingModeFlags_AreErrors(t *testing.T) {
+	saveFlagGlobals(t)
+	dir := t.TempDir()
+	origCwd, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(origCwd) })
+
+	cases := [][]string{
+		{"--changelog", "--release-version"},
+		{"--check-msg", "feat: x", "--dry-run"},
+		{"--only-version", "--no-increment"},
+		{"minor", "--no-increment"},
+		{"--increment", "major", "--no-increment"},
+		{"--check-commits", "--changelog"},
+	}
+	for _, args := range cases {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			cmd := NewRootCommand()
+			cmd.SetArgs(args)
+			var err error
+			_ = captureStderr(t, func() { err = cmd.Execute() })
+			if err == nil {
+				t.Fatalf("%v: the losing flag used to be dropped silently; expected an error", args)
+			}
+			if !strings.Contains(err.Error(), "cannot be combined") {
+				t.Errorf("%v: error should say the flags cannot be combined, got: %v", args, err)
+			}
+		})
+	}
+}
+
+func TestExecute_InvalidIncrementFlag_FailsBeforePipeline(t *testing.T) {
+	saveFlagGlobals(t)
+	dir := t.TempDir() // not a git repo on purpose: validation must fire first
+	origCwd, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(origCwd) })
+
+	cmd := NewRootCommand()
+	cmd.SetArgs([]string{"--increment", "bogus", "--ci"})
+	var err error
+	_ = captureStderr(t, func() { err = cmd.Execute() })
+	if err == nil {
+		t.Fatal("-i bogus must be rejected up front (it used to fail after init and prerequisites)")
+	}
+	if !strings.Contains(err.Error(), "increment") {
+		t.Errorf("error should name the increment flag, got: %v", err)
+	}
+	if strings.Contains(err.Error(), "git") {
+		t.Errorf("validation must run before any git interaction, got: %v", err)
+	}
+}

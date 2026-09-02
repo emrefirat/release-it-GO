@@ -46,6 +46,9 @@ type Installer struct {
 	projectDir string // project root directory
 	hooksDir   string // .hooks/ directory path
 	force      bool
+	// DryRun reports what would be written without touching the filesystem
+	// or git config.
+	DryRun bool
 }
 
 // NewInstaller creates an Installer for the project root directory.
@@ -86,6 +89,16 @@ func (i *Installer) Install(hooks map[string][]string) error {
 		if len(commands) > 0 {
 			configured[name] = true
 		}
+	}
+
+	if i.DryRun {
+		for _, name := range supportedGitHooks {
+			if configured[name] {
+				fmt.Printf("  [dry-run] would install %s to %s/\n", name, hooksDirectory)
+			}
+		}
+		fmt.Printf("  [dry-run] would set git config core.hooksPath %s\n", hooksDirectory)
+		return nil
 	}
 
 	if len(configured) > 0 {
@@ -206,6 +219,10 @@ func setHooksPath(path string) error {
 func (i *Installer) Remove() error {
 	if !exists(i.hooksDir) {
 		fmt.Println("No hooks directory found.")
+		return nil
+	}
+	if i.DryRun {
+		fmt.Printf("  [dry-run] would remove managed hooks from %s/ and reset core.hooksPath\n", hooksDirectory)
 		return nil
 	}
 

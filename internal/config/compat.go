@@ -55,9 +55,7 @@ func normalizeRaw(raw map[string]interface{}, cfg *Config) map[string]interface{
 	if p, ok := raw["plugins"].(map[string]interface{}); ok {
 		plugins = p
 	}
-	if _, ok := raw["plugins"]; ok {
-		delete(raw, "plugins")
-	}
+	delete(raw, "plugins")
 
 	for key, lk := range legacyTopLevelKeys {
 		if _, ok := raw[key]; ok {

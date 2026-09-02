@@ -209,8 +209,56 @@ func buildFlagOverrides(cmd *cobra.Command) config.FlagOverrides {
 	return overrides
 }
 
+// checkModeFlagConflicts rejects flag combinations that used to be resolved
+// by silent if-order precedence (the losing flag was simply dropped).
+func checkModeFlagConflicts(args []string) error {
+	var modes []string
+	if checkMsgFile != "" {
+		modes = append(modes, "--check-msg")
+	}
+	if checkCommits {
+		modes = append(modes, "--check-commits")
+	}
+	if showChangelog {
+		modes = append(modes, "--changelog")
+	}
+	if releaseVersion {
+		modes = append(modes, "--release-version")
+	}
+	if onlyVersion {
+		modes = append(modes, "--only-version")
+	}
+	if noIncrement {
+		modes = append(modes, "--no-increment")
+	}
+	if len(modes) > 1 {
+		return fmt.Errorf("flags %s cannot be combined (pick one mode)", strings.Join(modes, " and "))
+	}
+	if noIncrement && (increment != "" || len(args) > 0) {
+		return fmt.Errorf("--no-increment and an increment (%s) cannot be combined", firstNonEmpty(increment, args))
+	}
+	if dryRun && (checkMsgFile != "" || checkCommits) {
+		return fmt.Errorf("--dry-run and %s cannot be combined (lint modes change nothing)", modes[0])
+	}
+	return nil
+}
+
+func firstNonEmpty(flag string, args []string) string {
+	if flag != "" {
+		return "--increment " + flag
+	}
+	if len(args) > 0 {
+		return args[0]
+	}
+	return ""
+}
+
 // runRelease is the main entry point for the release command.
 func runRelease(cmd *cobra.Command, args []string) error {
+	if err := checkModeFlagConflicts(args); err != nil {
+		return err
+	}
+
 	// Load config
 	cfg, err := config.LoadConfig(cfgFile)
 	if err != nil {
@@ -232,6 +280,12 @@ func runRelease(cmd *cobra.Command, args []string) error {
 	}
 	if resolvedIncrement != "" {
 		cfg.Increment = resolvedIncrement
+	}
+
+	// Flags can introduce invalid values too (-i bogus, --preReleaseId beta!);
+	// validate before touching the repository.
+	if err := cfg.Validate(); err != nil {
+		return err
 	}
 
 	// When preRelease is set, auto-mark GitHub/GitLab releases as pre-release

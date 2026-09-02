@@ -3,6 +3,8 @@ package cli
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"release-it-go/internal/config"
@@ -628,4 +630,26 @@ func fileSize(t *testing.T, path string) int64 {
 		t.Fatalf("stat %s: %v", path, err)
 	}
 	return info.Size()
+}
+
+func TestRunInit_DryRun_WritesNothing(t *testing.T) {
+	saveFlagGlobals(t)
+	dir := setupGitRepo(t)
+	ciMode = true
+	dryRun = true
+
+	stderr := captureStderr(t, func() {
+		if err := runInit(nil, nil); err != nil {
+			t.Fatalf("init --dry-run failed: %v", err)
+		}
+	})
+
+	for _, name := range []string{".release-it-go.json", ".release-it-go.yaml"} {
+		if _, err := os.Stat(filepath.Join(dir, name)); !os.IsNotExist(err) {
+			t.Errorf("--dry-run must not write %s", name)
+		}
+	}
+	if !strings.Contains(string(stderr), "dry-run") {
+		t.Errorf("expected a dry-run notice, got:\n%s", stderr)
+	}
 }

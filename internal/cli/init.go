@@ -53,6 +53,10 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 // runInitFullExample generates a full example config file with all options (YAML).
 func runInitFullExample() error {
+	if dryRun {
+		fmt.Fprintf(os.Stderr, "[dry-run] would write %s\n", fullExampleFile)
+		return nil
+	}
 	if err := config.WriteFullExampleYAML(fullExampleFile); err != nil {
 		return fmt.Errorf("writing full example config: %w", err)
 	}
@@ -200,6 +204,11 @@ func runInitWithPrompter(prompter ui.Prompter) error {
 	}
 	nativeFile := config.NativeConfigFileForFormat(format)
 
+	if dryRun {
+		fmt.Fprintf(os.Stderr, "[dry-run] would write %s (nothing written)\n", nativeFile)
+		return nil
+	}
+
 	// If switching format (e.g. JSON→YAML), rename old file to .bak
 	if existingFile != "" && existingFile != nativeFile {
 		backupPath := existingFile + ".bak"
@@ -240,6 +249,11 @@ func runMigrationWithFormat(prompter ui.Prompter, legacyPath string) error {
 		format = "yaml"
 	}
 	nativeFile := config.NativeConfigFileForFormat(format)
+
+	if dryRun {
+		fmt.Fprintf(os.Stderr, "[dry-run] would migrate %s → %s (backup %s.bak)\n", legacyPath, nativeFile, legacyPath)
+		return nil
+	}
 
 	if err := config.MigrateLegacyConfigTo(legacyPath, format); err != nil {
 		return fmt.Errorf("migration failed: %w", err)

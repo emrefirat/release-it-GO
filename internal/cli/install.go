@@ -69,6 +69,7 @@ func runHooksInstall(cmd *cobra.Command, args []string) error {
 
 	hooks := githook.HooksFromConfig(&cfg.Hooks)
 	installer := githook.NewInstaller(projectDir, hooksForce)
+	installer.DryRun = dryRun
 
 	if len(hooks) == 0 {
 		fmt.Println("No git hooks configured in hooks section.")
@@ -89,6 +90,7 @@ func runHooksRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	installer := githook.NewInstaller(projectDir, false)
+	installer.DryRun = dryRun
 	fmt.Println("Removing managed git hooks...")
 	return installer.Remove()
 }

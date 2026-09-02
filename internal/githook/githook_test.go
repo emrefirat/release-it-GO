@@ -585,3 +585,27 @@ func TestInstall_EmptyMapNoHooksDir_NoGitCalls(t *testing.T) {
 		t.Errorf("expected no git calls, got %d", gitCalls)
 	}
 }
+
+func TestInstall_DryRun_NoWrites(t *testing.T) {
+	gitCalls := 0
+	original := commandExecutor
+	t.Cleanup(func() { commandExecutor = original })
+	commandExecutor = func(name string, args ...string) (string, error) {
+		gitCalls++
+		return "", nil
+	}
+
+	dir := t.TempDir()
+	installer := NewInstaller(dir, false)
+	installer.DryRun = true
+
+	if err := installer.Install(map[string][]string{"pre-commit": {"echo hi"}}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if exists(filepath.Join(dir, hooksDirectory)) {
+		t.Error("dry-run must not create the hooks directory")
+	}
+	if gitCalls != 0 {
+		t.Errorf("dry-run must not touch git config, got %d calls", gitCalls)
+	}
+}

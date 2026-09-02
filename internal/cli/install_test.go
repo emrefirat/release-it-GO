@@ -373,3 +373,21 @@ func TestRunHooksRemove_LeavesNonManagedHookUntouched(t *testing.T) {
 		t.Error("user hook content was modified")
 	}
 }
+
+func TestRunHooksInstall_DryRun_WritesNothing(t *testing.T) {
+	saveFlagGlobals(t)
+	dir := setupGitRepo(t)
+	writeConfig(t, dir, "hooks:\n  \"pre-commit\":\n    - \"echo hi\"\n")
+	dryRun = true
+
+	if err := runHooksInstall(nil, nil); err != nil {
+		t.Fatalf("hooks install --dry-run failed: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(dir, ".hooks")); !os.IsNotExist(err) {
+		t.Error("--dry-run must not create .hooks/")
+	}
+	if out, err := exec.Command("git", "-C", dir, "config", "--local", "core.hooksPath").Output(); err == nil {
+		t.Errorf("--dry-run must not set core.hooksPath, got %q", strings.TrimSpace(string(out)))
+	}
+}
