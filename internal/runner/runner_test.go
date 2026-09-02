@@ -2725,9 +2725,10 @@ func TestRunner_RunOnlyVersion(t *testing.T) {
 		output string
 		err    error
 	}{
-		"git remote get-url origin":       {output: "https://github.com/testowner/testrepo.git", err: nil},
-		"git rev-parse --abbrev-ref HEAD": {output: "main", err: nil},
-		"git describe --tags --abbrev=0":  {output: "v1.0.0", err: nil},
+		"git rev-parse --is-inside-work-tree": {output: "true", err: nil},
+		"git remote get-url origin":           {output: "https://github.com/testowner/testrepo.git", err: nil},
+		"git rev-parse --abbrev-ref HEAD":     {output: "main", err: nil},
+		"git describe --tags --abbrev=0":      {output: "v1.0.0", err: nil},
 	})
 
 	err := runner.RunOnlyVersion()
@@ -2761,9 +2762,10 @@ func TestRunner_RunNoIncrement(t *testing.T) {
 		output string
 		err    error
 	}{
-		"git remote get-url origin":       {output: "https://github.com/testowner/testrepo.git", err: nil},
-		"git rev-parse --abbrev-ref HEAD": {output: "main", err: nil},
-		"git describe --tags --abbrev=0":  {output: "v3.2.1", err: nil},
+		"git rev-parse --is-inside-work-tree": {output: "true", err: nil},
+		"git remote get-url origin":           {output: "https://github.com/testowner/testrepo.git", err: nil},
+		"git rev-parse --abbrev-ref HEAD":     {output: "main", err: nil},
+		"git describe --tags --abbrev=0":      {output: "v3.2.1", err: nil},
 	})
 
 	err := runner.RunNoIncrement()
@@ -2795,9 +2797,10 @@ func TestRunner_RunNoIncrement_NoTags(t *testing.T) {
 		output string
 		err    error
 	}{
-		"git remote get-url origin":       {output: "", err: fmt.Errorf("no remote")},
-		"git rev-parse --abbrev-ref HEAD": {output: "main", err: nil},
-		"git describe --tags --abbrev=0":  {output: "", err: fmt.Errorf("no tags")},
+		"git rev-parse --is-inside-work-tree": {output: "true", err: nil},
+		"git remote get-url origin":           {output: "", err: fmt.Errorf("no remote")},
+		"git rev-parse --abbrev-ref HEAD":     {output: "main", err: nil},
+		"git describe --tags --abbrev=0":      {output: "", err: fmt.Errorf("no tags")},
 	})
 
 	err := runner.RunNoIncrement()
@@ -4335,5 +4338,108 @@ func TestRunner_CommitsSinceLatestRelease_NoTags_BumperVersion_UsesAllCommits(t 
 	}
 	if len(commits) != 1 || commits[0].Message != "feat: first" {
 		t.Errorf("commits = %+v, want the single feat commit", commits)
+	}
+}
+
+// --- entry points must enforce the same safety checks as Run() ---
+
+func TestRunner_RunOnlyVersion_DirtyTree_FailsBeforeAnyGitWrite(t *testing.T) {
+	cfg := &config.Config{
+		CI:        true,
+		Increment: "patch",
+		Git: config.GitConfig{
+			Commit: true, Tag: true,
+			TagName:                "v${version}",
+			RequireCleanWorkingDir: true,
+		},
+	}
+	var calls []string
+	restore := git.SetCommandExecutorForTest(func(name string, args ...string) (string, error) {
+		call := name + " " + strings.Join(args, " ")
+		calls = append(calls, call)
+		switch {
+		case strings.HasPrefix(call, "git rev-parse --is-inside-work-tree"):
+			return "true", nil
+		case strings.HasPrefix(call, "git status --porcelain"):
+			return " M dirty.txt", nil
+		}
+		return "", nil
+	})
+	t.Cleanup(restore)
+
+	runner := NewRunner(cfg)
+	err := runner.RunOnlyVersion()
+	if err == nil {
+		t.Fatal("expected the dirty working tree to abort --only-version")
+	}
+	if !strings.Contains(err.Error(), "not clean") {
+		t.Errorf("error should name the failed prerequisite, got: %v", err)
+	}
+	for _, c := range calls {
+		if strings.HasPrefix(c, "git commit") || strings.HasPrefix(c, "git tag --annotate") {
+			t.Errorf("no git write may happen after a failed prerequisite, saw: %s", c)
+		}
+	}
+}
+
+func TestRunner_RunNoIncrement_MissingToken_FailsBeforeAnyGitWrite(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "")
+	cfg := &config.Config{
+		CI:     true,
+		Git:    config.GitConfig{Commit: true, Tag: true, TagName: "v${version}"},
+		GitHub: config.GitHubConfig{Release: true, TokenRef: "GITHUB_TOKEN"},
+	}
+	var calls []string
+	restore := git.SetCommandExecutorForTest(func(name string, args ...string) (string, error) {
+		call := name + " " + strings.Join(args, " ")
+		calls = append(calls, call)
+		switch {
+		case strings.HasPrefix(call, "git rev-parse --is-inside-work-tree"):
+			return "true", nil
+		case strings.HasPrefix(call, "git describe"):
+			return "v1.0.0", nil
+		case strings.HasPrefix(call, "git config user."):
+			return "Test User", nil // identity check passes; the token check is the one under test
+		}
+		return "", nil
+	})
+	t.Cleanup(restore)
+
+	runner := NewRunner(cfg)
+	err := runner.RunNoIncrement()
+	if err == nil {
+		t.Fatal("expected the missing token to abort --no-increment before any git write")
+	}
+	if !strings.Contains(err.Error(), "GITHUB_TOKEN") {
+		t.Errorf("error should name the missing token, got: %v", err)
+	}
+	for _, c := range calls {
+		if strings.HasPrefix(c, "git commit") || strings.HasPrefix(c, "git tag --annotate") {
+			t.Errorf("no git write may happen after a failed prerequisite, saw: %s", c)
+		}
+	}
+}
+
+func TestRunner_RunChangelogOnly_NeverPrompts(t *testing.T) {
+	// Scripting mode: VERSION=$(release-it-go --changelog) must not block on
+	// an interactive version menu even in a TTY.
+	cfg := &config.Config{Git: config.GitConfig{TagName: "v${version}"}}
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{
+		"git describe --tags --abbrev=0": {output: "v1.0.0", err: nil},
+		"git log v1.0.0..HEAD --pretty=format:%h%x1f%B%x1e": {
+			output: "abc1234\x1ffeat: thing\x1e", err: nil,
+		},
+	})
+	runner.ctx.IsCI = false
+	runner.ctx.Prompter = &mockPrompter{selectVersionErr: fmt.Errorf("prompt must not be shown in --changelog mode")}
+
+	if err := runner.RunChangelogOnly(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if runner.ctx.Version != "1.1.0" {
+		t.Errorf("Version = %q, want auto-detected 1.1.0", runner.ctx.Version)
 	}
 }

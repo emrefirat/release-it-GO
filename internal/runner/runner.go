@@ -46,6 +46,15 @@ func (r *Runner) printBanner() {
 
 // Run executes the full release pipeline.
 func (r *Runner) Run() error {
+	return r.runPipeline(r.determineVersion)
+}
+
+// runPipeline executes the standard pipeline with the given version step.
+// Every entry point goes through here so the prerequisite and token checks
+// can never be bypassed: --only-version and --no-increment previously
+// started at bump/changelog, so a dirty tree, wrong branch or missing token
+// surfaced only after commit, tag and push had already happened.
+func (r *Runner) runPipeline(versionStep func() error) error {
 	start := time.Now()
 	r.printBanner()
 
@@ -53,7 +62,7 @@ func (r *Runner) Run() error {
 		{"init", r.init},
 		{"prerequisites", r.checkPrerequisites},
 		{"commitlint", r.checkCommitLint},
-		{"version", r.determineVersion},
+		{"version", versionStep},
 		{"bump", r.bumpFiles},
 		{"changelog", r.generateChangelog},
 		{"git:release", r.gitRelease},
@@ -116,7 +125,9 @@ func (r *Runner) runSteps(steps []pipelineStep) error {
 }
 
 // RunChangelogOnly generates and prints the changelog without performing a release.
+// Scripting mode: never prompts, even in a TTY.
 func (r *Runner) RunChangelogOnly() error {
+	r.ctx.IsCI = true
 	if err := r.init(); err != nil {
 		return err
 	}
@@ -140,7 +151,9 @@ func (r *Runner) RunChangelogOnly() error {
 }
 
 // RunReleaseVersionOnly determines and prints the next version.
+// Scripting mode: never prompts, even in a TTY.
 func (r *Runner) RunReleaseVersionOnly() error {
+	r.ctx.IsCI = true
 	if err := r.init(); err != nil {
 		return err
 	}
@@ -151,47 +164,30 @@ func (r *Runner) RunReleaseVersionOnly() error {
 	return nil
 }
 
-// RunOnlyVersion prompts for version selection, then runs the rest automatically.
+// RunOnlyVersion prompts for the version interactively, then completes the
+// release without further prompts. Same safety checks as Run().
 func (r *Runner) RunOnlyVersion() error {
-	r.printBanner()
-
-	if err := r.init(); err != nil {
-		return err
-	}
-	if err := r.determineVersion(); err != nil {
-		return err
-	}
-
-	// After version is selected, run rest in CI mode (no prompts)
-	r.ctx.IsCI = true
-
-	steps := []pipelineStep{
-		{"bump", r.bumpFiles},
-		{"changelog", r.generateChangelog},
-		{"git:release", r.gitRelease},
-		{"github:release", r.githubRelease},
-		{"gitlab:release", r.gitlabRelease},
-		{"notification", r.sendNotification},
-	}
-
-	start := time.Now()
-	if err := r.runSteps(steps); err != nil {
-		return err
-	}
-
-	r.printSummary(time.Since(start))
-	return nil
+	return r.runPipeline(func() error {
+		if err := r.determineVersion(); err != nil {
+			return err
+		}
+		r.ctx.IsCI = true // the rest of the pipeline runs without prompts
+		return nil
+	})
 }
 
-// RunNoIncrement runs the release pipeline without incrementing the version.
+// RunNoIncrement re-runs the release steps for the current version — npm
+// release-it's documented recovery flow after a failed push. There are no
+// new commits by definition, so requireCommits is disabled; every other
+// prerequisite (clean tree, branch, upstream, identity, tokens) still applies.
 func (r *Runner) RunNoIncrement() error {
-	r.printBanner()
+	r.ctx.Config.Git.RequireCommits = false
+	return r.runPipeline(r.determineNoIncrementVersion)
+}
 
-	if err := r.init(); err != nil {
-		return err
-	}
-
-	// Get latest version but don't increment
+// determineNoIncrementVersion keeps the latest released version as the
+// release version.
+func (r *Runner) determineNoIncrementVersion() error {
 	latestTag, err := r.ctx.Git.GetLatestTag()
 	if err != nil {
 		return fmt.Errorf("getting latest tag: %w", err)
@@ -206,23 +202,7 @@ func (r *Runner) RunNoIncrement() error {
 	r.ctx.LatestVersion = parsed.String()
 	r.ctx.Version = parsed.String()
 	r.ctx.TagName = renderTagName(r.ctx.Config.Git.TagName, r.ctx.Version)
-	r.ctx.UpdateVars()
-
-	// Run remaining steps
-	start := time.Now()
-	steps := []pipelineStep{
-		{"changelog", r.generateChangelog},
-		{"git:release", r.gitRelease},
-		{"github:release", r.githubRelease},
-		{"gitlab:release", r.gitlabRelease},
-		{"notification", r.sendNotification},
-	}
-
-	if err := r.runSteps(steps); err != nil {
-		return err
-	}
-
-	r.printSummary(time.Since(start))
+	r.ctx.Logger.Print("  %s Version: %s (no increment)", ui.IconVersion, r.ctx.Version)
 	return nil
 }
 
@@ -821,6 +801,16 @@ func (r *Runner) generateChangelog() error {
 	if err != nil {
 		r.ctx.Spinner.Stop(false)
 		return fmt.Errorf("getting commits: %w", err)
+	}
+
+	if len(rawCommits) == 0 {
+		// Nothing new since the last release (e.g. a --no-increment recovery
+		// run). Writing an empty section would corrupt CHANGELOG.md and the
+		// resulting commit would move HEAD away from the existing tag.
+		r.ctx.Changelog = ""
+		r.ctx.Spinner.Update("Changelog unchanged (no new commits)")
+		r.ctx.Spinner.Stop(true)
+		return nil
 	}
 
 	parsed := changelog.ParseCommits(rawCommits)

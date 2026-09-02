@@ -1217,7 +1217,7 @@ func TestIntegration_VPrefixInference(t *testing.T) {
 	assertTagExists(t, dir, "v1.1.0")
 }
 
-func TestIntegration_NoIncrement_ExistingTagAtHead_Skips(t *testing.T) {
+func TestIntegration_NoIncrement_RecoveryRerun_DefaultChangelog(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
@@ -1228,22 +1228,69 @@ func TestIntegration_NoIncrement_ExistingTagAtHead_Skips(t *testing.T) {
 	defer func() { _ = os.Chdir(origDir) }()
 
 	initGitRepo(t, dir)
+	createTag(t, dir, "v1.0.0")
 	createCommits(t, dir, []string{"feat: shipped work"})
-	createTag(t, dir, "v0.1.0") // release already tagged at HEAD (e.g. push failed)
 
+	// First run: full release (changelog + commit + tag), as if the push then failed
 	cfg := newTestConfig(dir)
-	cfg.Changelog.Enabled = false // recovery re-run: nothing new to generate
+	if err := runner.NewRunner(cfg).Run(); err != nil {
+		t.Fatalf("initial release failed: %v", err)
+	}
+	assertTagExists(t, dir, "v1.1.0")
+	headAfterRelease := getHeadHash(t, dir)
+	changelogBefore, _ := os.ReadFile(filepath.Join(dir, "CHANGELOG.md"))
 
-	r := runner.NewRunner(cfg)
-	// npm's documented recovery flow: re-run release steps for the current
-	// version. The existing tag at HEAD must be tolerated, not fatal.
-	if err := r.RunNoIncrement(); err != nil {
+	// Recovery re-run with the SHIPPED defaults (changelog enabled): it used
+	// to prepend an empty duplicate section, commit it, and then die on
+	// "tag already exists on a different commit".
+	cfg2 := newTestConfig(dir)
+	if err := runner.NewRunner(cfg2).RunNoIncrement(); err != nil {
 		t.Fatalf("RunNoIncrement() failed: %v", err)
 	}
 
-	assertTagExists(t, dir, "v0.1.0")
+	if getHeadHash(t, dir) != headAfterRelease {
+		t.Error("recovery run must not create a new commit")
+	}
+	changelogAfter, _ := os.ReadFile(filepath.Join(dir, "CHANGELOG.md"))
+	if string(changelogAfter) != string(changelogBefore) {
+		t.Errorf("recovery run must leave CHANGELOG.md untouched:\n--- before ---\n%s\n--- after ---\n%s", changelogBefore, changelogAfter)
+	}
+	if n := strings.Count(string(changelogAfter), "\n## "); n != 1 {
+		t.Errorf("expected exactly 1 version section (## heading), got %d", n)
+	}
 }
 
+func TestIntegration_OnlyVersion_HookSeesTheVersion(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	_ = os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+
+	marker := filepath.Join(dir, "hook_version.txt")
+	initGitRepo(t, dir)
+	createTag(t, dir, "v1.0.0")
+	createCommits(t, dir, []string{"feat: new"})
+
+	cfg := newTestConfig(dir)
+	// canonical npm recipe: bump another manifest with the new version
+	cfg.Hooks.BeforeBump = []string{"echo '${version}|'$RELEASE_VERSION > " + marker}
+
+	if err := runner.NewRunner(cfg).RunOnlyVersion(); err != nil {
+		t.Fatalf("RunOnlyVersion() failed: %v", err)
+	}
+
+	content, err := os.ReadFile(marker)
+	if err != nil {
+		t.Fatalf("before:bump hook did not run: %v", err)
+	}
+	if strings.TrimSpace(string(content)) != "1.1.0|1.1.0" {
+		t.Errorf("before:bump saw %q, want \"1.1.0|1.1.0\" (template var and env var)", strings.TrimSpace(string(content)))
+	}
+}
 func TestIntegration_ReleaseCommit_DoesNotSweepUnrelatedChanges(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
