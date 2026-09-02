@@ -31,5 +31,5 @@
 | 12 | `.gitignore` `/release-it-go` çapası (şu an `cmd/release-it-go/` altındaki yeni dosyaları gizliyor); `/deneme4/`, `coverage.*` | ✅ `122f841` |
 | 13 | goreleaser deprecated `format:` → `formats:`; nfpm `license` + `git` bağımlılığı; `before.hooks`'tan `go mod tidy` | ✅ `122f841` (`license` atlandı: repoda LICENSE dosyası yok) |
 | 14 | `Makefile`: `check` sırası (vuln test'i kapılamasın), `docker-run` `GIT_USER_*` env | ✅ `122f841` |
-| 15 | dependabot (gomod + github-actions); CI OS matrisi (macos/windows build+unit) | ✅ `aa89ce6` (Windows advisory) |
+| 15 | dependabot (gomod + github-actions); CI OS matrisi (macos/windows build+unit) | ✅ `aa89ce6` (Windows bloklayıcı: izin assert'leri Windows'ta atlanıyor) |
 | 16 | CHANGELOG'un araçla yeniden üretimi (v0.2.0/v0.3.0 girdileri, compare ref'leri) | ✅ `1282983` |

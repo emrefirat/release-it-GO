@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/emrefirat/release-it-GO/internal/config"
+	"runtime"
 )
 
 // mockGitCommands sets up commandExecutor to handle git config calls silently.
@@ -104,7 +105,8 @@ func TestInstall_NewHooks(t *testing.T) {
 		if err != nil {
 			t.Fatalf("hook %s not created: %v", name, err)
 		}
-		if info.Mode().Perm() != 0755 {
+		// Windows has no Unix mode bits; git runs hooks there regardless.
+		if runtime.GOOS != "windows" && info.Mode().Perm() != 0755 {
 			t.Errorf("hook %s permission = %o, want 0755", name, info.Mode().Perm())
 		}
 		content, _ := os.ReadFile(path)

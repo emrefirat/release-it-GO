@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -143,7 +144,8 @@ func TestRunHooksInstall_WritesHookWithManagedHeader(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stat: %v", err)
 	}
-	if info.Mode().Perm()&0o100 == 0 {
+	// Windows has no Unix mode bits; git runs hooks there regardless.
+	if runtime.GOOS != "windows" && info.Mode().Perm()&0o100 == 0 {
 		t.Error("hook file should be user-executable")
 	}
 }

@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
 
 permissions:
@@ -70,10 +70,6 @@ jobs:
       matrix:
         os: [macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    # Windows is advisory until the unit suite has been proven there: the
-    # hook and git-hook code paths were written with Windows in mind but
-    # never executed on it. macOS is blocking.
-    continue-on-error: ${{ matrix.os == 'windows-latest' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5

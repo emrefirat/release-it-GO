@@ -113,7 +113,7 @@ make coverage   # opens coverage.html
 make check   # fmt + vet + lint + test + build + vuln
 ```
 
-This **must pass** before you commit. CI runs the same checks (`build + vet + test + race + coverage gate (70%) + lint + govulncheck`) plus a macOS/Windows build-and-unit matrix (Windows is advisory). `test/integration` builds the binary and drives real git repositories, so `git` must be on `PATH`.
+This **must pass** before you commit. CI runs the same checks (`build + vet + test + race + coverage gate (70%) + lint + govulncheck`) plus a macOS/Windows build-and-unit matrix. `test/integration` builds the binary and drives real git repositories, so `git` must be on `PATH`.
 
 ### 7. Commit
 

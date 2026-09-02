@@ -767,7 +767,7 @@
 - [x] `.gitignore` anchored (`/release-it-go` hid new files under `cmd/release-it-go/`), coverage artifacts, scratch dir
 - [x] GoReleaser: v2.6 `formats`, `go mod verify` instead of `go mod tidy` at release time, `git` as nfpm dependency (`goreleaser check` passes)
 - [x] Makefile: govulncheck last in `check`; `docker-run` forwards `GIT_USER_NAME`/`GIT_USER_EMAIL`
-- [x] CI: 70% coverage gate, pinned govulncheck job re-enabled, `go mod verify`, macOS (blocking) + Windows (advisory) build/unit matrix, dependabot (gomod + actions)
+- [x] CI: 70% coverage gate, pinned govulncheck job re-enabled, `go mod verify`, macOS + Windows build/unit matrix (both blocking), dependabot (gomod + actions)
 - [x] release.yml runs the suite before tagging and pushes HEAD + tag with one `--atomic` push
 - [x] CHANGELOG: 0.2.0 / 0.3.0 entries added, compare links use the real tag names
 - [x] Full-example `commit-msg` hook validates `$1` (`--check-msg`) instead of linting history (`--check-commits`)
@@ -775,7 +775,7 @@
 ### Notes
 
 - No LICENSE file exists in the repository, so the nfpm `license` field was left out rather than inventing one — add the file first.
-- Windows unit tests are `continue-on-error` on purpose: the hook code paths were written for Windows but have never run there; promote the job to blocking once it is green.
+- The first Windows CI run failed only on two Unix permission assertions (`0755` on hook scripts); they are skipped on Windows and the job is blocking since then. CI runs on pushes to `main` and on pull requests (feature branches get CI through their PR).
 - Integration tests now build the binary once per run (`releaseItBinary`) for hook end-to-end coverage; the temp dir is removed by TestMain.
 
 ---
