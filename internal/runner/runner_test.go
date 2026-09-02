@@ -10,6 +10,7 @@ import (
 	"release-it-go/internal/changelog"
 	"release-it-go/internal/config"
 	"release-it-go/internal/git"
+	applog "release-it-go/internal/log"
 	"release-it-go/internal/ui"
 )
 
@@ -3258,7 +3259,7 @@ func TestFormatLintError_SingleFailure(t *testing.T) {
 		{Hash: "abc1234", Subject: "bad commit message", Reason: "missing type prefix"},
 	}
 
-	err := formatLintError(failed, 5)
+	err := formatLintError(failed, 5, true)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -3290,7 +3291,7 @@ func TestFormatLintError_MultipleFailures(t *testing.T) {
 		{Hash: "def5678", Subject: "bad two", Reason: "empty subject"},
 	}
 
-	err := formatLintError(failed, 10)
+	err := formatLintError(failed, 10, true)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -4273,5 +4274,35 @@ func TestRunner_GitRelease_PushError_SuggestsRecovery(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "--no-increment") {
 		t.Errorf("push failure must point at the --no-increment recovery flow, got: %v", err)
+	}
+}
+
+func TestRunner_RunCheckCommits_Verbose_ListsEachFailureOnce(t *testing.T) {
+	cfg := &config.Config{
+		CI:      true,
+		Verbose: 1,
+		Git:     config.GitConfig{TagName: "v${version}"},
+	}
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{
+		"git describe --tags --abbrev=0":              {output: "v1.0.0", err: nil},
+		"git log v1.0.0..HEAD --pretty=format:%h||%s": {output: "abc1234||feat: good\ndef5678||bad message here", err: nil},
+	})
+	var buf strings.Builder
+	runner.ctx.Logger = applog.NewLoggerWithWriter(1, false, &buf)
+
+	err := runner.RunCheckCommits()
+	if err == nil {
+		t.Fatal("expected lint failure")
+	}
+
+	combined := buf.String() + err.Error()
+	if n := strings.Count(combined, "bad message here"); n != 1 {
+		t.Errorf("failure listed %d times, want exactly once (verbose ✓/✗ list and error block duplicated it):\n%s", n, combined)
+	}
+	if !strings.Contains(err.Error(), "1 of 2 commits") {
+		t.Errorf("summary should still report the count, got: %v", err)
 	}
 }

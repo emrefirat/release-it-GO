@@ -2,9 +2,11 @@ package cli
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -237,8 +239,8 @@ func TestRunCheckMsg_DirectString_Invalid_ReturnsError(t *testing.T) {
 			t.Error("expected error for non-conventional message")
 		}
 	})
-	if !bytesContains(stderr, "commitlint") {
-		t.Errorf("expected commitlint header in stderr, got: %s", stderr)
+	if !bytesContains(stderr, "Invalid commit message") {
+		t.Errorf("expected the diagnostic header in stderr, got: %s", stderr)
 	}
 }
 
@@ -495,5 +497,131 @@ func TestNewRootCommand_RejectsMultipleArgs(t *testing.T) {
 	cmd.SetArgs([]string{"minor", "extra"})
 	if err := cmd.Execute(); err == nil {
 		t.Error("expected error for two positional args")
+	}
+}
+
+func TestFirstSubjectLine(t *testing.T) {
+	tests := []struct{ in, want string }{
+		{"feat: x\n\nbody", "feat: x"},
+		{"\n\nfeat: x\n", "feat: x"},                                 // leading blank lines (git strips them later)
+		{"# Please enter the commit message\n#\nfix: y\n", "fix: y"}, // template comments
+		{"  feat: z  ", "feat: z"},
+		{"", ""},
+		{"# only comments\n#\n", ""},
+	}
+	for _, tt := range tests {
+		if got := firstSubjectLine(tt.in); got != tt.want {
+			t.Errorf("firstSubjectLine(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
+func TestRunCheckMsg_FileMode_SkipsLeadingBlankAndCommentLines(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "COMMIT_EDITMSG")
+	content := "\n# Please enter the commit message for your changes.\n#\nfeat: real subject\n"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	if err := runCheckMsg(path, false); err != nil {
+		t.Errorf("expected nil (subject is the first real line), got %v", err)
+	}
+}
+
+func TestRunCheckMsg_Output_IsScannable(t *testing.T) {
+	stderr := captureStderr(t, func() {
+		_ = runCheckMsg("fic: deneme", false)
+	})
+	out := string(stderr)
+	for _, want := range []string{"Invalid commit message", "message:", "problem:", "Expected:", "Example:", "Types:"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "commitlint —") {
+		t.Errorf("old cramped header must be gone, got:\n%s", out)
+	}
+}
+
+func TestRunCheckMsg_UnknownType_SuggestsClosestAndRewritesExample(t *testing.T) {
+	stderr := captureStderr(t, func() {
+		_ = runCheckMsg("fic: deneme", false)
+	})
+	out := string(stderr)
+	if !strings.Contains(out, `did you mean "fix"`) {
+		t.Errorf("expected a suggestion for the typo, got:\n%s", out)
+	}
+	if !strings.Contains(out, "fix: deneme") {
+		t.Errorf("example should be the user's own message with the corrected type, got:\n%s", out)
+	}
+}
+
+func TestRunCheckMsg_ReturnsSentinel(t *testing.T) {
+	var err error
+	_ = captureStderr(t, func() { err = runCheckMsg("bogus", false) })
+	if !errors.Is(err, ErrCheckFailed) {
+		t.Errorf("expected ErrCheckFailed so Execute skips the redundant Error: line, got %v", err)
+	}
+}
+
+func TestRunCheckMsg_Verbose_ListsEveryAcceptedType(t *testing.T) {
+	stderr := captureStderr(t, func() { _ = runCheckMsg("bogus", true) })
+	if !strings.Contains(string(stderr), "build") {
+		t.Errorf("build is accepted by the linter and must appear in the verbose type list, got:\n%s", stderr)
+	}
+}
+
+func TestRunCheckMsg_Verbose_DoesNotClaimUnenforcedRules(t *testing.T) {
+	stderr := captureStderr(t, func() { _ = runCheckMsg("bogus", true) })
+	out := string(stderr)
+	if strings.Contains(out, "must start with lowercase") {
+		t.Errorf("help claims a description-case rule the linter does not enforce:\n%s", out)
+	}
+	if !strings.Contains(out, "type must be lowercase") {
+		t.Errorf("help should state the rule that IS enforced (type case), got:\n%s", out)
+	}
+}
+
+func TestRunCheckMsg_LabelColumnsAlign(t *testing.T) {
+	stderr := captureStderr(t, func() { _ = runCheckMsg("fic: deneme", false) })
+	lines := strings.Split(string(stderr), "\n")
+	col := map[string]int{}
+	for _, line := range lines {
+		for _, label := range []string{"message:", "problem:", "Expected:", "Example:", "Types:"} {
+			if idx := strings.Index(line, label); idx >= 0 {
+				col[label] = idx
+			}
+		}
+	}
+	if len(col) < 5 {
+		t.Fatalf("labels missing: %v\n%s", col, stderr)
+	}
+	for label, idx := range col {
+		if idx != col["message:"] {
+			t.Errorf("label %q at column %d, want %d (all labels aligned)", label, idx, col["message:"])
+		}
+	}
+}
+
+func TestExecute_CheckMsg_NoConfigWarningSuppressed(t *testing.T) {
+	saveFlagGlobals(t)
+	dir := t.TempDir()
+	origCwd, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(origCwd) })
+
+	cmd := NewRootCommand()
+	cmd.SetArgs([]string{"--check-msg", "feat: ok"})
+	stderr := captureStderr(t, func() {
+		if err := cmd.Execute(); err != nil {
+			t.Errorf("valid message must pass, got %v", err)
+		}
+	})
+	// The commit-msg hook runs this on every commit; a config-file warning
+	// for a mode that never reads the config is pure noise.
+	if strings.Contains(string(stderr), "No config file found") {
+		t.Errorf("no-config warning must be suppressed in --check-msg mode, got:\n%s", stderr)
 	}
 }

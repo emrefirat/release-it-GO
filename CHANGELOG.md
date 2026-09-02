@@ -11,6 +11,7 @@
 
 ### Bug Fixes
 
+* `--check-msg` diagnostics redesigned for readability: what you wrote, what is wrong (with a `did you mean "fix"?` suggestion for typos and wrong-case types), the expected format, and an example built from your own message with the type corrected. `-V` lists every accepted type (`build` was missing) and only rules the linter actually enforces. `fixup!`, `squash!`, and `amend!` commits are accepted (so `git commit --fixup` works under the commit-msg hook), leading blank/comment lines in COMMIT_EDITMSG are skipped, the "No config file found" warning no longer fires in lint modes, and `--check-commits -V` no longer lists each failure twice.
 * the bumper no longer destroys file formatting: version updates in JSON/YAML/TOML now replace only the version value (preserving key order, indentation, and comments), with the old full rewrite kept as a verified fallback.
 * transient GitHub/GitLab/webhook failures (429/502/503/504) are retried with exponential backoff, honoring `Retry-After`; connection errors are replayed only for idempotent requests.
 * lifecycle hooks now work on Windows (`%COMSPEC% /C` instead of requiring `sh`), and hook scripts receive `RELEASE_*` environment variables (`RELEASE_VERSION`, `RELEASE_TAG_NAME`, `RELEASE_REPO_OWNER`, ...).
@@ -21,7 +22,6 @@
 * declining the Commit or Tag prompt no longer silently cancels the operations after it — commit, tag, and push are confirmed independently.
 * `--no-increment` now completes when the release tag already exists at HEAD (npm's documented recovery flow after a failed push); a tag on a different commit remains a clear error.
 * config migration no longer silently drops the `hooks`, `bumper`, `calver`, and `notification` sections (the writer serialized only 4 of 8 sections).
-
 * `before:release` and `after:release` lifecycle hooks now fire (before the git release step and at pipeline end, matching npm release-it). They were accepted in config and documented, but the pipeline never emitted them.
 * `ci`, `dry-run`, and `verbose` set in the config file are no longer overwritten by unset CLI flags — flag values only override the config when actually passed.
 * webhook failure messages no longer contain the webhook URL (a bearer credential for Slack/Teams); the error names the webhook type and `urlRef` instead.

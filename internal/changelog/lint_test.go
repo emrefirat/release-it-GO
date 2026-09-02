@@ -182,3 +182,67 @@ func TestLintCommits_AllValidTypes(t *testing.T) {
 		t.Errorf("expected 0 failed, got %d", len(failed))
 	}
 }
+
+func TestLintCommits_AutoPassesFixupSquashAmend(t *testing.T) {
+	// commitlint's defaults ignore these: they exist to be squashed before
+	// merge, and the commit-msg hook must not reject `git commit --fixup`.
+	commits := []LintInput{
+		{Hash: "a", Subject: "fixup! feat: x"},
+		{Hash: "b", Subject: "squash! fix: y"},
+		{Hash: "c", Subject: "amend! chore: z"},
+	}
+	passed, failed := LintCommits(commits)
+	if len(failed) != 0 {
+		t.Fatalf("fixup!/squash!/amend! must auto-pass, failed: %+v", failed)
+	}
+	if len(passed) != 3 {
+		t.Errorf("passed = %d, want 3", len(passed))
+	}
+}
+
+func TestSuggestType(t *testing.T) {
+	tests := []struct{ in, want string }{
+		{"fic", "fix"},     // one-letter typo
+		{"Feat", "feat"},   // wrong case
+		{"FIX", "fix"},     // wrong case
+		{"chroe", "chore"}, // transposition
+		{"docs", ""},       // already valid — nothing to suggest
+		{"xyzzy", ""},      // nothing close
+		{"", ""},
+	}
+	for _, tt := range tests {
+		if got := SuggestType(tt.in); got != tt.want {
+			t.Errorf("SuggestType(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
+func TestLintCommits_UnknownType_CarriesSuggestion(t *testing.T) {
+	_, failed := LintCommits([]LintInput{{Hash: "a", Subject: "fic: deneme"}})
+	if len(failed) != 1 {
+		t.Fatalf("expected 1 failure, got %d", len(failed))
+	}
+	if failed[0].Suggestion != "fix" {
+		t.Errorf("Suggestion = %q, want fix", failed[0].Suggestion)
+	}
+}
+
+func TestValidTypes_MatchesAllowedTypes(t *testing.T) {
+	types := ValidTypes()
+	if len(types) != len(allowedTypes) {
+		t.Fatalf("ValidTypes has %d entries, allowedTypes has %d — they must be one list", len(types), len(allowedTypes))
+	}
+	seen := map[string]bool{}
+	for _, tt := range types {
+		if !allowedTypes[tt.Name] {
+			t.Errorf("ValidTypes lists %q but the linter does not accept it", tt.Name)
+		}
+		if tt.Description == "" {
+			t.Errorf("%q has no description", tt.Name)
+		}
+		seen[tt.Name] = true
+	}
+	if !seen["build"] {
+		t.Error("build is accepted by the linter but was missing from the help list")
+	}
+}

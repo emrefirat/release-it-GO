@@ -2,9 +2,11 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -247,6 +249,10 @@ func runRelease(cmd *cobra.Command, args []string) error {
 
 	if cfg.ConfigFile != "" {
 		logger.Debug("config loaded from %s", cfg.ConfigFile)
+	} else if checkMsgFile != "" || checkCommits {
+		// Lint-only modes never read the config; the commit-msg hook runs
+		// --check-msg on every commit, so this warning would be pure noise.
+		logger.Verbose("No config file found, using defaults")
 	} else {
 		logger.Print("  %s No config file found, using defaults", "⚠")
 	}
@@ -303,7 +309,7 @@ func runRelease(cmd *cobra.Command, args []string) error {
 // Compact output by default, verbose (-V) shows detailed help.
 // Accepts: file path, "-" for stdin, or direct message string.
 func runCheckMsg(input string, verbose bool) error {
-	var subject string
+	var raw string
 
 	switch {
 	case input == "-":
@@ -311,72 +317,113 @@ func runCheckMsg(input string, verbose bool) error {
 		if err != nil {
 			return fmt.Errorf("reading stdin: %w", err)
 		}
-		subject = strings.TrimSpace(strings.SplitN(string(data), "\n", 2)[0])
+		raw = string(data)
 	case fileExists(input):
 		data, err := os.ReadFile(input)
 		if err != nil {
 			return fmt.Errorf("reading commit message file: %w", err)
 		}
-		subject = strings.TrimSpace(strings.SplitN(string(data), "\n", 2)[0])
+		raw = string(data)
 	default:
-		subject = strings.TrimSpace(input)
+		raw = input
 	}
 
+	subject := firstSubjectLine(raw)
 	if subject == "" {
 		return fmt.Errorf("commit message is empty")
 	}
 
-	lintInput := []changelog.LintInput{{Hash: "", Subject: subject}}
-	_, failed := changelog.LintCommits(lintInput)
-
+	_, failed := changelog.LintCommits([]changelog.LintInput{{Subject: subject}})
 	if len(failed) == 0 {
 		return nil
 	}
 
-	reason := failed[0].Reason
+	fmt.Fprint(os.Stderr, formatCheckMsgFailure(subject, failed[0], verbose))
+	return ErrCheckFailed
+}
+
+// ErrCheckFailed marks a failed --check-msg run whose diagnostics were already
+// printed; Execute exits non-zero without appending a redundant "Error:" line.
+var ErrCheckFailed = errors.New("commit message is not conventional")
+
+// firstSubjectLine returns the first meaningful line of a commit message:
+// leading blank lines and "#" comment lines (git's COMMIT_EDITMSG template)
+// are skipped, as git itself strips them after the commit-msg hook runs.
+func firstSubjectLine(message string) string {
+	for _, line := range strings.Split(message, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		return line
+	}
+	return ""
+}
+
+// checkMsgLabelWidth aligns the label column of the --check-msg diagnostic.
+// Labels are padded as plain text — padding a colored string counts the ANSI
+// escape bytes and misaligns the columns on a real terminal.
+const checkMsgLabelWidth = 10
+
+// formatCheckMsgFailure renders the --check-msg diagnostic: what was written,
+// what is wrong (with a type suggestion when one is close), what is expected,
+// and an example — ideally the user's own message with the type corrected.
+func formatCheckMsgFailure(subject string, f changelog.LintResult, verbose bool) string {
 	var b strings.Builder
-
-	// Compact output (default) — single line like commitlint
-	fmt.Fprintf(&b, "\n  %s commitlint %s %d error found\n", ui.FormatError(ui.IconFail), ui.FormatDim("—"), len(failed))
-	fmt.Fprintf(&b, "\n    commit  %s\n", ui.FormatDim(fmt.Sprintf("%q", subject)))
-	fmt.Fprintf(&b, "\n    %s %-18s %s %s\n", ui.FormatError(ui.IconFail), ui.FormatError(reason), ui.FormatDim("·"), reasonDescription(reason))
-	fmt.Fprintf(&b, "\n      expected  %s  %s  e.g.  %s: add user login\n",
-		ui.FormatDim("type")+ui.FormatWarning("("+"scope"+")"+":"+" description"),
-		ui.FormatDim("·"),
-		ui.FormatSuccess("feat")+"("+ui.FormatWarning("auth")+")")
-
-	// Verbose output — show all valid types with descriptions
-	if verbose {
-		fmt.Fprintf(&b, "\n  %s Expected format:\n", ui.FormatInfo("ℹ"))
-		fmt.Fprintf(&b, "\n      type%s: description\n", ui.FormatWarning("(scope)"))
-		fmt.Fprintf(&b, "\n      %s scope is optional\n", ui.FormatDim("·"))
-		fmt.Fprintf(&b, "      %s description must start with lowercase\n", ui.FormatDim("·"))
-		fmt.Fprintf(&b, "\n  %s Valid types:\n\n", ui.FormatInfo("ℹ"))
-		types := []struct{ name, desc string }{
-			{"feat", "new feature"},
-			{"fix", "bug fix"},
-			{"docs", "documentation only"},
-			{"style", "formatting / whitespace"},
-			{"refactor", "code restructuring"},
-			{"test", "add or fix tests"},
-			{"chore", "build / dependency tasks"},
-			{"ci", "CI/CD changes"},
-			{"perf", "performance improvement"},
-			{"revert", "revert a commit"},
-		}
-		for _, t := range types {
-			fmt.Fprintf(&b, "      %s  %s %s\n",
-				ui.FormatSuccess(fmt.Sprintf("%-10s", t.name)),
-				ui.FormatDim("→"),
-				t.desc)
-		}
-		fmt.Fprintf(&b, "\n  %s Example:  %s: add user login\n",
-			ui.FormatDim("→"),
-			ui.FormatSuccess("feat")+"("+ui.FormatWarning("auth")+")")
+	row := func(label, value string) {
+		fmt.Fprintf(&b, "  %-*s %s\n", checkMsgLabelWidth, label, value)
 	}
 
-	fmt.Fprint(os.Stderr, b.String())
-	return fmt.Errorf("commit message is not conventional")
+	fmt.Fprintf(&b, "\n%s %s\n\n", ui.FormatError(ui.IconFail), ui.FormatBold("Invalid commit message"))
+	row("message:", subject)
+	row("problem:", ui.FormatError(describeProblem(f)))
+	b.WriteString("\n")
+	row("Expected:", "<type>(<scope>): <description>   "+ui.FormatDim("scope is optional"))
+	row("Example:", ui.FormatSuccess(exampleFor(subject, f)))
+	row("Types:", strings.Join(changelog.ValidTypeNames(), ", "))
+
+	if verbose {
+		b.WriteString("\n  Valid types:\n")
+		for _, t := range changelog.ValidTypes() {
+			fmt.Fprintf(&b, "    %-10s %s\n", t.Name, t.Description)
+		}
+		b.WriteString("\n  Rules:\n")
+		b.WriteString("    · type must be lowercase (feat, not Feat)\n")
+		b.WriteString("    · scope is optional: feat(auth): ...\n")
+		b.WriteString("    · merge, revert, fixup!, squash! and amend! commits are always accepted\n")
+	} else {
+		fmt.Fprintf(&b, "\n  %s\n", ui.FormatDim("Run with -V for type descriptions and rules."))
+	}
+	b.WriteString("\n")
+	return b.String()
+}
+
+// describeProblem turns a lint reason into an actionable sentence.
+func describeProblem(f changelog.LintResult) string {
+	switch {
+	case strings.HasPrefix(f.Reason, "unknown type:"):
+		unknown := strings.TrimSpace(strings.TrimPrefix(f.Reason, "unknown type:"))
+		if f.Suggestion != "" {
+			return fmt.Sprintf("unknown type %q — did you mean %q?", unknown, f.Suggestion)
+		}
+		return fmt.Sprintf("unknown type %q", unknown)
+	case strings.Contains(f.Reason, "not in conventional commit format"):
+		return `missing the "type: " prefix (or the ": " separator after the type)`
+	default:
+		return f.Reason
+	}
+}
+
+// leadingTypePattern matches the type token at the start of a subject.
+var leadingTypePattern = regexp.MustCompile(`^[A-Za-z]+`)
+
+// exampleFor prefers the user's own message with the suggested type swapped
+// in, falling back to a generic example.
+func exampleFor(subject string, f changelog.LintResult) string {
+	if f.Suggestion != "" && leadingTypePattern.MatchString(subject) {
+		return leadingTypePattern.ReplaceAllString(subject, f.Suggestion)
+	}
+	return "feat(auth): add user login"
 }
 
 // reasonDescription returns a human-readable description for lint reasons.
@@ -401,6 +448,9 @@ func fileExists(path string) bool {
 func Execute() {
 	rootCmd := NewRootCommand()
 	if err := rootCmd.Execute(); err != nil {
+		if errors.Is(err, ErrCheckFailed) {
+			os.Exit(1) // diagnostics were already printed
+		}
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}

@@ -357,7 +357,7 @@ func (r *Runner) checkCommitLint() error {
 	_, failed := changelog.LintCommits(lintInputs)
 	if len(failed) > 0 {
 		r.ctx.Spinner.Stop(false)
-		return formatLintError(failed, len(commitInfos))
+		return formatLintError(failed, len(commitInfos), true)
 	}
 
 	r.ctx.Spinner.Stop(true)
@@ -393,13 +393,15 @@ func (r *Runner) RunCheckCommits() error {
 
 	passed, failed := changelog.LintCommits(lintInputs)
 
-	// Verbose: show all checked commits with their status
-	if r.ctx.Logger.GetVerbose() >= 1 {
+	// Verbose: show all checked commits with their status. The error below
+	// then carries only the summary — repeating every failure was noise.
+	verbose := r.ctx.Logger.GetVerbose() >= 1
+	if verbose {
 		for _, p := range passed {
-			r.ctx.Logger.Print("  %s %s %s", ui.FormatSuccess(ui.IconSuccess), p.Hash[:7], p.Subject)
+			r.ctx.Logger.Print("  %s %s %s", ui.FormatSuccess(ui.IconSuccess), shortHash(p.Hash), p.Subject)
 		}
 		for _, f := range failed {
-			r.ctx.Logger.Print("  %s %s %s ← %s", ui.FormatError(ui.IconFail), f.Hash[:7], f.Subject, f.Reason)
+			r.ctx.Logger.Print("  %s %s %s ← %s", ui.FormatError(ui.IconFail), shortHash(f.Hash), f.Subject, lintReason(f))
 		}
 		fmt.Fprintln(os.Stderr)
 	}
@@ -409,19 +411,40 @@ func (r *Runner) RunCheckCommits() error {
 		return nil
 	}
 
-	return formatLintError(failed, len(commitInfos))
+	return formatLintError(failed, len(commitInfos), !verbose)
 }
 
-// formatLintError builds a formatted error message for failed commit lints.
-func formatLintError(failed []changelog.LintResult, total int) error {
+// formatLintError builds the error for failed commit lints. listDetails
+// controls whether each failing commit is repeated in the error (false when
+// the caller already printed the per-commit list).
+func formatLintError(failed []changelog.LintResult, total int, listDetails bool) error {
 	var b strings.Builder
 	b.WriteString("Commit lint failed:\n")
-	for _, f := range failed {
-		fmt.Fprintf(&b, "  %-10s %-40s ← %s\n", f.Hash, f.Subject, f.Reason)
+	if listDetails {
+		for _, f := range failed {
+			fmt.Fprintf(&b, "  %-10s %-40s ← %s\n", f.Hash, f.Subject, lintReason(f))
+		}
+		b.WriteString("\n")
 	}
-	fmt.Fprintf(&b, "\n  %d of %d commits are not conventional.\n", len(failed), total)
+	fmt.Fprintf(&b, "  %d of %d commits are not conventional.\n", len(failed), total)
 	b.WriteString("  Use --ignore-commit-lint to bypass.\n")
 	return fmt.Errorf("%s", b.String())
+}
+
+// lintReason renders a failure reason with its type suggestion, if any.
+func lintReason(f changelog.LintResult) string {
+	if f.Suggestion != "" {
+		return fmt.Sprintf("%s (did you mean %s?)", f.Reason, f.Suggestion)
+	}
+	return f.Reason
+}
+
+// shortHash abbreviates a commit hash for display.
+func shortHash(hash string) string {
+	if len(hash) > 7 {
+		return hash[:7]
+	}
+	return hash
 }
 
 // inferTagNameFormat replicates npm release-it's tag-prefix inference: with
