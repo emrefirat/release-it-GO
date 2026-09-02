@@ -58,6 +58,18 @@ func TestResolveBuildInfo(t *testing.T) {
 			want: BuildInfo{Version: "dev", Commit: "b2afd41-dirty", Date: "unknown"},
 		},
 		{
+			// Observed on Go 1.24+: a go build inside the repository stamps a
+			// pseudo-version with +dirty instead of "(devel)"; VCS wins for commit.
+			name: "go build in the repo (Go 1.24+): pseudo-version +dirty with VCS stamps",
+			ld:   ldDefaults,
+			info: fakeBuildInfo("v0.4.1-0.20260902214320-0ca1a8725a67+dirty", map[string]string{
+				"vcs.revision": "0ca1a8725a67deadbeef",
+				"vcs.time":     "2026-09-02T21:43:20Z",
+				"vcs.modified": "true",
+			}),
+			want: BuildInfo{Version: "0.4.1-0.20260902214320-0ca1a8725a67+dirty", Commit: "0ca1a87-dirty", Date: "2026-09-02T21:43:20Z"},
+		},
+		{
 			name: "no build info at all keeps the defaults",
 			ld:   ldDefaults,
 			info: nil,
