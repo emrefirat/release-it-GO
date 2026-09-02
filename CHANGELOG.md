@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Bug Fixes
+
+* `release-it-go version` no longer prints `dev (commit: none, built: unknown)` for binaries built without ldflags: `go install …@v0.4.0` reports the module version (and the commit of a pseudo-version), a plain `go build` in the repository reports the VCS revision, time and `-dirty` state. GoReleaser and `make build` values still take precedence.
+
 ## [0.4.0](https://github.com/emrefirat/release-it-GO/compare/v0.3.0...v0.4.0) (2026-09-03)
 
 ### Features

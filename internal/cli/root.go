@@ -107,7 +107,8 @@ func newVersionCommand() *cobra.Command {
 		Use:   "version",
 		Short: "Print the version of release-it-go",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("release-it-go %s (commit: %s, built: %s)\n", Version, Commit, Date)
+			bi := resolveBuildInfo(BuildInfo{Version: Version, Commit: Commit, Date: Date}, readBuildInfo())
+			_, _ = fmt.Fprint(cmd.OutOrStdout(), formatBuildInfo(bi))
 		},
 	}
 }

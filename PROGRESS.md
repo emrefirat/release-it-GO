@@ -865,6 +865,8 @@
 - [x] BUG: `hooks install` help and the full-example comment said hooks go to `.git/hooks/` (2026-09-02) → the installer has written `.hooks/` + `core.hooksPath` since Phase 20. Fix: texts corrected (docs commit `651b759`).
 - [x] BUG: Docs told Docker users to set `GIT_AUTHOR_*` (2026-09-02) → the entrypoint checks `GIT_USER_NAME`/`GIT_USER_EMAIL` only, so the documented command always failed with the identity error. Fix: TROUBLESHOOTING + README Docker section.
 
+- [x] BUG: `go install …@v0.4.0` binaries reported `dev (commit: none, built: unknown)` (2026-09-03) → only ldflags fed the version command, and `go install` injects none. Fix: `resolveBuildInfo` fills the gaps from `runtime/debug.ReadBuildInfo` (module version, pseudo-version hash, VCS revision/time/dirty); ldflags still win.
+
 ---
 
 ## Change History
@@ -948,6 +950,7 @@
 | 2026-09-02 | Claude | Phase 28 complete: strict config loading with unknown-key suggestions, `Validate()` rules, legacy-key normalization for all formats, hook fields for every step, mode-flag conflict errors, `--dry-run` in init/hooks, `commitsPath` / `addVersionUrl` / project-uploads wiring, 11 dead keys removed with load-time warnings, docs aligned |
 | 2026-09-02 | Claude | Phase 29 complete: git-isolated tests + t.Chdir, end-to-end hook/env/bumper/positional/retry coverage, real module path for `go install`, goreleaser v2.6 syntax, gitignore anchor, CI coverage gate + pinned govulncheck + OS matrix + dependabot, atomic release push, CHANGELOG 0.2.0/0.3.0 entries |
 | 2026-09-02 | Claude | Phase 30 complete: 12 wrong doc statements fixed, README sections for every behavior added since Phase 23, ARCHITECTURE/CLAUDE.md synced, ADR-014..018, help texts corrected. Second audit cycle (Phases 27–30) closed |
+| 2026-09-03 | Claude | v0.4.0 released with the tool itself (13 GoReleaser assets); dependabot enabled and its 5 PRs landed; x/text + x/sys bumped (govulncheck clean); Windows CI job blocking; `version` falls back to ReadBuildInfo for `go install` builds |
 
 ---
 

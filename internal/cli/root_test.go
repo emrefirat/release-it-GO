@@ -30,6 +30,8 @@ func TestNewRootCommand_Help(t *testing.T) {
 }
 
 func TestNewRootCommand_VersionSubcommand(t *testing.T) {
+	origV, origC, origD := Version, Commit, Date
+	t.Cleanup(func() { Version, Commit, Date = origV, origC, origD })
 	Version = "1.0.0-test"
 	Commit = "abc1234"
 	Date = "2026-02-16"
