@@ -4215,14 +4215,13 @@ func TestRunner_GitRelease_CommitMessageTemplateVars(t *testing.T) {
 	}
 }
 
-func TestRunner_GitRelease_TargetedStaging_StagesBumpedFilesOnly(t *testing.T) {
+func TestRunner_GitRelease_StagesTrackedChanges_ByDefault(t *testing.T) {
+	// npm release-it stages tracked modifications (git add . --update) so
+	// files changed by hooks (dist/, lockfiles) land in the release commit.
+	// Untracked files are only swept in with addUntrackedFiles.
 	cfg := &config.Config{
-		CI: true,
-		Git: config.GitConfig{
-			Commit:        true,
-			CommitMessage: "chore: release ${version}",
-			// AddUntrackedFiles=false (default): no whole-tree sweep
-		},
+		CI:  true,
+		Git: config.GitConfig{Commit: true, CommitMessage: "chore: release ${version}"},
 	}
 
 	var calls []string
@@ -4230,7 +4229,7 @@ func TestRunner_GitRelease_TargetedStaging_StagesBumpedFilesOnly(t *testing.T) {
 		call := name + " " + strings.Join(args, " ")
 		calls = append(calls, call)
 		if strings.HasPrefix(call, "git diff --cached") {
-			return "package.json", nil
+			return "dist/app.js", nil
 		}
 		return "", nil
 	})
@@ -4238,21 +4237,19 @@ func TestRunner_GitRelease_TargetedStaging_StagesBumpedFilesOnly(t *testing.T) {
 
 	runner := NewRunner(cfg)
 	runner.ctx.Version = "1.1.0"
-	runner.ctx.BumpedFiles = []string{"package.json"}
 
 	if err := runner.gitRelease(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	joined := strings.Join(calls, "\n")
-	if !strings.Contains(joined, "git add package.json") {
-		t.Errorf("bumped file must be staged explicitly; calls:\n%s", joined)
+	if !strings.Contains(joined, "git add . --update") {
+		t.Errorf("tracked modifications must be staged (git add . --update); calls:\n%s", joined)
 	}
-	if strings.Contains(joined, "git add . --update") || strings.Contains(joined, "git add .\n") {
-		t.Errorf("release commit must not sweep the whole tree by default; calls:\n%s", joined)
+	if strings.Contains(joined+"\n", "git add .\n") {
+		t.Errorf("untracked files must not be swept in without addUntrackedFiles; calls:\n%s", joined)
 	}
 }
-
 func TestRunner_GitRelease_PushError_SuggestsRecovery(t *testing.T) {
 	cfg := &config.Config{
 		CI:  true,
@@ -4495,5 +4492,97 @@ func TestRunner_DetermineSemVer_ExplicitVersionNotGreater_Errors(t *testing.T) {
 		if !strings.Contains(err.Error(), "greater") {
 			t.Errorf("error should explain the ordering rule, got: %v", err)
 		}
+	}
+}
+
+func TestRunner_CheckPrerequisites_ReleaseEnabledWithoutRepoInfo_Errors(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "tok")
+	cfg := &config.Config{
+		CI:     true,
+		Git:    config.GitConfig{TagName: "v${version}"},
+		GitHub: config.GitHubConfig{Release: true, TokenRef: "GITHUB_TOKEN"},
+	}
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{
+		"git rev-parse --is-inside-work-tree": {output: "true", err: nil},
+	})
+	runner.ctx.RepoInfo = nil // origin missing or unparseable
+
+	err := runner.checkPrerequisites()
+	if err == nil {
+		t.Fatal("a GitHub release cannot be created without repository info; this used to be skipped silently with a green 'Done'")
+	}
+	if !strings.Contains(err.Error(), "remote") {
+		t.Errorf("error should point at the remote, got: %v", err)
+	}
+}
+
+func TestRunner_Init_UsesPushRepoForRepoInfo(t *testing.T) {
+	cfg := &config.Config{
+		CI:  true,
+		Git: config.GitConfig{TagName: "v${version}", PushRepo: "upstream"},
+	}
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{
+		"git remote get-url upstream":     {output: "https://github.com/o/r.git", err: nil},
+		"git rev-parse --abbrev-ref HEAD": {output: "main", err: nil},
+	})
+
+	if err := runner.init(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if runner.ctx.RepoInfo == nil || runner.ctx.RepoInfo.Owner != "o" {
+		t.Errorf("RepoInfo should come from git.pushRepo (upstream), got %+v", runner.ctx.RepoInfo)
+	}
+}
+
+func TestRunner_AutoDetectIncrement_GitError_IsLogged(t *testing.T) {
+	cfg := &config.Config{CI: true, Git: config.GitConfig{TagName: "v${version}"}}
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{
+		"git log v1.0.0..HEAD --pretty=format:%h%x1f%B%x1e": {output: "", err: fmt.Errorf("fatal: bad revision")},
+		"git describe --tags --abbrev=0":                    {output: "", err: fmt.Errorf("no tags")},
+		"git log --pretty=format:%h%x1f%B%x1e":              {output: "", err: fmt.Errorf("fatal: bad revision")},
+	})
+	var buf strings.Builder
+	runner.ctx.Logger = applog.NewLoggerWithWriter(0, false, &buf)
+	runner.ctx.LatestVersion = "1.0.0"
+
+	if got := runner.autoDetectIncrement(); got != "patch" {
+		t.Errorf("fallback increment = %q, want patch", got)
+	}
+	if !strings.Contains(strings.ToLower(buf.String()), "bad revision") {
+		t.Errorf("a git failure behind the 'patch' fallback must be visible, log was:\n%s", buf.String())
+	}
+}
+
+func TestRunner_GenerateChangelog_CompareURLUsesTagNames(t *testing.T) {
+	cfg := &config.Config{
+		CI:        true,
+		Git:       config.GitConfig{TagName: "v${version}"},
+		Changelog: config.ChangelogConfig{Enabled: true}, // no Infile → no file write
+	}
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{
+		"git log v1.0.0..HEAD --pretty=format:%h%x1f%B%x1e": {output: "abc1234\x1ffeat: thing\x1e", err: nil},
+	})
+	runner.ctx.RepoInfo = &git.RepoInfo{Host: "github.com", Owner: "o", Repository: "r"}
+	runner.ctx.LatestVersion = "1.0.0"
+	runner.ctx.Version = "1.1.0"
+	runner.ctx.TagName = "v1.1.0"
+
+	if err := runner.generateChangelog(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(runner.ctx.Changelog, "compare/v1.0.0...v1.1.0") {
+		t.Errorf("compare link must use tag names on a v-tagged repo, got:\n%s", runner.ctx.Changelog)
 	}
 }

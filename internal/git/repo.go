@@ -18,14 +18,14 @@ type RepoInfo struct {
 // httpsPattern matches HTTPS remote URLs like https://github.com/owner/repo.git
 // Also handles URLs with credentials like https://user:token@github.com/owner/repo.git
 // Supports nested groups: https://gitlab.com/group/subgroup/repo.git
-var httpsPattern = regexp.MustCompile(`^https?://(?:[^@]+@)?([^/]+)/(.+)/([^/]+?)(?:\.git)?$`)
+var httpsPattern = regexp.MustCompile(`^https?://(?:[^@]+@)?([^/]+)/(.+)/([^/]+?)(?:\.git)?/?$`)
 
 // sshPattern matches SSH remote URLs like git@github.com:owner/repo.git
 // Supports nested groups: git@gitlab.com:group/subgroup/repo.git
 var sshPattern = regexp.MustCompile(`^git@([^:]+):(.+)/([^/]+?)(?:\.git)?$`)
 
 // sshURLPattern matches ssh:// protocol URLs like ssh://git@host:22/owner/repo.git
-var sshURLPattern = regexp.MustCompile(`^ssh://(?:[^@]+@)?([^:/]+)(?::\d+)?/(.+)/([^/]+?)(?:\.git)?$`)
+var sshURLPattern = regexp.MustCompile(`^ssh://(?:[^@]+@)?([^:/]+)(?::\d+)?/(.+)/([^/]+?)(?:\.git)?/?$`)
 
 // GetRepoInfo parses repository information from the given git remote.
 func GetRepoInfo(remoteName string) (*RepoInfo, error) {

@@ -301,3 +301,13 @@ func TestGetBranchName_Error(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestParseRepoURL_HTTPS_TrailingSlash(t *testing.T) {
+	info, err := ParseRepoURL("https://github.com/owner/repo/")
+	if err != nil {
+		t.Fatalf("trailing slash is common in copied remotes; got error: %v", err)
+	}
+	if info.Owner != "owner" || info.Repository != "repo" {
+		t.Errorf("got owner=%q repo=%q", info.Owner, info.Repository)
+	}
+}
