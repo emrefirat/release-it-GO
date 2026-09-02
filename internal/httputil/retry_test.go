@@ -119,3 +119,47 @@ func TestDo_ConnError_GET_Retried(t *testing.T) {
 		t.Errorf("GET conn error should be retried (2 sleeps for 3 attempts), got %d", len(delays))
 	}
 }
+
+func TestDo_POST_502_NotRetried(t *testing.T) {
+	// A gateway 502/504 says nothing about whether the upstream already
+	// processed the POST (e.g. created the release). Replaying it could
+	// create a duplicate — only 429/503 are safe for non-idempotent methods.
+	var attempts int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&attempts, 1)
+		w.WriteHeader(http.StatusBadGateway)
+	}))
+	defer server.Close()
+
+	req, _ := http.NewRequest("POST", server.URL, strings.NewReader("{}"))
+	resp, err := Do(server.Client(), req, Options{Sleep: func(time.Duration) {}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if atomic.LoadInt32(&attempts) != 1 {
+		t.Errorf("POST must not be replayed after 502; attempts = %d", attempts)
+	}
+}
+
+func TestDo_GET_502_Retried(t *testing.T) {
+	var attempts int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if atomic.AddInt32(&attempts, 1) == 1 {
+			w.WriteHeader(http.StatusBadGateway)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	req, _ := http.NewRequest("GET", server.URL, nil)
+	resp, err := Do(server.Client(), req, Options{Sleep: func(time.Duration) {}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if atomic.LoadInt32(&attempts) != 2 {
+		t.Errorf("idempotent GET should be retried after 502; attempts = %d", attempts)
+	}
+}

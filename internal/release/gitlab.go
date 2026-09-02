@@ -121,8 +121,12 @@ func (c *GitLabClient) createHTTPClient() *http.Client {
 		tlsConfig.InsecureSkipVerify = true //nolint:gosec // Explicit opt-out via gitlab.secure=false (default is true)
 	}
 
+	// Clone the default transport so HTTPS_PROXY/NO_PROXY and HTTP/2 apply.
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = tlsConfig
+
 	return &http.Client{
-		Transport: &http.Transport{TLSClientConfig: tlsConfig},
+		Transport: transport,
 		Timeout:   30 * time.Second,
 	}
 }

@@ -158,3 +158,17 @@ func TestShortHash(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderConventionalWithTagNames_CompareURLUsesTagNames(t *testing.T) {
+	commits := []*Commit{{Type: "feat", Description: "thing", Hash: "abc1234"}}
+	repo := &git.RepoInfo{Host: "github.com", Owner: "o", Repository: "r"}
+
+	out := RenderConventionalWithTagNames(commits, "1.2.0", "1.1.0", "v1.2.0", "v1.1.0", repo)
+
+	if !strings.Contains(out, "compare/v1.1.0...v1.2.0") {
+		t.Errorf("compare URL must use the real tag names (bare versions 404 on v-tagged repos), got:\n%s", out)
+	}
+	if !strings.Contains(out, "## [1.2.0]") {
+		t.Errorf("heading must keep the bare version, got:\n%s", out)
+	}
+}

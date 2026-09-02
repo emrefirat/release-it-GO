@@ -13,15 +13,30 @@ import (
 // Groups commits by type into sections (Features, Bug Fixes, etc.)
 // and includes commit hashes with optional links to the repository.
 func RenderConventional(commits []*Commit, version string, prevVersion string, repoInfo *git.RepoInfo) string {
+	return RenderConventionalWithTagNames(commits, version, prevVersion, version, prevVersion, repoInfo)
+}
+
+// RenderConventionalWithTagNames is RenderConventional with explicit git tag
+// names for the compare URL. Headings show bare versions, but compare links
+// must reference the real refs — on a v-tagged repo "compare/1.1.0...1.2.0"
+// is a 404.
+func RenderConventionalWithTagNames(commits []*Commit, version string, prevVersion string, tagName string, prevTagName string, repoInfo *git.RepoInfo) string {
 	var sb strings.Builder
 
 	date := time.Now().Format("2006-01-02")
+
+	if tagName == "" {
+		tagName = version
+	}
+	if prevTagName == "" {
+		prevTagName = prevVersion
+	}
 
 	// Version header with optional compare URL
 	if repoInfo != nil && prevVersion != "" {
 		compareURL := fmt.Sprintf("https://%s/%s/%s/compare/%s...%s",
 			repoInfo.Host, repoInfo.Owner, repoInfo.Repository,
-			prevVersion, version)
+			prevTagName, tagName)
 		fmt.Fprintf(&sb, "## [%s](%s) (%s)\n", version, compareURL, date)
 	} else {
 		fmt.Fprintf(&sb, "## %s (%s)\n", version, date)

@@ -37,7 +37,7 @@ type githubCreateReleaseRequest struct {
 	Body                   string `json:"body"`
 	Draft                  bool   `json:"draft"`
 	Prerelease             bool   `json:"prerelease"`
-	MakeLatest             string `json:"make_latest,omitempty"`
+	MakeLatest             string `json:"make_latest"` // always sent: GitHub defaults to "true" when omitted
 	GenerateReleaseNotes   bool   `json:"generate_release_notes,omitempty"`
 	DiscussionCategoryName string `json:"discussion_category_name,omitempty"`
 }
@@ -88,7 +88,9 @@ func resolveGitHubBaseURL(host string) string {
 
 // createHTTPClient creates an HTTP client with proxy and timeout support.
 func (c *GitHubClient) createHTTPClient() *http.Client {
-	transport := &http.Transport{}
+	// Start from the default transport so HTTPS_PROXY/NO_PROXY, HTTP/2 and
+	// sane dial/TLS timeouts apply; a zero http.Transport has Proxy: nil.
+	transport := http.DefaultTransport.(*http.Transport).Clone()
 
 	if c.config.Proxy != "" {
 		proxyURL, err := url.Parse(c.config.Proxy)
@@ -132,9 +134,9 @@ func (c *GitHubClient) CreateRelease(opts ReleaseOptions) (*ReleaseResult, error
 		DiscussionCategoryName: opts.DiscussionCategory,
 	}
 
-	if opts.MakeLatest {
-		reqBody.MakeLatest = "true"
-	}
+	// GitHub's default is "true": omitting the field made makeLatest: false
+	// a no-op and turned support-branch releases into the repository's Latest.
+	reqBody.MakeLatest = strconv.FormatBool(opts.MakeLatest)
 
 	body, err := json.Marshal(reqBody)
 	if err != nil {

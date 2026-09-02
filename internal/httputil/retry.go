@@ -37,9 +37,10 @@ type Options struct {
 }
 
 // Do executes req, retrying on 429/502/503/504 responses (honoring
-// Retry-After) with exponential backoff. Transport-level errors (no response
-// received) are retried only for idempotent methods — replaying a POST whose
-// fate is unknown could create a duplicate release. Request bodies are
+// Retry-After) with exponential backoff. Non-idempotent methods are replayed
+// only on 429/503 (rejected before processing); transport-level errors (no
+// response received) are retried only for idempotent methods — replaying a
+// POST whose fate is unknown could create a duplicate release. Request bodies are
 // replayed via req.GetBody, which http.NewRequest sets automatically for
 // bytes/strings readers.
 func Do(client *http.Client, req *http.Request, opts Options) (*http.Response, error) {
@@ -81,7 +82,7 @@ func Do(client *http.Client, req *http.Request, opts Options) (*http.Response, e
 			continue
 		}
 
-		if !retryableStatuses[resp.StatusCode] || attempt >= maxAttempts {
+		if !retryableStatuses[resp.StatusCode] || attempt >= maxAttempts || !safeToReplay(req.Method, resp.StatusCode) {
 			return resp, nil
 		}
 
@@ -95,6 +96,18 @@ func Do(client *http.Client, req *http.Request, opts Options) (*http.Response, e
 		sleep(wait)
 		delay *= 2
 	}
+}
+
+// safeToReplay reports whether a retryable status may be replayed for the
+// method. Idempotent methods: always. Others (POST creating a release): only
+// 429 and 503, which are rejected before processing — a gateway 502/504
+// says nothing about whether the upstream already acted on the request, and
+// replaying it could create a duplicate.
+func safeToReplay(method string, status int) bool {
+	if isIdempotent(method) {
+		return true
+	}
+	return status == http.StatusTooManyRequests || status == http.StatusServiceUnavailable
 }
 
 // isIdempotent reports whether the method is safe to replay when no response

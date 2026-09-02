@@ -29,6 +29,8 @@ type Options struct {
 	KeepUnreleased bool          // keep existing [Unreleased] section
 	AddVersionURL  bool          // add compare URLs
 	RepoInfo       *git.RepoInfo // repository info for URLs
+	TagName        string        // git tag of the new version (compare URL ref)
+	PrevTagName    string        // git tag of the previous version (compare URL ref)
 }
 
 // GenerateChangelog creates changelog content from parsed commits.
@@ -37,7 +39,7 @@ func GenerateChangelog(commits []*Commit, version string, prevVersion string, op
 	if opts.KeepAChangelog {
 		return RenderKeepAChangelog(commits, version, "")
 	}
-	return RenderConventional(commits, version, prevVersion, opts.RepoInfo)
+	return RenderConventionalWithTagNames(commits, version, prevVersion, opts.TagName, opts.PrevTagName, opts.RepoInfo)
 }
 
 // UpdateChangelogFile prepends new changelog content to the existing file.

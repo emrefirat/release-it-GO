@@ -595,3 +595,43 @@ func TestGitHubClient_ValidateToken_RetriesTransient503(t *testing.T) {
 		t.Errorf("attempts = %d, want 2", attempts)
 	}
 }
+
+func TestGitHubClient_CreateHTTPClient_HonorsProxyEnvironment(t *testing.T) {
+	t.Setenv("HTTPS_PROXY", "http://proxy.example:3128")
+	t.Setenv("NO_PROXY", "")
+	c := &GitHubClient{config: &config.GitHubConfig{}, logger: testLogger()}
+
+	client := c.createHTTPClient()
+	transport, ok := client.Transport.(*http.Transport)
+	if !ok || transport.Proxy == nil {
+		t.Fatal("transport must consult the proxy environment (HTTPS_PROXY/NO_PROXY) like the notification client does")
+	}
+	req, _ := http.NewRequest("GET", "https://api.github.com/user", nil)
+	proxyURL, err := transport.Proxy(req)
+	if err != nil || proxyURL == nil || proxyURL.Host != "proxy.example:3128" {
+		t.Errorf("Proxy(req) = %v, %v; want proxy.example:3128", proxyURL, err)
+	}
+}
+
+func TestGitHubClient_CreateRelease_SendsMakeLatestFalseExplicitly(t *testing.T) {
+	var body map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"id":1,"html_url":"u","upload_url":"x{?name}"}`))
+	}))
+	defer server.Close()
+
+	c := &GitHubClient{
+		config: &config.GitHubConfig{}, repoInfo: testRepoInfo(), logger: testLogger(),
+		client: server.Client(), baseURL: server.URL, token: "t",
+	}
+	if _, err := c.CreateRelease(ReleaseOptions{TagName: "v1.0.1", MakeLatest: false}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// GitHub's server-side default is "true": omitting the field makes a
+	// support-branch release the repository's "Latest".
+	if body["make_latest"] != "false" {
+		t.Errorf(`make_latest = %v, want the literal "false" on the wire`, body["make_latest"])
+	}
+}

@@ -761,3 +761,19 @@ func TestGitLabClient_CreateHTTPClient_CACertFromEnvRef(t *testing.T) {
 		t.Fatal("expected non-nil client")
 	}
 }
+
+func TestGitLabClient_CreateHTTPClient_HonorsProxyEnvironment(t *testing.T) {
+	t.Setenv("HTTPS_PROXY", "http://proxy.example:3128")
+	t.Setenv("NO_PROXY", "")
+	c := &GitLabClient{config: &config.GitLabConfig{Secure: true}, logger: applog.NewLogger(0, false)}
+
+	transport := c.createHTTPClient().Transport.(*http.Transport)
+	if transport.Proxy == nil {
+		t.Fatal("transport must consult the proxy environment")
+	}
+	req, _ := http.NewRequest("GET", "https://gitlab.com/api/v4/user", nil)
+	proxyURL, err := transport.Proxy(req)
+	if err != nil || proxyURL == nil || proxyURL.Host != "proxy.example:3128" {
+		t.Errorf("Proxy(req) = %v, %v; want proxy.example:3128", proxyURL, err)
+	}
+}
