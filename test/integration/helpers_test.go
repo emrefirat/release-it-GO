@@ -27,16 +27,21 @@ func initGitRepo(t *testing.T, dir string) {
 func createCommits(t *testing.T, dir string, messages []string) {
 	t.Helper()
 	for _, msg := range messages {
-		filename := fmt.Sprintf("file_%d_%d.txt", os.Getpid(), commitCounter)
-		commitCounter++
-		writeFile(t, filepath.Join(dir, filename), fmt.Sprintf("content for: %s\n", msg))
+		// A fresh temp file per commit: unique without any shared counter.
+		f, err := os.CreateTemp(dir, "commit_*.txt")
+		if err != nil {
+			t.Fatalf("creating commit file: %v", err)
+		}
+		if _, err := fmt.Fprintf(f, "content for: %s\n", msg); err != nil {
+			t.Fatalf("writing commit file: %v", err)
+		}
+		if err := f.Close(); err != nil {
+			t.Fatalf("closing commit file: %v", err)
+		}
 		runGit(t, dir, "add", ".")
 		runGit(t, dir, "commit", "-m", msg)
 	}
 }
-
-// commitCounter ensures unique file names across calls within the same test.
-var commitCounter int
 
 // createTag creates a git tag in the repo.
 func createTag(t *testing.T, dir string, tag string) {

@@ -2493,8 +2493,8 @@ func TestRunner_GitRelease_CI_TagError(t *testing.T) {
 	if err == nil {
 		t.Error("expected error when tag already exists")
 	}
-	if !strings.Contains(err.Error(), "tag") {
-		t.Errorf("expected tag error, got: %v", err)
+	if !strings.Contains(err.Error(), "already exists") {
+		t.Errorf("error must say the tag already exists, got: %v", err)
 	}
 }
 

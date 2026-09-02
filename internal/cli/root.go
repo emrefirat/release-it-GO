@@ -483,18 +483,6 @@ func exampleFor(subject string, f changelog.LintResult) string {
 	return "feat(auth): add user login"
 }
 
-// reasonDescription returns a human-readable description for lint reasons.
-func reasonDescription(reason string) string {
-	switch {
-	case strings.Contains(reason, "not in conventional commit format"):
-		return "message must follow conventional commit format"
-	case strings.HasPrefix(reason, "unknown type:"):
-		return "type is not in the allowed list"
-	default:
-		return reason
-	}
-}
-
 // fileExists checks if a path exists and is a regular file.
 func fileExists(path string) bool {
 	info, err := os.Stat(path)

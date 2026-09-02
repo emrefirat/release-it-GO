@@ -37,9 +37,7 @@ func TestIntegration_FullReleasePipeline(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v1.0.0")
@@ -77,9 +75,7 @@ func TestIntegration_PatchBump(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v2.3.1")
@@ -105,9 +101,7 @@ func TestIntegration_MajorBump(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v1.0.0")
@@ -133,9 +127,7 @@ func TestIntegration_DryRun(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v1.0.0")
@@ -163,9 +155,7 @@ func TestIntegration_NoExistingTags(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	initGitRepo(t, dir)
 	createCommits(t, dir, []string{
@@ -194,9 +184,7 @@ func TestIntegration_ChangelogOnly(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v1.0.0")
@@ -224,9 +212,7 @@ func TestIntegration_ReleaseVersionOnly(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v3.2.1")
@@ -253,9 +239,7 @@ func TestIntegration_DisableCommitAndTag(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v1.0.0")
@@ -284,9 +268,7 @@ func TestIntegration_ConventionalCommitAutoIncrement(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v1.0.0")
@@ -314,9 +296,7 @@ func TestIntegration_BreakingChangeAutoMajor(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v1.0.0")
@@ -343,9 +323,7 @@ func TestIntegration_BreakingChangeFooter_AutoMajor(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v1.0.0")
@@ -389,9 +367,7 @@ func TestIntegration_BumperFileUpdate(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	// Create package.json with version
 	pkgJSON := filepath.Join(dir, "package.json")
@@ -440,9 +416,7 @@ func TestIntegration_KeepAChangelog(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v1.0.0")
@@ -472,9 +446,7 @@ func TestIntegration_ReleaseHooks_FireInOrder(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	logFile := filepath.Join(dir, "hook_order.txt")
 
@@ -512,9 +484,7 @@ func TestIntegration_ReleaseHooks_SkippedWhenNoCommits(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	markerFile := filepath.Join(dir, "after_release.txt")
 
@@ -541,9 +511,7 @@ func TestIntegration_HookExecution(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	markerFile := filepath.Join(dir, "hook_executed.txt")
 
@@ -575,9 +543,7 @@ func TestIntegration_HookFailure(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v1.0.0")
@@ -605,9 +571,7 @@ func TestIntegration_ConfigFromJSON(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	configContent := `{
 		"git": {
@@ -651,9 +615,7 @@ func TestIntegration_ConfigFromYAML(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	configContent := `git:
   commit: true
@@ -695,9 +657,7 @@ func TestIntegration_NoIncrement(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v1.5.0")
@@ -725,9 +685,7 @@ func TestIntegration_PreRelease_BranchAware_ContinueSeries(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	// Setup: main branch with v1.2.4
 	initGitRepo(t, dir)
@@ -761,9 +719,7 @@ func TestIntegration_PreRelease_BranchAware_NewSeries(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	// Setup: main branch with v1.2.4, then advance to v2.0.0
 	initGitRepo(t, dir)
@@ -796,9 +752,7 @@ func TestIntegration_PreRelease_BranchAware_MasterAdvanced(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	// Setup: main branch with v1.2.4
 	initGitRepo(t, dir)
@@ -841,9 +795,7 @@ func TestIntegration_PreRelease_NoFlag_BehaviorUnchanged(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v1.0.0")
@@ -869,9 +821,7 @@ func TestIntegration_TagFormatChange_VPrefixRemoved(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	initGitRepo(t, dir)
 
@@ -923,9 +873,7 @@ func TestIntegration_CalVer_YearMonthMinor(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	initGitRepo(t, dir)
 	createCommits(t, dir, []string{"feat: initial feature"})
@@ -954,9 +902,7 @@ func TestIntegration_TagFormat_NoPrefix(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "1.0.0") // No v prefix
@@ -982,9 +928,7 @@ func TestIntegration_TagFormat_SequentialNoPrefix(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "1.0.0") // No prefix
@@ -1018,9 +962,7 @@ func TestIntegration_WorkingDirCleanAfterRelease(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v1.0.0")
@@ -1046,9 +988,7 @@ func TestIntegration_Error_DirtyWorkingDirectory(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v1.0.0")
@@ -1077,9 +1017,7 @@ func TestIntegration_Error_NoCommitsSinceTag(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v1.0.0")
@@ -1104,9 +1042,7 @@ func TestIntegration_Changelog_Disabled(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v1.0.0")
@@ -1135,9 +1071,7 @@ func TestIntegration_SequentialReleases(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v1.0.0")
@@ -1169,9 +1103,7 @@ func TestIntegration_ExplicitVersionIncrement(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v1.0.0")
@@ -1194,9 +1126,7 @@ func TestIntegration_VPrefixInference(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v1.0.0")
@@ -1222,9 +1152,7 @@ func TestIntegration_NoIncrement_RecoveryRerun_DefaultChangelog(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v1.0.0")
@@ -1265,9 +1193,7 @@ func TestIntegration_OnlyVersion_HookSeesTheVersion(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	marker := filepath.Join(dir, "hook_version.txt")
 	initGitRepo(t, dir)
@@ -1296,9 +1222,7 @@ func TestIntegration_ReleaseCommit_IncludesHookModifiedFiles(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	initGitRepo(t, dir)
 	// A tracked build artifact that a hook regenerates during the release
@@ -1336,9 +1260,7 @@ func TestIntegration_BumperTextTarget_EditsInPlace(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	initGitRepo(t, dir)
 	readme := filepath.Join(dir, "README.md")
@@ -1372,9 +1294,7 @@ func TestIntegration_BumperTextTarget_VersionMissing_FailsBeforeCommit(t *testin
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	initGitRepo(t, dir)
 	readme := filepath.Join(dir, "README.md")
@@ -1415,9 +1335,7 @@ func TestIntegration_CustomTagTemplate_SecondRelease(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "release-1.0.0")
@@ -1440,9 +1358,7 @@ func TestIntegration_AllRefs_VTags_NoTemplateConfigured(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(dir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Chdir(dir)
 
 	initGitRepo(t, dir)
 	createTag(t, dir, "v1.0.0")

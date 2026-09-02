@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"errors"
+	"github.com/spf13/pflag"
 	"io"
 	"os"
 	"os/exec"
@@ -240,11 +241,7 @@ func TestExecute_ReleaseVersionFlag_PrintsNextVersion(t *testing.T) {
 func TestExecute_OutsideGitRepo_ReturnsError(t *testing.T) {
 	saveFlagGlobals(t)
 	dir := t.TempDir()
-	origCwd, _ := os.Getwd()
-	if err := os.Chdir(dir); err != nil {
-		t.Fatalf("chdir: %v", err)
-	}
-	t.Cleanup(func() { _ = os.Chdir(origCwd) })
+	t.Chdir(dir)
 
 	cmd := NewRootCommand()
 	cmd.SetArgs([]string{"--ci", "--dry-run"})
@@ -261,17 +258,27 @@ func TestExecute_OutsideGitRepo_ReturnsError(t *testing.T) {
 func TestNewRootCommand_HasExpectedFlags(t *testing.T) {
 	cmd := NewRootCommand()
 
-	expectedPersistentFlags := []string{"config", "dry-run", "ci", "verbose", "increment", "preReleaseId"}
-	for _, name := range expectedPersistentFlags {
-		if cmd.PersistentFlags().Lookup(name) == nil {
-			t.Errorf("missing persistent flag: %s", name)
+	// The complete public flag surface. A flag added to root.go without being
+	// listed here (and documented) fails the test, and so does a removed one.
+	expected := map[string]bool{
+		"config": true, "dry-run": true, "ci": true, "verbose": true, "increment": true,
+		"preReleaseId": true, "preRelease": true,
+		"changelog": true, "release-version": true, "only-version": true, "no-increment": true,
+		"no-git.commit": true, "no-git.tag": true, "no-git.push": true,
+		"check-commits": true, "ignore-commit-lint": true, "check-msg": true,
+	}
+	registered := map[string]bool{}
+	cmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { registered[f.Name] = true })
+	cmd.Flags().VisitAll(func(f *pflag.Flag) { registered[f.Name] = true })
+
+	for name := range expected {
+		if !registered[name] {
+			t.Errorf("missing flag: --%s", name)
 		}
 	}
-
-	expectedFlags := []string{"changelog", "release-version", "only-version", "no-increment", "no-git.commit", "no-git.tag", "no-git.push"}
-	for _, name := range expectedFlags {
-		if cmd.Flags().Lookup(name) == nil {
-			t.Errorf("missing flag: %s", name)
+	for name := range registered {
+		if !expected[name] {
+			t.Errorf("unexpected flag --%s: add it to this list and to the README", name)
 		}
 	}
 }
@@ -589,43 +596,6 @@ func TestBuildFlagOverrides_SetFlags_ArePresent(t *testing.T) {
 	}
 }
 
-func TestReasonDescription(t *testing.T) {
-	tests := []struct {
-		name     string
-		reason   string
-		expected string
-	}{
-		{
-			name:     "not conventional substring",
-			reason:   "commit 'abc' not in conventional commit format",
-			expected: "message must follow conventional commit format",
-		},
-		{
-			name:     "unknown type prefix",
-			reason:   "unknown type: fic",
-			expected: "type is not in the allowed list",
-		},
-		{
-			name:     "fallback passes reason through",
-			reason:   "some other reason",
-			expected: "some other reason",
-		},
-		{
-			name:     "empty reason falls through",
-			reason:   "",
-			expected: "",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := reasonDescription(tt.reason)
-			if got != tt.expected {
-				t.Errorf("reasonDescription(%q) = %q, want %q", tt.reason, got, tt.expected)
-			}
-		})
-	}
-}
-
 func TestResolveIncrementArg(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -773,11 +743,7 @@ func TestRunCheckMsg_LabelColumnsAlign(t *testing.T) {
 func TestExecute_CheckMsg_NoConfigWarningSuppressed(t *testing.T) {
 	saveFlagGlobals(t)
 	dir := t.TempDir()
-	origCwd, _ := os.Getwd()
-	if err := os.Chdir(dir); err != nil {
-		t.Fatalf("chdir: %v", err)
-	}
-	t.Cleanup(func() { _ = os.Chdir(origCwd) })
+	t.Chdir(dir)
 
 	cmd := NewRootCommand()
 	cmd.SetArgs([]string{"--check-msg", "feat: ok"})
@@ -798,11 +764,7 @@ func TestExecute_CheckMsg_NoConfigWarningSuppressed(t *testing.T) {
 func TestExecute_ConflictingModeFlags_AreErrors(t *testing.T) {
 	saveFlagGlobals(t)
 	dir := t.TempDir()
-	origCwd, _ := os.Getwd()
-	if err := os.Chdir(dir); err != nil {
-		t.Fatalf("chdir: %v", err)
-	}
-	t.Cleanup(func() { _ = os.Chdir(origCwd) })
+	t.Chdir(dir)
 
 	cases := [][]string{
 		{"--changelog", "--release-version"},
@@ -831,11 +793,7 @@ func TestExecute_ConflictingModeFlags_AreErrors(t *testing.T) {
 func TestExecute_InvalidIncrementFlag_FailsBeforePipeline(t *testing.T) {
 	saveFlagGlobals(t)
 	dir := t.TempDir() // not a git repo on purpose: validation must fire first
-	origCwd, _ := os.Getwd()
-	if err := os.Chdir(dir); err != nil {
-		t.Fatalf("chdir: %v", err)
-	}
-	t.Cleanup(func() { _ = os.Chdir(origCwd) })
+	t.Chdir(dir)
 
 	cmd := NewRootCommand()
 	cmd.SetArgs([]string{"--increment", "bogus", "--ci"})

@@ -63,9 +63,7 @@ func TestDetectVersion_FallsBackToVersionFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	origDir, _ := os.Getwd()
-	defer func() { _ = os.Chdir(origDir) }()
-	_ = os.Chdir(dir)
+	t.Chdir(dir)
 
 	got := DetectVersion(VersionOptions{})
 	if got != "2.5.0" {
@@ -82,9 +80,7 @@ func TestDetectVersion_FallsBackToDefault(t *testing.T) {
 
 	// Change to temp dir with no VERSION file
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	defer func() { _ = os.Chdir(origDir) }()
-	_ = os.Chdir(dir)
+	t.Chdir(dir)
 
 	got := DetectVersion(VersionOptions{})
 	if got != FallbackVersion {

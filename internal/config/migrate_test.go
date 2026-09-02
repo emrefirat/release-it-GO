@@ -8,9 +8,7 @@ import (
 
 func TestDetectLegacyConfig_Found(t *testing.T) {
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	defer func() { _ = os.Chdir(origDir) }()
-	_ = os.Chdir(dir)
+	t.Chdir(dir)
 
 	if err := os.WriteFile(LegacyConfigFile, []byte(`{}`), 0644); err != nil {
 		t.Fatal(err)
@@ -27,9 +25,7 @@ func TestDetectLegacyConfig_Found(t *testing.T) {
 
 func TestDetectLegacyConfig_NotFound(t *testing.T) {
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	defer func() { _ = os.Chdir(origDir) }()
-	_ = os.Chdir(dir)
+	t.Chdir(dir)
 
 	_, found := DetectLegacyConfig()
 	if found {
@@ -64,9 +60,7 @@ func TestNativeConfigFileForFormat(t *testing.T) {
 
 func TestDetectNativeConfigAny_JSONExists(t *testing.T) {
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	defer func() { _ = os.Chdir(origDir) }()
-	_ = os.Chdir(dir)
+	t.Chdir(dir)
 
 	if err := os.WriteFile(NativeConfigFile, []byte(`{}`), 0644); err != nil {
 		t.Fatal(err)
@@ -83,9 +77,7 @@ func TestDetectNativeConfigAny_JSONExists(t *testing.T) {
 
 func TestDetectNativeConfigAny_YAMLExists(t *testing.T) {
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	defer func() { _ = os.Chdir(origDir) }()
-	_ = os.Chdir(dir)
+	t.Chdir(dir)
 
 	if err := os.WriteFile(NativeConfigFileYAML, []byte("git:\n  commit: true\n"), 0644); err != nil {
 		t.Fatal(err)
@@ -102,9 +94,7 @@ func TestDetectNativeConfigAny_YAMLExists(t *testing.T) {
 
 func TestDetectNativeConfigAny_JSONPriorityOverYAML(t *testing.T) {
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	defer func() { _ = os.Chdir(origDir) }()
-	_ = os.Chdir(dir)
+	t.Chdir(dir)
 
 	if err := os.WriteFile(NativeConfigFile, []byte(`{}`), 0644); err != nil {
 		t.Fatal(err)
@@ -124,9 +114,7 @@ func TestDetectNativeConfigAny_JSONPriorityOverYAML(t *testing.T) {
 
 func TestDetectNativeConfigAny_NoneExists(t *testing.T) {
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	defer func() { _ = os.Chdir(origDir) }()
-	_ = os.Chdir(dir)
+	t.Chdir(dir)
 
 	_, found := DetectNativeConfigAny()
 	if found {
@@ -138,9 +126,7 @@ func TestDetectNativeConfigAny_NoneExists(t *testing.T) {
 
 func TestMigrateLegacyConfigTo_JSON(t *testing.T) {
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	defer func() { _ = os.Chdir(origDir) }()
-	_ = os.Chdir(dir)
+	t.Chdir(dir)
 
 	legacyContent := `{
 		"git": {
@@ -169,9 +155,7 @@ func TestMigrateLegacyConfigTo_JSON(t *testing.T) {
 
 func TestMigrateLegacyConfigTo_YAML(t *testing.T) {
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	defer func() { _ = os.Chdir(origDir) }()
-	_ = os.Chdir(dir)
+	t.Chdir(dir)
 
 	legacyContent := `{
 		"git": {
@@ -209,9 +193,7 @@ func TestMigrateLegacyConfigTo_YAML(t *testing.T) {
 
 func TestMigrateLegacyConfigTo_NonexistentFile(t *testing.T) {
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	defer func() { _ = os.Chdir(origDir) }()
-	_ = os.Chdir(dir)
+	t.Chdir(dir)
 
 	err := MigrateLegacyConfigTo("nonexistent.json", "json")
 	if err == nil {
@@ -221,9 +203,7 @@ func TestMigrateLegacyConfigTo_NonexistentFile(t *testing.T) {
 
 func TestDetectNativeConfig_Found(t *testing.T) {
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	defer func() { _ = os.Chdir(origDir) }()
-	_ = os.Chdir(dir)
+	t.Chdir(dir)
 
 	if err := os.WriteFile(NativeConfigFile, []byte(`{}`), 0644); err != nil {
 		t.Fatal(err)
@@ -236,9 +216,7 @@ func TestDetectNativeConfig_Found(t *testing.T) {
 
 func TestDetectNativeConfig_NotFound(t *testing.T) {
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	defer func() { _ = os.Chdir(origDir) }()
-	_ = os.Chdir(dir)
+	t.Chdir(dir)
 
 	if DetectNativeConfig() {
 		t.Error("expected native config not to be found")
@@ -247,9 +225,7 @@ func TestDetectNativeConfig_NotFound(t *testing.T) {
 
 func TestMigrateLegacyConfig_Basic(t *testing.T) {
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	defer func() { _ = os.Chdir(origDir) }()
-	_ = os.Chdir(dir)
+	t.Chdir(dir)
 
 	// Create legacy config with npm-specific fields
 	legacyContent := `{
@@ -316,9 +292,7 @@ func TestMigrateLegacyConfig_Basic(t *testing.T) {
 
 func TestMigrateLegacyConfig_NonexistentFile(t *testing.T) {
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	defer func() { _ = os.Chdir(origDir) }()
-	_ = os.Chdir(dir)
+	t.Chdir(dir)
 
 	err := MigrateLegacyConfig("nonexistent.json")
 	if err == nil {
@@ -328,9 +302,7 @@ func TestMigrateLegacyConfig_NonexistentFile(t *testing.T) {
 
 func TestMigrateLegacyConfig_InvalidJSON(t *testing.T) {
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	defer func() { _ = os.Chdir(origDir) }()
-	_ = os.Chdir(dir)
+	t.Chdir(dir)
 
 	if err := os.WriteFile(LegacyConfigFile, []byte("{invalid"), 0644); err != nil {
 		t.Fatal(err)
@@ -349,9 +321,7 @@ func TestMigrateLegacyConfig_InvalidJSON(t *testing.T) {
 
 func TestMigrateLegacyConfig_PreservesHooksAndNotification(t *testing.T) {
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	defer func() { _ = os.Chdir(origDir) }()
-	_ = os.Chdir(dir)
+	t.Chdir(dir)
 
 	legacyContent := `{
 		"git": {"commit": false},

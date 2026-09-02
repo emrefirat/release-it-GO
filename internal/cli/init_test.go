@@ -54,9 +54,7 @@ func (m *mockPrompter) Select(question string, options []string, defaultIndex in
 
 func TestRunInit_WizardCreatesConfig(t *testing.T) {
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	defer func() { _ = os.Chdir(origDir) }()
-	_ = os.Chdir(dir)
+	t.Chdir(dir)
 
 	p := &mockPrompter{
 		selectAnswers:  []int{0, 0},                                                    // GitHub, JSON
@@ -88,9 +86,7 @@ func TestRunInit_WizardCreatesConfig(t *testing.T) {
 
 func TestRunInit_WizardWritesExplicitFields(t *testing.T) {
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	defer func() { _ = os.Chdir(origDir) }()
-	_ = os.Chdir(dir)
+	t.Chdir(dir)
 
 	// User picks GitHub + all defaults
 	// Even though commit=true, tag=true, push=true are defaults,
@@ -149,9 +145,7 @@ func TestRunInit_WizardWritesExplicitFields(t *testing.T) {
 
 func TestRunInit_GitLabPlatform(t *testing.T) {
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	defer func() { _ = os.Chdir(origDir) }()
-	_ = os.Chdir(dir)
+	t.Chdir(dir)
 
 	p := &mockPrompter{
 		selectAnswers:  []int{1, 0},              // GitLab, JSON
@@ -181,9 +175,7 @@ func TestRunInit_GitLabPlatform(t *testing.T) {
 
 func TestRunInit_GitTagOnly_NoChangelog(t *testing.T) {
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	defer func() { _ = os.Chdir(origDir) }()
-	_ = os.Chdir(dir)
+	t.Chdir(dir)
 
 	p := &mockPrompter{
 		selectAnswers:  []int{2, 0},                // Git tag only, JSON
@@ -222,9 +214,7 @@ func TestRunInit_GitTagOnly_NoChangelog(t *testing.T) {
 
 func TestRunInit_CommitTagEnabled_PushDisabled(t *testing.T) {
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	defer func() { _ = os.Chdir(origDir) }()
-	_ = os.Chdir(dir)
+	t.Chdir(dir)
 
 	p := &mockPrompter{
 		selectAnswers:  []int{2, 0},               // Git tag only, JSON
@@ -260,9 +250,7 @@ func TestRunInit_CommitTagEnabled_PushDisabled(t *testing.T) {
 
 func TestRunInit_MigrateLegacy(t *testing.T) {
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	defer func() { _ = os.Chdir(origDir) }()
-	_ = os.Chdir(dir)
+	t.Chdir(dir)
 
 	// Create legacy config
 	legacy := `{"github": {"release": true}, "git": {"tagName": "v${version}"}}`
@@ -291,9 +279,7 @@ func TestRunInit_MigrateLegacy(t *testing.T) {
 
 func TestRunInit_ExistingNativeConfig_Abort(t *testing.T) {
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	defer func() { _ = os.Chdir(origDir) }()
-	_ = os.Chdir(dir)
+	t.Chdir(dir)
 
 	// Create existing native config
 	if err := os.WriteFile(config.NativeConfigFile, []byte(`{}`), 0644); err != nil {
@@ -317,9 +303,7 @@ func TestRunInit_ExistingNativeConfig_Abort(t *testing.T) {
 
 func TestRunInit_ExistingNativeConfig_Overwrite(t *testing.T) {
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	defer func() { _ = os.Chdir(origDir) }()
-	_ = os.Chdir(dir)
+	t.Chdir(dir)
 
 	// Create existing native config
 	if err := os.WriteFile(config.NativeConfigFile, []byte(`{}`), 0644); err != nil {
@@ -345,9 +329,7 @@ func TestRunInit_ExistingNativeConfig_Overwrite(t *testing.T) {
 
 func TestRunInit_FormatSwitch_RenamesOldConfig(t *testing.T) {
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	defer func() { _ = os.Chdir(origDir) }()
-	_ = os.Chdir(dir)
+	t.Chdir(dir)
 
 	// Create existing JSON config
 	if err := os.WriteFile(config.NativeConfigFile, []byte(`{}`), 0644); err != nil {
@@ -389,9 +371,7 @@ func TestRunInit_FormatSwitch_RenamesOldConfig(t *testing.T) {
 
 func TestRunInit_ChangelogDefaultConventional(t *testing.T) {
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	defer func() { _ = os.Chdir(origDir) }()
-	_ = os.Chdir(dir)
+	t.Chdir(dir)
 
 	p := &mockPrompter{
 		selectAnswers:  []int{0, 0},                                                    // GitHub, JSON
@@ -418,9 +398,7 @@ func TestRunInit_ChangelogDefaultConventional(t *testing.T) {
 
 func TestRunInit_FullExample(t *testing.T) {
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	defer func() { _ = os.Chdir(origDir) }()
-	_ = os.Chdir(dir)
+	t.Chdir(dir)
 
 	if err := runInitFullExample(); err != nil {
 		t.Fatalf("runInitFullExample failed: %v", err)
@@ -484,9 +462,7 @@ func stringContains(s, substr string) bool {
 
 func TestRunInit_YAMLFormat(t *testing.T) {
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	defer func() { _ = os.Chdir(origDir) }()
-	_ = os.Chdir(dir)
+	t.Chdir(dir)
 
 	p := &mockPrompter{
 		selectAnswers:  []int{0, 1},                                                    // GitHub, YAML
@@ -544,14 +520,7 @@ func TestNewInitCommand_HasFullExampleFlag(t *testing.T) {
 func chdirTemp(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getwd: %v", err)
-	}
-	if err := os.Chdir(dir); err != nil {
-		t.Fatalf("chdir: %v", err)
-	}
-	t.Cleanup(func() { _ = os.Chdir(origDir) })
+	t.Chdir(dir)
 	return dir
 }
 

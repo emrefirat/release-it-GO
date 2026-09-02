@@ -227,14 +227,8 @@ release = true
 
 func TestLoadConfig_NoFile_ReturnsDefaults(t *testing.T) {
 	// Change to a temp dir with no config files
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(origDir) }()
-
 	dir := t.TempDir()
-	_ = os.Chdir(dir)
+	t.Chdir(dir)
 
 	cfg, err := LoadConfig("")
 	if err != nil {
@@ -307,9 +301,7 @@ func TestLoadConfigFromBytes_InvalidJSON(t *testing.T) {
 
 func TestLoadConfig_NativeConfigPriority(t *testing.T) {
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	defer func() { _ = os.Chdir(origDir) }()
-	_ = os.Chdir(dir)
+	t.Chdir(dir)
 
 	// Create both legacy and native config with different values
 	legacy := `{"git": {"tagName": "legacy-${version}"}}`
@@ -338,9 +330,7 @@ func TestLoadConfig_NativeConfigPriority(t *testing.T) {
 
 func TestLoadConfig_FallsBackToLegacy(t *testing.T) {
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	defer func() { _ = os.Chdir(origDir) }()
-	_ = os.Chdir(dir)
+	t.Chdir(dir)
 
 	// Create only legacy config
 	legacy := `{"git": {"tagName": "legacy-${version}"}}`

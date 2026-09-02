@@ -65,18 +65,11 @@ func setupGitRepo(t *testing.T) string {
 	mustRun(t, dir, "git", "config", "user.email", "test@example.com")
 	mustRun(t, dir, "git", "config", "user.name", "Test User")
 
-	origCwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getwd: %v", err)
-	}
-	if err := os.Chdir(dir); err != nil {
-		t.Fatalf("chdir: %v", err)
-	}
+	t.Chdir(dir)
 
 	origCfgFile := cfgFile
 	origHooksForce := hooksForce
 	t.Cleanup(func() {
-		_ = os.Chdir(origCwd)
 		cfgFile = origCfgFile
 		hooksForce = origHooksForce
 	})
@@ -103,11 +96,7 @@ func writeConfig(t *testing.T, dir, content string) {
 
 func TestRunHooksInstall_NotAGitRepo_ReturnsError(t *testing.T) {
 	dir := t.TempDir()
-	origCwd, _ := os.Getwd()
-	if err := os.Chdir(dir); err != nil {
-		t.Fatalf("chdir: %v", err)
-	}
-	t.Cleanup(func() { _ = os.Chdir(origCwd) })
+	t.Chdir(dir)
 
 	err := runHooksInstall(nil, nil)
 	if err == nil {
@@ -316,11 +305,7 @@ func TestRunHooksInstall_AllHooksRemoved_UnsetsHooksPath(t *testing.T) {
 
 func TestRunHooksRemove_NotAGitRepo_ReturnsError(t *testing.T) {
 	dir := t.TempDir()
-	origCwd, _ := os.Getwd()
-	if err := os.Chdir(dir); err != nil {
-		t.Fatalf("chdir: %v", err)
-	}
-	t.Cleanup(func() { _ = os.Chdir(origCwd) })
+	t.Chdir(dir)
 
 	if err := runHooksRemove(nil, nil); err == nil {
 		t.Error("expected error when not inside a git repository")
