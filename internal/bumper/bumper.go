@@ -38,16 +38,16 @@ func (b *Bumper) ReadVersion() (string, error) {
 }
 
 // WriteVersion writes the new version to all configured output files.
+// Text targets require the current version; prefer WriteVersionFiles.
 func (b *Bumper) WriteVersion(version string) error {
-	_, err := b.WriteVersionFiles(version)
+	_, err := b.WriteVersionFiles("", version)
 	return err
 }
 
 // WriteVersionFiles writes the new version to all configured output files and
-// returns the paths it actually modified, so the caller can stage exactly
-// those files instead of sweeping the whole working tree into the release
-// commit. Dry-run reports no files (nothing was written).
-func (b *Bumper) WriteVersionFiles(version string) ([]string, error) {
+// returns the paths it actually modified. currentVersion is needed to edit
+// plain-text targets in place. Dry-run reports no files (nothing was written).
+func (b *Bumper) WriteVersionFiles(currentVersion string, version string) ([]string, error) {
 	if b.config == nil || len(b.config.Out) == 0 {
 		return nil, nil
 	}
@@ -69,7 +69,7 @@ func (b *Bumper) WriteVersionFiles(version string) ([]string, error) {
 			}
 
 			b.logger.Verbose("Updating version in %s to %s", f, version)
-			if err := WriteVersionToFile(fileCopy, version); err != nil {
+			if err := WriteVersionToFileFrom(fileCopy, currentVersion, version); err != nil {
 				return updated, err
 			}
 			updated = append(updated, f)

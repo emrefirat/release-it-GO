@@ -145,3 +145,15 @@ func writeFile(t *testing.T, path string, content string) {
 		t.Fatalf("failed to write file %s: %v", path, err)
 	}
 }
+
+// getHeadHash returns the full HEAD commit hash.
+func getHeadHash(t *testing.T, dir string) string {
+	t.Helper()
+	cmd := exec.Command("git", "rev-parse", "HEAD")
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("git rev-parse HEAD: %v", err)
+	}
+	return strings.TrimSpace(string(out))
+}

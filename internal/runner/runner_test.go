@@ -4306,3 +4306,34 @@ func TestRunner_RunCheckCommits_Verbose_ListsEachFailureOnce(t *testing.T) {
 		t.Errorf("summary should still report the count, got: %v", err)
 	}
 }
+
+func TestRunner_CommitsSinceLatestRelease_NoTags_BumperVersion_UsesAllCommits(t *testing.T) {
+	// bumper.in supplied "5.0.0" but the repo has no tags: the rendered tag
+	// v5.0.0 does not exist, GetLatestTag fails too, and the changelog step
+	// used to abort with "ambiguous argument". Fall back to all commits.
+	cfg := &config.Config{
+		CI:  true,
+		Git: config.GitConfig{TagName: "v${version}"},
+	}
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{
+		"git log v5.0.0..HEAD --pretty=format:%h%x1f%B%x1e": {
+			output: "", err: fmt.Errorf("fatal: ambiguous argument 'v5.0.0..HEAD'"),
+		},
+		"git describe --tags --abbrev=0": {output: "", err: fmt.Errorf("fatal: No names found")},
+		"git log --pretty=format:%h%x1f%B%x1e": {
+			output: "abc1234\x1ffeat: first\x1e", err: nil,
+		},
+	})
+	runner.ctx.LatestVersion = "5.0.0"
+
+	commits, err := runner.commitsSinceLatestRelease()
+	if err != nil {
+		t.Fatalf("expected fallback to all commits, got error: %v", err)
+	}
+	if len(commits) != 1 || commits[0].Message != "feat: first" {
+		t.Errorf("commits = %+v, want the single feat commit", commits)
+	}
+}

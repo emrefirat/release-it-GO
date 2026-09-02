@@ -107,21 +107,24 @@ func TestWriteVersionToFile_INI(t *testing.T) {
 }
 
 func TestWriteVersionToFile_Text(t *testing.T) {
+	// A bare VERSION file: in-place replacement of the current version is
+	// byte-equivalent to the old overwrite — but only because the file holds
+	// nothing else. (The old test asserted whole-file overwrite for any text
+	// target, which is the data-loss bug fixed in Phase 27.)
 	dir := t.TempDir()
 	file := filepath.Join(dir, "VERSION")
-	_ = os.WriteFile(file, []byte("1.0.0\n"), 0644)
+	if err := os.WriteFile(file, []byte("1.0.0\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
-	err := WriteVersionToFile(config.BumperFile{File: file}, "2.0.0")
-	if err != nil {
+	if err := WriteVersionToFileFrom(config.BumperFile{File: file}, "1.0.0", "2.0.0"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
-	data, _ := os.ReadFile(file)
-	if string(data) != "2.0.0\n" {
-		t.Errorf("expected '2.0.0\\n', got %q", string(data))
+	got, _ := os.ReadFile(file)
+	if string(got) != "2.0.0\n" {
+		t.Errorf("got %q, want %q", got, "2.0.0\n")
 	}
 }
-
 func TestWriteVersionToFile_ConsumeWholeFile(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "VERSION")
@@ -262,5 +265,119 @@ func TestWriteYAML_NonStringValue_FallsBackButUpdates(t *testing.T) {
 	}
 	if tree["version"] != "2.0.0" {
 		t.Errorf("version = %v, want 2.0.0 via fallback", tree["version"])
+	}
+}
+
+// --- text targets: in-place replacement, never whole-file truncation ---
+
+func TestWriteVersionToFileFrom_Text_ReplacesOnlyTheVersion(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "README.md")
+	original := "# My Project\n\nCurrent version: 1.0.0\n\nLots of docs here.\n"
+	if err := os.WriteFile(file, []byte(original), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	err := WriteVersionToFileFrom(config.BumperFile{File: file}, "1.0.0", "1.1.0")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	got, _ := os.ReadFile(file)
+	want := strings.Replace(original, "1.0.0", "1.1.0", 1)
+	if string(got) != want {
+		t.Errorf("text target must be edited in place, not truncated:\n--- got ---\n%s\n--- want ---\n%s", got, want)
+	}
+}
+
+func TestWriteVersionToFileFrom_Text_ReplacesEveryOccurrence(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "install.sh")
+	original := "VERSION=1.0.0\necho \"installing 1.0.0\"\n"
+	if err := os.WriteFile(file, []byte(original), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := WriteVersionToFileFrom(config.BumperFile{File: file}, "1.0.0", "2.0.0"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	got, _ := os.ReadFile(file)
+	if strings.Contains(string(got), "1.0.0") || strings.Count(string(got), "2.0.0") != 2 {
+		t.Errorf("all occurrences must be replaced, got:\n%s", got)
+	}
+}
+
+func TestWriteVersionToFileFrom_Text_VersionNotFound_ErrorsAndLeavesFileUntouched(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "README.md")
+	original := "# No version mentioned here\n"
+	if err := os.WriteFile(file, []byte(original), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	err := WriteVersionToFileFrom(config.BumperFile{File: file}, "1.0.0", "1.1.0")
+	if err == nil {
+		t.Fatal("expected an error when the current version is absent")
+	}
+	if !strings.Contains(err.Error(), "consumeWholeFile") {
+		t.Errorf("error should point at consumeWholeFile as the explicit opt-in, got: %v", err)
+	}
+
+	got, _ := os.ReadFile(file)
+	if string(got) != original {
+		t.Errorf("file must be left untouched on error, got:\n%s", got)
+	}
+}
+
+func TestWriteVersionToFileFrom_Text_UnknownCurrentVersion_Errors(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "README.md")
+	original := "version 1.0.0\n"
+	if err := os.WriteFile(file, []byte(original), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Empty "from" = the pipeline does not know the current version (no
+	// tags, no bumper.in). Guessing would risk the old truncation behavior.
+	err := WriteVersionToFileFrom(config.BumperFile{File: file}, "", "1.1.0")
+	if err == nil {
+		t.Fatal("expected an error when the current version is unknown")
+	}
+	got, _ := os.ReadFile(file)
+	if string(got) != original {
+		t.Errorf("file must be left untouched on error, got:\n%s", got)
+	}
+}
+
+func TestWriteVersionToFileFrom_Text_PrefixedValueInFile(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "deps.txt")
+	if err := os.WriteFile(file, []byte("lib ^1.0.0\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := WriteVersionToFileFrom(config.BumperFile{File: file, Prefix: "^"}, "1.0.0", "1.1.0"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got, _ := os.ReadFile(file)
+	if string(got) != "lib ^1.1.0\n" {
+		t.Errorf("in-place replacement must keep the surrounding prefix, got %q", got)
+	}
+}
+
+func TestWriteVersionToFile_ConsumeWholeFile_RemainsTheOnlyOverwritePath(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "VERSION")
+	if err := os.WriteFile(file, []byte("anything at all\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := WriteVersionToFileFrom(config.BumperFile{File: file, ConsumeWholeFile: true}, "", "3.0.0"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got, _ := os.ReadFile(file)
+	if string(got) != "3.0.0\n" {
+		t.Errorf("consumeWholeFile must overwrite the whole file, got %q", got)
 	}
 }

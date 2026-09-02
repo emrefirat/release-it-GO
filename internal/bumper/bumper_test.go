@@ -265,7 +265,7 @@ func TestWriteVersionFiles_ReturnsUpdatedPaths(t *testing.T) {
 	}
 	b := NewBumper(cfg, applog.NewLogger(0, false), false)
 
-	files, err := b.WriteVersionFiles("2.0.0")
+	files, err := b.WriteVersionFiles("1.0.0", "2.0.0")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -287,11 +287,37 @@ func TestWriteVersionFiles_DryRun_NoPaths(t *testing.T) {
 	}
 	b := NewBumper(cfg, applog.NewLogger(0, false), true)
 
-	files, err := b.WriteVersionFiles("2.0.0")
+	files, err := b.WriteVersionFiles("1.0.0", "2.0.0")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(files) != 0 {
 		t.Errorf("dry-run must not report written files, got %v", files)
+	}
+}
+
+func TestWriteVersionFiles_TextTarget_ReplacesCurrentVersion(t *testing.T) {
+	dir := t.TempDir()
+	readme := filepath.Join(dir, "README.md")
+	if err := os.WriteFile(readme, []byte("# App\n\nVersion 1.0.0 is out.\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := &config.BumperConfig{
+		Enabled: true,
+		Out:     []config.BumperFile{{File: readme}},
+	}
+	b := NewBumper(cfg, applog.NewLogger(0, false), false)
+
+	files, err := b.WriteVersionFiles("1.0.0", "1.1.0")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(files) != 1 {
+		t.Fatalf("files = %v, want the README", files)
+	}
+	got, _ := os.ReadFile(readme)
+	if string(got) != "# App\n\nVersion 1.1.0 is out.\n" {
+		t.Errorf("README must keep its content, got:\n%s", got)
 	}
 }

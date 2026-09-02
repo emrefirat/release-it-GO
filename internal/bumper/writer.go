@@ -13,9 +13,19 @@ import (
 	"release-it-go/internal/config"
 )
 
-// WriteVersionToFile updates the version in the specified file.
+// WriteVersionToFile updates the version in the specified file. Text targets
+// need the current version to edit in place; use WriteVersionToFileFrom.
 func WriteVersionToFile(file config.BumperFile, version string) error {
-	finalVersion := file.Prefix + version
+	return WriteVersionToFileFrom(file, "", version)
+}
+
+// WriteVersionToFileFrom updates the version in the specified file, given the
+// current version (from) and the new one (to). Structured formats locate the
+// value by path; plain-text targets are edited in place by replacing every
+// occurrence of the current version — they are NEVER truncated to the bare
+// version unless ConsumeWholeFile is set explicitly.
+func WriteVersionToFileFrom(file config.BumperFile, from string, to string) error {
+	finalVersion := file.Prefix + to
 
 	if file.ConsumeWholeFile {
 		return os.WriteFile(file.File, []byte(finalVersion+"\n"), 0644)
@@ -39,8 +49,7 @@ func WriteVersionToFile(file config.BumperFile, version string) error {
 	case FormatINI:
 		updated, err = writeINI(data, file.Path, finalVersion)
 	case FormatText:
-		updated = []byte(finalVersion + "\n")
-		err = nil
+		updated, err = replaceVersionInText(data, from, to, file.File)
 	default:
 		return fmt.Errorf("unsupported format for %s", file.File)
 	}
@@ -270,4 +279,20 @@ func setNestedValue(obj map[string]interface{}, path string, value string) error
 	}
 
 	return nil
+}
+
+// replaceVersionInText replaces every occurrence of the current version in a
+// plain-text file. Any file whose extension is not a structured format lands
+// here (README.md, install.sh, ...), so overwriting the whole file — the old
+// behavior — silently destroyed documentation. Without a known current
+// version, or when it does not occur in the file, refuse and point at the
+// explicit consumeWholeFile opt-in instead of guessing.
+func replaceVersionInText(data []byte, from string, to string, name string) ([]byte, error) {
+	if from == "" {
+		return nil, fmt.Errorf("%s: current version is unknown, cannot replace it in a text file (set consumeWholeFile: true to overwrite the whole file, or configure bumper.in)", name)
+	}
+	if !strings.Contains(string(data), from) {
+		return nil, fmt.Errorf("%s: current version %q not found in file (set consumeWholeFile: true to overwrite the whole file)", name, from)
+	}
+	return []byte(strings.ReplaceAll(string(data), from, to)), nil
 }

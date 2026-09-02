@@ -710,7 +710,7 @@ func (r *Runner) bumpFiles() error {
 	r.ctx.Spinner.Start("Version files updated")
 
 	b := bumper.NewBumper(&r.ctx.Config.Bumper, r.ctx.Logger, r.ctx.IsDryRun)
-	updated, err := b.WriteVersionFiles(r.ctx.Version)
+	updated, err := b.WriteVersionFiles(r.ctx.LatestVersion, r.ctx.Version)
 	if err != nil {
 		r.ctx.Spinner.Stop(false)
 		return fmt.Errorf("bumping version files: %w", err)
@@ -733,7 +733,13 @@ func (r *Runner) commitsSinceLatestRelease() ([]changelog.RawCommit, error) {
 	commits, err := r.ctx.Git.GetFullCommitsSinceTag(latestTag)
 	if err != nil && latestTag != "" {
 		rawTag, rawErr := r.ctx.Git.GetLatestTag()
-		if rawErr == nil && rawTag != latestTag {
+		switch {
+		case rawErr != nil:
+			// No tags at all (the version came from bumper.in): every commit
+			// belongs to this release.
+			r.ctx.Logger.Debug("tag %q not found and no tags exist, using all commits", latestTag)
+			commits, err = r.ctx.Git.GetFullCommitsSinceTag("")
+		case rawTag != latestTag:
 			r.ctx.Logger.Debug("tag %q not found, falling back to %q", latestTag, rawTag)
 			commits, err = r.ctx.Git.GetFullCommitsSinceTag(rawTag)
 		}

@@ -1291,3 +1291,82 @@ func TestIntegration_ReleaseCommit_DoesNotSweepUnrelatedChanges(t *testing.T) {
 		t.Error("unrelated edit should remain uncommitted in the working tree")
 	}
 }
+
+func TestIntegration_BumperTextTarget_EditsInPlace(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	_ = os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+
+	initGitRepo(t, dir)
+	readme := filepath.Join(dir, "README.md")
+	original := "# My Project\n\nCurrent version: 1.0.0\n\nLots of docs here.\n"
+	writeFile(t, readme, original)
+	runGit(t, dir, "add", ".")
+	runGit(t, dir, "commit", "-m", "docs: readme")
+	createTag(t, dir, "v1.0.0")
+	createCommits(t, dir, []string{"feat: new thing"})
+
+	cfg := newTestConfig(dir)
+	cfg.Bumper.Enabled = true
+	cfg.Bumper.Out = []config.BumperFile{{File: readme}} // .md → text format
+
+	r := runner.NewRunner(cfg)
+	if err := r.Run(); err != nil {
+		t.Fatalf("Run() failed: %v", err)
+	}
+
+	got, _ := os.ReadFile(readme)
+	want := strings.Replace(original, "1.0.0", "1.1.0", 1)
+	if string(got) != want {
+		t.Errorf("README must be edited in place (was truncated to the version before):\n--- got ---\n%s", got)
+	}
+	assertTagExists(t, dir, "v1.1.0")
+}
+
+func TestIntegration_BumperTextTarget_VersionMissing_FailsBeforeCommit(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	_ = os.Chdir(dir)
+	defer func() { _ = os.Chdir(origDir) }()
+
+	initGitRepo(t, dir)
+	readme := filepath.Join(dir, "README.md")
+	writeFile(t, readme, "# No version here\n")
+	runGit(t, dir, "add", ".")
+	runGit(t, dir, "commit", "-m", "docs: readme")
+	createTag(t, dir, "v1.0.0")
+	createCommits(t, dir, []string{"feat: new thing"})
+	headBefore := getHeadHash(t, dir)
+
+	cfg := newTestConfig(dir)
+	cfg.Bumper.Enabled = true
+	cfg.Bumper.Out = []config.BumperFile{{File: readme}}
+
+	r := runner.NewRunner(cfg)
+	err := r.Run()
+	if err == nil {
+		t.Fatal("expected the release to fail when the current version is not in the text target")
+	}
+	if !strings.Contains(err.Error(), "consumeWholeFile") {
+		t.Errorf("error should name the explicit opt-in, got: %v", err)
+	}
+
+	// Failure must happen at the bump step: no tag, no release commit, README intact
+	assertTagNotExists(t, dir, "v1.1.0")
+	if getHeadHash(t, dir) != headBefore {
+		t.Error("no commit must be created when the bump step fails")
+	}
+	got, _ := os.ReadFile(readme)
+	if string(got) != "# No version here\n" {
+		t.Errorf("README must be untouched, got %q", got)
+	}
+}
