@@ -19,7 +19,9 @@ import (
 
 	"release-it-go/internal/config"
 	"release-it-go/internal/git"
+	"release-it-go/internal/httputil"
 	applog "release-it-go/internal/log"
+	"sync/atomic"
 )
 
 func testGitLabRepoInfo() *git.RepoInfo {
@@ -832,5 +834,57 @@ func TestGitLabClient_UploadAssets_ProjectUploads_WhenGenericDisabled(t *testing
 	}
 	if linkBody.LinkType != "other" {
 		t.Errorf("link_type = %q, want other for project uploads", linkBody.LinkType)
+	}
+}
+
+// QA: a transient 503 on the release POST is replayed once the server says
+// so, with the same body, and Retry-After drives the wait — verified through
+// the real client, not the retry helper in isolation.
+func TestGitLabClient_CreateRelease_RetriesTransient503(t *testing.T) {
+	orig := retryOptions
+	t.Cleanup(func() { retryOptions = orig })
+	var slept []time.Duration
+	retryOptions = httputil.Options{Sleep: func(d time.Duration) { slept = append(slept, d) }}
+
+	var calls int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if atomic.AddInt32(&calls, 1) == 1 {
+			w.Header().Set("Retry-After", "2")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte(`{"message":"maintenance"}`))
+			return
+		}
+		var req gitlabCreateReleaseRequest
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		if req.TagName != "v1.0.0" {
+			t.Errorf("replayed request lost its body: tag_name = %q", req.TagName)
+		}
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(gitlabCreateReleaseResponse{TagName: req.TagName})
+	}))
+	defer server.Close()
+
+	c := &GitLabClient{
+		config:    &config.GitLabConfig{},
+		repoInfo:  testGitLabRepoInfo(),
+		logger:    applog.NewLogger(0, false),
+		client:    server.Client(),
+		baseURL:   server.URL,
+		token:     "test-token",
+		projectID: "testgroup%2Ftestproject",
+	}
+
+	result, err := c.CreateRelease(ReleaseOptions{TagName: "v1.0.0", ReleaseName: "Release v1.0.0"})
+	if err != nil {
+		t.Fatalf("a single 503 must be retried, got error: %v", err)
+	}
+	if result.ID != "v1.0.0" {
+		t.Errorf("ID = %q, want v1.0.0 from the retried response", result.ID)
+	}
+	if got := atomic.LoadInt32(&calls); got != 2 {
+		t.Errorf("server calls = %d, want 2 (one failure, one success)", got)
+	}
+	if len(slept) != 1 || slept[0] != 2*time.Second {
+		t.Errorf("Retry-After: 2 must drive the wait, slept %v", slept)
 	}
 }

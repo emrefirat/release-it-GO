@@ -364,7 +364,7 @@ func (c *GitLabClient) doRequest(method, reqURL string, body io.Reader) (*http.R
 
 	// Transient 429/5xx responses are retried with backoff (Retry-After
 	// honored); connection errors are replayed only for idempotent methods.
-	return httputil.Do(c.client, req, httputil.Options{})
+	return httputil.Do(c.client, req, retryOptions)
 }
 
 // setAuthHeader sets the authentication header based on config.

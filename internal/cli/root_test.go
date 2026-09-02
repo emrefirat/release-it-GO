@@ -809,3 +809,42 @@ func TestExecute_InvalidIncrementFlag_FailsBeforePipeline(t *testing.T) {
 		t.Errorf("validation must run before any git interaction, got: %v", err)
 	}
 }
+
+// Positional arguments travel through cobra's Execute like a real invocation
+// (npm parity: `release-it minor`, `release-it 3.2.1`).
+func TestExecute_PositionalIncrement_OverridesAutoDetect(t *testing.T) {
+	saveFlagGlobals(t)
+	dir := setupReleaseRepo(t) // latest tag v1.0.0, one feat commit → auto would be minor
+
+	cmd := NewRootCommand()
+	cmd.SetArgs([]string{"major", "--ci"})
+	_ = captureStderr(t, func() {
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("release failed: %v", err)
+		}
+	})
+
+	if !tagExists(t, dir, "v2.0.0") {
+		t.Error("positional \"major\" must win over the feat-derived minor bump: v2.0.0 missing")
+	}
+	if tagExists(t, dir, "v1.1.0") {
+		t.Error("auto-detected v1.1.0 must not be created when an increment is given")
+	}
+}
+
+func TestExecute_PositionalVersion_CreatesExactTag(t *testing.T) {
+	saveFlagGlobals(t)
+	dir := setupReleaseRepo(t)
+
+	cmd := NewRootCommand()
+	cmd.SetArgs([]string{"3.2.1", "--ci"})
+	_ = captureStderr(t, func() {
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("release failed: %v", err)
+		}
+	})
+
+	if !tagExists(t, dir, "v3.2.1") {
+		t.Error("an explicit positional version must be released as-is: v3.2.1 missing")
+	}
+}

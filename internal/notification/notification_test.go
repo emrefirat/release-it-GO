@@ -10,7 +10,9 @@ import (
 	"time"
 
 	"release-it-go/internal/config"
+	"release-it-go/internal/httputil"
 	applog "release-it-go/internal/log"
+	"sync/atomic"
 )
 
 func newTestLogger() *applog.Logger {
@@ -474,5 +476,61 @@ func TestSendAll_TeamsRichPayload(t *testing.T) {
 	// Should have facts section
 	if len(card.Sections) == 0 || len(card.Sections[0].Facts) == 0 {
 		t.Error("expected facts in rich Teams payload")
+	}
+}
+
+func noSleep(t *testing.T) *int32 {
+	t.Helper()
+	orig := retryOptions
+	t.Cleanup(func() { retryOptions = orig })
+	retryOptions = httputil.Options{Sleep: func(time.Duration) {}}
+	return new(int32)
+}
+
+// QA: webhook posts survive a transient 503 (the runner treats notification
+// failures as non-fatal, so without a retry the message is simply lost).
+func TestSendAll_RetriesTransient503_ThenSucceeds(t *testing.T) {
+	calls := noSleep(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if atomic.AddInt32(calls, 1) == 1 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+	t.Setenv("TEST_SLACK_URL", server.URL)
+
+	client := NewClient([]config.WebhookConfig{{Type: "slack", URLRef: "TEST_SLACK_URL"}}, map[string]string{"version": "1.0.0"}, newTestLogger(), false)
+	if err := client.SendAll(); err != nil {
+		t.Fatalf("a single 503 must be retried, got: %v", err)
+	}
+	if got := atomic.LoadInt32(calls); got != 2 {
+		t.Errorf("webhook calls = %d, want 2", got)
+	}
+}
+
+// QA: a 502 from a gateway says nothing about whether the webhook already
+// delivered the message, so the POST must not be replayed (duplicate
+// announcements) — the failure is reported instead.
+func TestSendAll_502_IsNotReplayed(t *testing.T) {
+	calls := noSleep(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(calls, 1)
+		w.WriteHeader(http.StatusBadGateway)
+	}))
+	defer server.Close()
+	t.Setenv("TEST_SLACK_URL", server.URL)
+
+	client := NewClient([]config.WebhookConfig{{Type: "slack", URLRef: "TEST_SLACK_URL"}}, map[string]string{"version": "1.0.0"}, newTestLogger(), false)
+	err := client.SendAll()
+	if err == nil {
+		t.Fatal("expected an error after a 502")
+	}
+	if !strings.Contains(err.Error(), "502") {
+		t.Errorf("error should carry the status, got: %v", err)
+	}
+	if got := atomic.LoadInt32(calls); got != 1 {
+		t.Errorf("webhook calls = %d, want exactly 1 (502 must not be replayed)", got)
 	}
 }

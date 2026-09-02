@@ -49,6 +49,10 @@ type Client struct {
 }
 
 // NewClient creates a new notification client.
+// retryOptions tunes transient-failure retries for webhook posts. Tests
+// override Sleep so backoff does not slow the suite.
+var retryOptions = httputil.Options{}
+
 func NewClient(webhooks []config.WebhookConfig, vars map[string]string, logger *applog.Logger, dryRun bool) *Client {
 	return &Client{
 		webhooks:   webhooks,
@@ -127,7 +131,7 @@ func (c *Client) sendOne(wh config.WebhookConfig) error {
 
 	// Retries transient 429/5xx webhook responses; connection errors are not
 	// replayed (the POST may have been delivered).
-	resp, err := httputil.Do(c.httpClient, req, httputil.Options{})
+	resp, err := httputil.Do(c.httpClient, req, retryOptions)
 	if err != nil {
 		// A *url.Error's message contains the full webhook URL, which is a
 		// bearer credential (Slack/Teams embed the secret in the path) and

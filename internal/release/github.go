@@ -308,7 +308,7 @@ func (c *GitHubClient) doRequest(method, url string, body io.Reader) (*http.Resp
 
 	// Transient 429/5xx responses are retried with backoff (Retry-After
 	// honored); connection errors are replayed only for idempotent methods.
-	return httputil.Do(c.client, req, httputil.Options{})
+	return httputil.Do(c.client, req, retryOptions)
 }
 
 // handleErrorResponse creates a descriptive error from an HTTP response.

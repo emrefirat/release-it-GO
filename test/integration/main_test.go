@@ -16,5 +16,7 @@ func TestMain(m *testing.M) {
 		fmt.Fprintln(os.Stderr, "isolating git:", err)
 		os.Exit(1)
 	}
-	os.Exit(m.Run())
+	code := m.Run()
+	removeBuiltBinary()
+	os.Exit(code)
 }
