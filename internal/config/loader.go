@@ -150,7 +150,9 @@ func describeDecodeError(err error) error {
 	var msgs []string
 	for _, line := range strings.Split(err.Error(), "\n") {
 		line = strings.TrimSpace(line)
-		if line == "" || strings.HasSuffix(line, "decoding:") {
+		// mapstructure prefixes its list with a header line ("decoding failed
+		// due to the following error(s):"); only the entries carry information.
+		if line == "" || strings.HasSuffix(line, ":") {
 			continue
 		}
 		m := invalidKeysPattern.FindStringSubmatch(line)

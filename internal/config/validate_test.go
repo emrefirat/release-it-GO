@@ -244,3 +244,28 @@ func TestDefaultConfig_WiredFieldDefaults(t *testing.T) {
 		t.Error("gitlab.useGenericPackageRepositoryForAssets must default to true to keep existing upload behavior")
 	}
 }
+
+// QA: the unknown-key error must read as our message only — no decoder
+// header ("decoding failed due to the following error(s):") leaking through.
+func TestLoadConfig_UnknownKey_ErrorHasNoDecoderNoise(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".release-it.yaml")
+	if err := os.WriteFile(path, []byte("github:\n  relase: true\nhooks:\n  preCommit: [\"go vet\"]\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := LoadConfig(path)
+	if err == nil {
+		t.Fatal("expected an unknown-key error")
+	}
+	msg := err.Error()
+	for _, noise := range []string{"decoding failed", "error(s)", ":;"} {
+		if strings.Contains(msg, noise) {
+			t.Errorf("error leaks decoder text %q: %s", noise, msg)
+		}
+	}
+	want := `unknown config key "github.relase" (did you mean "release"?); unknown config key "hooks.precommit" (did you mean "pre-commit"?)`
+	if !strings.HasSuffix(msg, want) {
+		t.Errorf("error = %q\nwant suffix %q", msg, want)
+	}
+}
