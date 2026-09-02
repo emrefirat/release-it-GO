@@ -4566,7 +4566,7 @@ func TestRunner_GenerateChangelog_CompareURLUsesTagNames(t *testing.T) {
 	cfg := &config.Config{
 		CI:        true,
 		Git:       config.GitConfig{TagName: "v${version}"},
-		Changelog: config.ChangelogConfig{Enabled: true}, // no Infile → no file write
+		Changelog: config.ChangelogConfig{Enabled: true, AddVersionUrl: true}, // no Infile → no file write
 	}
 	runner := setupMockedRunner(t, cfg, map[string]struct {
 		output string

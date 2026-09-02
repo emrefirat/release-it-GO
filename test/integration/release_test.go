@@ -932,9 +932,8 @@ func TestIntegration_CalVer_YearMonthMinor(t *testing.T) {
 
 	cfg := newTestConfig(dir)
 	cfg.CalVer = config.CalVerConfig{
-		Enabled:           true,
-		Format:            "yyyy.mm.minor",
-		FallbackIncrement: "minor",
+		Enabled: true,
+		Format:  "yyyy.mm.minor",
 	}
 	cfg.Increment = ""
 

@@ -331,3 +331,29 @@ func TestCheckCommits_NoCommits_ErrorIsSentinel(t *testing.T) {
 		t.Errorf("errors.Is(err, ErrNoCommits) = false; err = %v", err)
 	}
 }
+
+func TestCheckCommits_CommitsPath_ScopesTheLog(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	var logArgs []string
+	commandExecutor = func(name string, args ...string) (string, error) {
+		cmd := strings.Join(args, " ")
+		if strings.Contains(cmd, "describe") {
+			return "v1.0.0", nil
+		}
+		if strings.HasPrefix(cmd, "log") {
+			logArgs = args
+			return "abc123 feat: api", nil
+		}
+		return "", nil
+	}
+
+	g := newTestGitWithConfig(&config.GitConfig{RequireCommits: true, CommitsPath: "packages/api"}, false)
+	if err := g.checkCommits(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.HasSuffix(strings.Join(logArgs, " "), "-- packages/api") {
+		t.Errorf("requireCommits must only count commits under commitsPath, got: %v", logArgs)
+	}
+}

@@ -188,6 +188,9 @@ git:
   requireUpstream: true
   # Require new commits since latest tag
   requireCommits: true
+  # Only count commits touching this path (monorepo); applies to requireCommits,
+  # commit lint, changelog and notifications. Empty = whole repository
+  commitsPath: ""
   # Require all commits to follow conventional commit format
   requireConventionalCommits: true
   # Search all refs (not just current branch) for latest tag
@@ -219,16 +222,6 @@ github:
   timeout: 30
   # Skip GitHub API pre-flight checks
   skipChecks: false
-  # Open release URL in browser after creation
-  web: false
-  # Automated comments on issues/PRs included in the release
-  comments:
-    # Enable automated comments
-    submit: false
-    # Comment template for resolved issues
-    issue: ":rocket: _This issue has been resolved in v${version}._"
-    # Comment template for included pull requests
-    pr: ":rocket: _This pull request is included in v${version}._"
 
 # GitLab release settings
 gitlab:
@@ -236,12 +229,13 @@ gitlab:
   release: false
   # Release title template
   releaseName: "Release ${version}"
-  # Mark as pre-release (upcoming release)
-  preRelease: false
   # Associate release with milestones
   milestones: []
   # Release asset links
   assets: []
+  # true: upload assets to the Generic Package Registry (release links of type
+  # "package"); false: use the project uploads API (no Package Registry needed)
+  useGenericPackageRepositoryForAssets: true
   # Environment variable name containing GitLab token
   tokenRef: "GITLAB_TOKEN"
   # HTTP header name for authentication
@@ -290,12 +284,8 @@ changelog:
   header: "# Changelog"
   # Use Keep a Changelog format instead of conventional
   keepAChangelog: false
-  # Add Unreleased section to changelog
-  addUnreleased: false
-  # Keep Unreleased section after release
-  keepUnreleased: false
   # Add compare URL for each version
-  addVersionUrl: false
+  addVersionUrl: true
 
 # Bumper — update version in multiple files
 bumper:
@@ -318,10 +308,6 @@ calver:
   enabled: false
   # CalVer format pattern
   format: "yy.mm.minor"
-  # How to increment calendar version
-  increment: "calendar"
-  # Fallback increment when no calendar change
-  fallbackIncrement: "minor"
 
 # Webhook notifications after release
 notification:

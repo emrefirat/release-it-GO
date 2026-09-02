@@ -9,9 +9,7 @@ import (
 
 // CalVer handles calendar-based versioning.
 type CalVer struct {
-	Format            string
-	Increment         string
-	FallbackIncrement string
+	Format string
 }
 
 // CalVerParts holds the parsed components of a calendar version.
@@ -23,12 +21,8 @@ type CalVerParts struct {
 }
 
 // NewCalVer creates a CalVer instance from config values.
-func NewCalVer(format, increment, fallbackIncrement string) *CalVer {
-	return &CalVer{
-		Format:            format,
-		Increment:         increment,
-		FallbackIncrement: fallbackIncrement,
-	}
+func NewCalVer(format string) *CalVer {
+	return &CalVer{Format: format}
 }
 
 // NextVersion calculates the next calendar version based on the current version.

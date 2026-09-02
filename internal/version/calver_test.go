@@ -7,7 +7,7 @@ import (
 )
 
 func TestCalVer_NextVersion_FirstVersion(t *testing.T) {
-	cv := NewCalVer("yy.mm.minor", "calendar", "minor")
+	cv := NewCalVer("yy.mm.minor")
 
 	got, err := cv.NextVersion("")
 	if err != nil {
@@ -22,7 +22,7 @@ func TestCalVer_NextVersion_FirstVersion(t *testing.T) {
 }
 
 func TestCalVer_NextVersion_SameMonth(t *testing.T) {
-	cv := NewCalVer("yy.mm.minor", "calendar", "minor")
+	cv := NewCalVer("yy.mm.minor")
 	now := time.Now()
 	current := fmt.Sprintf("%d.%d.0", now.Year()%100, int(now.Month()))
 
@@ -38,7 +38,7 @@ func TestCalVer_NextVersion_SameMonth(t *testing.T) {
 }
 
 func TestCalVer_NextVersion_DifferentMonth(t *testing.T) {
-	cv := NewCalVer("yy.mm.minor", "calendar", "minor")
+	cv := NewCalVer("yy.mm.minor")
 	now := time.Now()
 
 	// Use a previous month
@@ -60,7 +60,7 @@ func TestCalVer_NextVersion_DifferentMonth(t *testing.T) {
 }
 
 func TestCalVer_NextVersion_YYYYFormat(t *testing.T) {
-	cv := NewCalVer("yyyy.mm.minor", "calendar", "minor")
+	cv := NewCalVer("yyyy.mm.minor")
 	now := time.Now()
 	current := fmt.Sprintf("%d.%d.0", now.Year(), int(now.Month()))
 
@@ -76,7 +76,7 @@ func TestCalVer_NextVersion_YYYYFormat(t *testing.T) {
 }
 
 func TestCalVer_NextVersion_InvalidCurrent(t *testing.T) {
-	cv := NewCalVer("yy.mm.minor", "calendar", "minor")
+	cv := NewCalVer("yy.mm.minor")
 
 	got, err := cv.NextVersion("invalid")
 	if err != nil {
@@ -91,7 +91,7 @@ func TestCalVer_NextVersion_InvalidCurrent(t *testing.T) {
 }
 
 func TestCalVer_Parse(t *testing.T) {
-	cv := NewCalVer("yy.mm.minor", "calendar", "minor")
+	cv := NewCalVer("yy.mm.minor")
 
 	tests := []struct {
 		name    string
@@ -118,7 +118,7 @@ func TestCalVer_Parse(t *testing.T) {
 }
 
 func TestCalVer_Parse_YYYYMMDD(t *testing.T) {
-	cv := NewCalVer("yyyy.mm.dd", "calendar", "minor")
+	cv := NewCalVer("yyyy.mm.dd")
 
 	tests := []struct {
 		name      string
@@ -156,7 +156,7 @@ func TestCalVer_Parse_YYYYMMDD(t *testing.T) {
 }
 
 func TestCalVer_NextVersion_YYYYMMDD_FirstRelease(t *testing.T) {
-	cv := NewCalVer("yyyy.mm.dd", "calendar", "minor")
+	cv := NewCalVer("yyyy.mm.dd")
 	now := time.Now()
 
 	got, err := cv.NextVersion("")
@@ -171,7 +171,7 @@ func TestCalVer_NextVersion_YYYYMMDD_FirstRelease(t *testing.T) {
 }
 
 func TestCalVer_NextVersion_YYYYMMDD_SameDay(t *testing.T) {
-	cv := NewCalVer("yyyy.mm.dd", "calendar", "minor")
+	cv := NewCalVer("yyyy.mm.dd")
 	now := time.Now()
 	current := fmt.Sprintf("%d.%d.%d", now.Year(), int(now.Month()), now.Day())
 
@@ -188,7 +188,7 @@ func TestCalVer_NextVersion_YYYYMMDD_SameDay(t *testing.T) {
 }
 
 func TestCalVer_NextVersion_YYYYMMDD_SameDaySecondIncrement(t *testing.T) {
-	cv := NewCalVer("yyyy.mm.dd", "calendar", "minor")
+	cv := NewCalVer("yyyy.mm.dd")
 	now := time.Now()
 	current := fmt.Sprintf("%d.%d.%d.1", now.Year(), int(now.Month()), now.Day())
 

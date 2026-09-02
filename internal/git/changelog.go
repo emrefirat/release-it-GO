@@ -5,33 +5,6 @@ import (
 	"strings"
 )
 
-// GenerateChangelog generates a changelog from git log between two refs.
-// If fromTag is empty, all commits up to toRef are included.
-func (g *Git) GenerateChangelog(fromTag string, toRef string) (string, error) {
-	if toRef == "" {
-		toRef = "HEAD"
-	}
-
-	var rangeArg string
-	if fromTag == "" {
-		rangeArg = toRef
-	} else {
-		rangeArg = fromTag + ".." + toRef
-	}
-
-	format := g.config.Changelog
-	if format == "" {
-		format = "* %s (%h)"
-	}
-
-	out, err := g.runSilent("log", rangeArg, "--pretty=format:"+format)
-	if err != nil {
-		return "", fmt.Errorf("generating changelog: %w", err)
-	}
-
-	return strings.TrimSpace(out), nil
-}
-
 // CommitInfo holds a commit's short hash and subject line.
 type CommitInfo struct {
 	Hash    string // short hash (8 char)
@@ -47,6 +20,7 @@ func (g *Git) GetCommitsWithHashSinceTag(tag string) ([]CommitInfo, error) {
 	} else {
 		args = []string{"log", tag + "..HEAD", "--pretty=format:%h||%s"}
 	}
+	args = append(args, g.pathspec()...)
 
 	out, err := g.runSilent(args...)
 	if err != nil {
@@ -99,6 +73,7 @@ func (g *Git) GetFullCommitsSinceTag(tag string) ([]FullCommit, error) {
 	} else {
 		args = []string{"log", tag + "..HEAD", fullCommitFormat}
 	}
+	args = append(args, g.pathspec()...)
 
 	out, err := g.runSilent(args...)
 	if err != nil {
@@ -135,6 +110,7 @@ func (g *Git) GetCommitCountSinceTag(tag string) (int, error) {
 	} else {
 		args = []string{"rev-list", "--count", tag + "..HEAD"}
 	}
+	args = append(args, g.pathspec()...)
 
 	out, err := g.runSilent(args...)
 	if err != nil {
@@ -159,6 +135,7 @@ func (g *Git) GetContributorsSinceTag(tag string) ([]string, error) {
 	} else {
 		args = []string{"log", "--pretty=format:%cn", tag + "..HEAD"}
 	}
+	args = append(args, g.pathspec()...)
 
 	out, err := g.runSilent(args...)
 	if err != nil {
@@ -180,4 +157,14 @@ func (g *Git) GetContributorsSinceTag(tag string) ([]string, error) {
 		}
 	}
 	return unique, nil
+}
+
+// pathspec limits history queries to git.commitsPath (npm release-it's
+// monorepo lever): only commits touching that path count for requireCommits,
+// commit lint, the changelog, and notifications.
+func (g *Git) pathspec() []string {
+	if g.config.CommitsPath == "" {
+		return nil
+	}
+	return []string{"--", g.config.CommitsPath}
 }

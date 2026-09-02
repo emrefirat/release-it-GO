@@ -290,8 +290,7 @@ func runRelease(cmd *cobra.Command, args []string) error {
 
 	// When preRelease is set, auto-mark GitHub/GitLab releases as pre-release
 	if preRelease != "" {
-		cfg.GitHub.PreRelease = true
-		cfg.GitLab.PreRelease = true
+		cfg.GitHub.PreRelease = true // GitLab releases have no pre-release flag
 	}
 
 	// Create logger

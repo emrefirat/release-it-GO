@@ -16,17 +16,12 @@ func DefaultConfig() *Config {
 			RequireUpstream:            true,
 			RequireCommits:             true,
 			RequireConventionalCommits: true,
-			Changelog:                  `git log --pretty=format:"* %s (%h)" ${latestTag}...HEAD`,
 		},
 		GitHub: GitHubConfig{
 			ReleaseName: "Release ${version}",
 			MakeLatest:  true,
 			Host:        "github.com",
 			TokenRef:    "GITHUB_TOKEN",
-			Comments: GitHubCommentsConfig{
-				Issue: ":rocket: _This issue has been resolved in v${version}._",
-				PR:    ":rocket: _This pull request is included in v${version}._",
-			},
 		},
 		GitLab: GitLabConfig{
 			ReleaseName:                 "Release ${version}",
@@ -36,17 +31,20 @@ func DefaultConfig() *Config {
 			// TLS verification is on by default; secure: false is an explicit
 			// opt-out for self-signed instances without a CA file.
 			Secure: true,
+			// Generic Package Registry keeps the historical upload behavior;
+			// false switches to the project uploads API (npm's default).
+			UseGenericPackageRepositoryForAssets: true,
 		},
 		Changelog: ChangelogConfig{
 			Enabled: true,
 			Preset:  "angular",
 			Infile:  "CHANGELOG.md",
 			Header:  "# Changelog",
+			// compare links were always emitted before; now honored as a switch
+			AddVersionUrl: true,
 		},
 		CalVer: CalVerConfig{
-			Format:            "yy.mm.minor",
-			Increment:         "calendar",
-			FallbackIncrement: "minor",
+			Format: "yy.mm.minor",
 		},
 		Notification: NotificationConfig{
 			Enabled:  false,

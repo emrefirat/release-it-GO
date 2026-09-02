@@ -143,6 +143,7 @@ func (r *Runner) RunChangelogOnly() error {
 	parsed := changelog.ParseCommits(rawCommits)
 	opts := changelog.Options{
 		KeepAChangelog: r.ctx.Config.Changelog.KeepAChangelog,
+		AddVersionURL:  r.ctx.Config.Changelog.AddVersionUrl,
 		RepoInfo:       r.ctx.RepoInfo,
 		TagName:        r.ctx.TagName,
 		PrevTagName:    latestVersionToTag(r.ctx.LatestVersion, r.ctx.Config.Git.TagName),
@@ -569,11 +570,7 @@ func (r *Runner) determineVersion() error {
 
 // determineCalVer calculates the next calendar version.
 func (r *Runner) determineCalVer(latestVersion string) error {
-	cv := version.NewCalVer(
-		r.ctx.Config.CalVer.Format,
-		r.ctx.Config.CalVer.Increment,
-		r.ctx.Config.CalVer.FallbackIncrement,
-	)
+	cv := version.NewCalVer(r.ctx.Config.CalVer.Format)
 
 	newVersion, err := cv.NextVersion(latestVersion)
 	if err != nil {
@@ -864,6 +861,7 @@ func (r *Runner) generateChangelog() error {
 	parsed := changelog.ParseCommits(rawCommits)
 	opts := changelog.Options{
 		KeepAChangelog: r.ctx.Config.Changelog.KeepAChangelog,
+		AddVersionURL:  r.ctx.Config.Changelog.AddVersionUrl,
 		RepoInfo:       r.ctx.RepoInfo,
 		TagName:        r.ctx.TagName,
 		PrevTagName:    latestVersionToTag(r.ctx.LatestVersion, r.ctx.Config.Git.TagName),

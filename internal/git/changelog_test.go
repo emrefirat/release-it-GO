@@ -8,99 +8,6 @@ import (
 	"release-it-go/internal/config"
 )
 
-func TestGenerateChangelog(t *testing.T) {
-	original := commandExecutor
-	defer func() { commandExecutor = original }()
-
-	commandExecutor = func(name string, args ...string) (string, error) {
-		return "* feat: add feature (abc1234)\n* fix: bug fix (def5678)", nil
-	}
-
-	cfg := &config.GitConfig{Changelog: "* %s (%h)"}
-	g := newTestGitWithConfig(cfg, false)
-
-	changelog, err := g.GenerateChangelog("v1.0.0", "HEAD")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !strings.Contains(changelog, "feat: add feature") {
-		t.Errorf("expected changelog to contain commit message, got: %s", changelog)
-	}
-}
-
-func TestGenerateChangelog_DefaultFormat(t *testing.T) {
-	original := commandExecutor
-	defer func() { commandExecutor = original }()
-
-	var capturedArgs []string
-	commandExecutor = func(name string, args ...string) (string, error) {
-		capturedArgs = args
-		return "* some commit (abc1234)", nil
-	}
-
-	cfg := &config.GitConfig{} // empty changelog format
-	g := newTestGitWithConfig(cfg, false)
-
-	_, err := g.GenerateChangelog("v1.0.0", "HEAD")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	cmd := strings.Join(capturedArgs, " ")
-	if !strings.Contains(cmd, "* %s (%h)") {
-		t.Errorf("expected default format, got args: %v", capturedArgs)
-	}
-}
-
-func TestGenerateChangelog_NoFromTag(t *testing.T) {
-	original := commandExecutor
-	defer func() { commandExecutor = original }()
-
-	var capturedArgs []string
-	commandExecutor = func(name string, args ...string) (string, error) {
-		capturedArgs = args
-		return "* initial commit", nil
-	}
-
-	cfg := &config.GitConfig{}
-	g := newTestGitWithConfig(cfg, false)
-
-	_, err := g.GenerateChangelog("", "HEAD")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	cmd := strings.Join(capturedArgs, " ")
-	// Should use just "HEAD" not "..HEAD"
-	if strings.Contains(cmd, "..HEAD") {
-		t.Errorf("should not contain range when fromTag is empty, got: %v", capturedArgs)
-	}
-}
-
-func TestGenerateChangelog_DefaultToRef(t *testing.T) {
-	original := commandExecutor
-	defer func() { commandExecutor = original }()
-
-	var capturedArgs []string
-	commandExecutor = func(name string, args ...string) (string, error) {
-		capturedArgs = args
-		return "", nil
-	}
-
-	cfg := &config.GitConfig{}
-	g := newTestGitWithConfig(cfg, false)
-
-	_, err := g.GenerateChangelog("v1.0.0", "")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	cmd := strings.Join(capturedArgs, " ")
-	if !strings.Contains(cmd, "v1.0.0..HEAD") {
-		t.Errorf("expected default toRef=HEAD, got args: %v", capturedArgs)
-	}
-}
-
 func TestGetCommitsWithHashSinceTag(t *testing.T) {
 	original := commandExecutor
 	defer func() { commandExecutor = original }()
@@ -423,5 +330,45 @@ func TestGetContributorsSinceTag_GitError(t *testing.T) {
 	_, err := g.GetContributorsSinceTag("v1.0.0")
 	if err == nil {
 		t.Error("expected error")
+	}
+}
+
+func TestGetFullCommitsSinceTag_CommitsPath_ScopesTheLog(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	var capturedArgs []string
+	commandExecutor = func(name string, args ...string) (string, error) {
+		capturedArgs = args
+		return "abc1234\x1ffeat: api\x1e", nil
+	}
+
+	// npm's monorepo lever: only commits touching commitsPath count
+	g := newTestGitWithConfig(&config.GitConfig{CommitsPath: "packages/api"}, false)
+	if _, err := g.GetFullCommitsSinceTag("v1.0.0"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	joined := strings.Join(capturedArgs, " ")
+	if !strings.HasSuffix(joined, "-- packages/api") {
+		t.Errorf("git log must be scoped with a pathspec, got: %s", joined)
+	}
+}
+
+func TestGetCommitCountSinceTag_CommitsPath_ScopesRevList(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	var capturedArgs []string
+	commandExecutor = func(name string, args ...string) (string, error) {
+		capturedArgs = args
+		return "3", nil
+	}
+
+	g := newTestGitWithConfig(&config.GitConfig{CommitsPath: "packages/api"}, false)
+	if _, err := g.GetCommitCountSinceTag("v1.0.0"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.HasSuffix(strings.Join(capturedArgs, " "), "-- packages/api") {
+		t.Errorf("rev-list must be scoped with a pathspec, got: %v", capturedArgs)
 	}
 }

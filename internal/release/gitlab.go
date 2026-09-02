@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
@@ -189,13 +190,23 @@ func (c *GitLabClient) UploadAssets(releaseID string, assets []string) error {
 	}
 
 	for _, assetPath := range assets {
-		packageURL, err := c.uploadToGenericPackage(releaseID, assetPath)
+		filename := filepath.Base(assetPath)
+		var assetURL, linkType string
+		var err error
+		if c.config.UseGenericPackageRepositoryForAssets {
+			assetURL, err = c.uploadToGenericPackage(releaseID, assetPath)
+			linkType = "package"
+		} else {
+			// npm release-it's default: the project uploads API, which needs no
+			// Package Registry
+			assetURL, err = c.uploadToProject(assetPath)
+			linkType = "other"
+		}
 		if err != nil {
 			return fmt.Errorf("uploading asset %s: %w", assetPath, err)
 		}
 
-		filename := filepath.Base(assetPath)
-		if err := c.createReleaseLink(releaseID, filename, packageURL); err != nil {
+		if err := c.createReleaseLink(releaseID, filename, assetURL, linkType); err != nil {
 			return fmt.Errorf("creating release link for %s: %w", assetPath, err)
 		}
 	}
@@ -240,14 +251,14 @@ func (c *GitLabClient) uploadToGenericPackage(tagName string, assetPath string) 
 }
 
 // createReleaseLink creates a link in a GitLab release to an uploaded asset.
-func (c *GitLabClient) createReleaseLink(tagName string, name string, assetURL string) error {
+func (c *GitLabClient) createReleaseLink(tagName string, name string, assetURL string, linkType string) error {
 	endpoint := fmt.Sprintf("%s/projects/%s/releases/%s/assets/links",
 		c.baseURL, c.projectID, url.PathEscape(tagName))
 
 	reqBody := gitlabReleaseLinkRequest{
 		Name:     name,
 		URL:      assetURL,
-		LinkType: "package",
+		LinkType: linkType,
 	}
 
 	body, err := json.Marshal(reqBody)
@@ -378,4 +389,58 @@ func (c *GitLabClient) handleErrorResponse(resp *http.Response, context string) 
 	default:
 		return fmt.Errorf("%s failed (HTTP %d): %s", context, resp.StatusCode, truncate(bodyStr, 200))
 	}
+}
+
+// uploadToProject uploads a file via POST /projects/:id/uploads (multipart)
+// and returns the absolute URL of the uploaded file.
+func (c *GitLabClient) uploadToProject(assetPath string) (string, error) {
+	f, err := os.Open(assetPath)
+	if err != nil {
+		return "", fmt.Errorf("asset file not found: %s", assetPath)
+	}
+	defer func() { _ = f.Close() }()
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("file", filepath.Base(assetPath))
+	if err != nil {
+		return "", fmt.Errorf("preparing upload: %w", err)
+	}
+	if _, err := io.Copy(part, f); err != nil {
+		return "", fmt.Errorf("reading asset: %w", err)
+	}
+	if err := writer.Close(); err != nil {
+		return "", fmt.Errorf("preparing upload: %w", err)
+	}
+
+	endpoint := fmt.Sprintf("%s/projects/%s/uploads", c.baseURL, c.projectID)
+	req, err := http.NewRequest("POST", endpoint, bytes.NewReader(body.Bytes()))
+	if err != nil {
+		return "", fmt.Errorf("creating upload request: %w", err)
+	}
+	c.setAuthHeader(req)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("uploading to project: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusCreated {
+		return "", c.handleErrorResponse(resp, "uploading to project")
+	}
+
+	var result struct {
+		URL      string `json:"url"`
+		FullPath string `json:"full_path"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("decoding upload response: %w", err)
+	}
+	instance := strings.TrimSuffix(c.baseURL, "/api/v4")
+	if result.FullPath != "" {
+		return instance + result.FullPath, nil
+	}
+	return instance + result.URL, nil
 }

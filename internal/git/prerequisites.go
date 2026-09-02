@@ -150,7 +150,8 @@ func (g *Git) checkCommits() error {
 		return nil
 	}
 
-	out, err := g.runSilent("log", latestTag+"..HEAD", "--oneline")
+	args := append([]string{"log", latestTag + "..HEAD", "--oneline"}, g.pathspec()...)
+	out, err := g.runSilent(args...)
 	if err != nil {
 		return fmt.Errorf("failed to check commits since %s: %w", latestTag, err)
 	}

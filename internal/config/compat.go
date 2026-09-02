@@ -29,6 +29,7 @@ var legacySectionKeys = map[string]map[string]legacyKey{
 	"github": {
 		"releasenotes": {"releaseNotes", "removed: release notes come from the generated changelog"},
 		"web":          {"web", "removed: no web-based release flow"},
+		"comments":     {"comments", "not implemented yet: issue/PR comments are not posted"},
 	},
 	"gitlab": {
 		"releasenotes": {"releaseNotes", "removed: release notes come from the generated changelog"},

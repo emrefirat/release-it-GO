@@ -317,7 +317,7 @@ func TestGitLabClient_UploadAssets_Success(t *testing.T) {
 	_ = os.WriteFile(testFile, []byte("fake zip content"), 0644)
 
 	c := &GitLabClient{
-		config:    &config.GitLabConfig{},
+		config:    &config.GitLabConfig{UseGenericPackageRepositoryForAssets: true},
 		repoInfo:  testGitLabRepoInfo(),
 		logger:    applog.NewLogger(0, false),
 		client:    server.Client(),
@@ -340,7 +340,7 @@ func TestGitLabClient_UploadAssets_Success(t *testing.T) {
 
 func TestGitLabClient_UploadAssets_FileNotFound(t *testing.T) {
 	c := &GitLabClient{
-		config:    &config.GitLabConfig{},
+		config:    &config.GitLabConfig{UseGenericPackageRepositoryForAssets: true},
 		repoInfo:  testGitLabRepoInfo(),
 		logger:    applog.NewLogger(0, false),
 		client:    http.DefaultClient,
@@ -775,5 +775,62 @@ func TestGitLabClient_CreateHTTPClient_HonorsProxyEnvironment(t *testing.T) {
 	proxyURL, err := transport.Proxy(req)
 	if err != nil || proxyURL == nil || proxyURL.Host != "proxy.example:3128" {
 		t.Errorf("Proxy(req) = %v, %v; want proxy.example:3128", proxyURL, err)
+	}
+}
+
+func TestGitLabClient_UploadAssets_ProjectUploads_WhenGenericDisabled(t *testing.T) {
+	tmp := filepath.Join(t.TempDir(), "app.tar.gz")
+	if err := os.WriteFile(tmp, []byte("binary"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var uploadPath, uploadContentType string
+	var linkBody gitlabReleaseLinkRequest
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/uploads"):
+			uploadPath = r.URL.EscapedPath() // projectID is %2F-escaped
+			uploadContentType = r.Header.Get("Content-Type")
+			if _, _, err := r.FormFile("file"); err != nil {
+				t.Errorf("multipart field 'file' missing: %v", err)
+			}
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"url":"/uploads/abc123/app.tar.gz","full_path":"/testgroup/testproject/uploads/abc123/app.tar.gz"}`))
+		case r.Method == "POST" && strings.Contains(r.URL.Path, "/assets/links"):
+			_ = json.NewDecoder(r.Body).Decode(&linkBody)
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"id":1}`))
+		default:
+			t.Errorf("unexpected request %s %s (generic package API must not be used)", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	c := &GitLabClient{
+		config:    &config.GitLabConfig{UseGenericPackageRepositoryForAssets: false},
+		repoInfo:  testGitLabRepoInfo(),
+		logger:    applog.NewLogger(0, false),
+		client:    server.Client(),
+		baseURL:   server.URL + "/api/v4",
+		token:     "test-token",
+		projectID: "testgroup%2Ftestproject",
+	}
+
+	if err := c.UploadAssets("v1.0.0", []string{tmp}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if uploadPath != "/api/v4/projects/testgroup%2Ftestproject/uploads" {
+		t.Errorf("upload path = %q, want the project uploads API", uploadPath)
+	}
+	if !strings.HasPrefix(uploadContentType, "multipart/form-data") {
+		t.Errorf("uploads API requires multipart/form-data, got %q", uploadContentType)
+	}
+	wantURL := server.URL + "/testgroup/testproject/uploads/abc123/app.tar.gz"
+	if linkBody.URL != wantURL {
+		t.Errorf("release link URL = %q, want absolute %q", linkBody.URL, wantURL)
+	}
+	if linkBody.LinkType != "other" {
+		t.Errorf("link_type = %q, want other for project uploads", linkBody.LinkType)
 	}
 }

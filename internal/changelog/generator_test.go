@@ -3,6 +3,7 @@ package changelog
 import (
 	"os"
 	"path/filepath"
+	"release-it-go/internal/git"
 	"strings"
 	"testing"
 )
@@ -194,5 +195,23 @@ func TestUpdateChangelogFile_PreservesExistingContent(t *testing.T) {
 	}
 	if !strings.Contains(content, "fix one") {
 		t.Error("expected new content to be added")
+	}
+}
+
+func TestGenerateChangelog_AddVersionURL_GatesCompareLink(t *testing.T) {
+	commits := []*Commit{{Type: "feat", Description: "thing", Hash: "abc1234"}}
+	repo := &git.RepoInfo{Host: "github.com", Owner: "o", Repository: "r"}
+
+	with := GenerateChangelog(commits, "1.1.0", "1.0.0", Options{RepoInfo: repo, AddVersionURL: true})
+	if !strings.Contains(with, "compare/1.0.0...1.1.0") {
+		t.Errorf("addVersionUrl: true must emit the compare link, got:\n%s", with)
+	}
+
+	without := GenerateChangelog(commits, "1.1.0", "1.0.0", Options{RepoInfo: repo, AddVersionURL: false})
+	if strings.Contains(without, "compare/") {
+		t.Errorf("addVersionUrl: false was documented but always ignored; got:\n%s", without)
+	}
+	if !strings.Contains(without, "abc1234") {
+		t.Error("commit hash links must not depend on addVersionUrl")
 	}
 }

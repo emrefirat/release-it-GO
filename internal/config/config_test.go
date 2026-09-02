@@ -106,12 +106,6 @@ func TestDefaultConfig_CalVerDefaults(t *testing.T) {
 	if cfg.CalVer.Format != "yy.mm.minor" {
 		t.Errorf("calver.format = %q, expected %q", cfg.CalVer.Format, "yy.mm.minor")
 	}
-	if cfg.CalVer.Increment != "calendar" {
-		t.Errorf("calver.increment = %q, expected %q", cfg.CalVer.Increment, "calendar")
-	}
-	if cfg.CalVer.FallbackIncrement != "minor" {
-		t.Errorf("calver.fallbackIncrement = %q, expected %q", cfg.CalVer.FallbackIncrement, "minor")
-	}
 }
 
 func TestDefaultConfig_TopLevelDefaults(t *testing.T) {

@@ -25,9 +25,7 @@ type Options struct {
 	Infile         string        // "CHANGELOG.md"
 	Header         string        // "# Changelog"
 	KeepAChangelog bool          // false = conventional format
-	AddUnreleased  bool          // add [Unreleased] section
-	KeepUnreleased bool          // keep existing [Unreleased] section
-	AddVersionURL  bool          // add compare URLs
+	AddVersionURL  bool          // add compare URLs to version headings
 	RepoInfo       *git.RepoInfo // repository info for URLs
 	TagName        string        // git tag of the new version (compare URL ref)
 	PrevTagName    string        // git tag of the previous version (compare URL ref)
@@ -39,7 +37,11 @@ func GenerateChangelog(commits []*Commit, version string, prevVersion string, op
 	if opts.KeepAChangelog {
 		return RenderKeepAChangelog(commits, version, "")
 	}
-	return RenderConventionalWithTagNames(commits, version, prevVersion, opts.TagName, opts.PrevTagName, opts.RepoInfo)
+	compareRepo := opts.RepoInfo
+	if !opts.AddVersionURL {
+		compareRepo = nil // heading compare link off; commit hash links stay
+	}
+	return renderConventional(commits, version, prevVersion, opts.TagName, opts.PrevTagName, compareRepo, opts.RepoInfo)
 }
 
 // UpdateChangelogFile prepends new changelog content to the existing file.

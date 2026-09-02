@@ -210,3 +210,37 @@ func TestLoadConfig_InvalidValue_FailsAtLoad(t *testing.T) {
 		t.Errorf("error should name the field, got: %v", err)
 	}
 }
+
+func TestLoadConfig_RemovedKeys_WarnAndLoad(t *testing.T) {
+	content := `{
+		"git": {"changelog": "git log", "commit": false},
+		"github": {"web": true, "comments": {"submit": true}},
+		"gitlab": {"preRelease": true},
+		"changelog": {"addUnreleased": true},
+		"calver": {"fallbackIncrement": "minor"},
+		"bumper": {"out": [{"file": "x.json", "versionPrefix": "v"}]}
+	}`
+	cfg, err := LoadConfig(writeCfg(t, ".release-it.json", content))
+	if err != nil {
+		t.Fatalf("removed keys must keep old configs loadable, got: %v", err)
+	}
+	if cfg.Git.Commit {
+		t.Error("real settings next to removed keys must still apply")
+	}
+	joined := strings.Join(cfg.Warnings, "\n")
+	for _, key := range []string{"git.changelog", "github.web", "github.comments", "gitlab.preRelease", "changelog.addUnreleased", "calver.fallbackIncrement", "versionPrefix"} {
+		if !strings.Contains(joined, key) {
+			t.Errorf("expected a warning naming %s, warnings were:\n%s", key, joined)
+		}
+	}
+}
+
+func TestDefaultConfig_WiredFieldDefaults(t *testing.T) {
+	cfg := DefaultConfig()
+	if !cfg.Changelog.AddVersionUrl {
+		t.Error("changelog.addVersionUrl must default to true (compare links were always emitted before)")
+	}
+	if !cfg.GitLab.UseGenericPackageRepositoryForAssets {
+		t.Error("gitlab.useGenericPackageRepositoryForAssets must default to true to keep existing upload behavior")
+	}
+}

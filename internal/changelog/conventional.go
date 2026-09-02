@@ -13,7 +13,7 @@ import (
 // Groups commits by type into sections (Features, Bug Fixes, etc.)
 // and includes commit hashes with optional links to the repository.
 func RenderConventional(commits []*Commit, version string, prevVersion string, repoInfo *git.RepoInfo) string {
-	return RenderConventionalWithTagNames(commits, version, prevVersion, version, prevVersion, repoInfo)
+	return renderConventional(commits, version, prevVersion, version, prevVersion, repoInfo, repoInfo)
 }
 
 // RenderConventionalWithTagNames is RenderConventional with explicit git tag
@@ -21,6 +21,12 @@ func RenderConventional(commits []*Commit, version string, prevVersion string, r
 // must reference the real refs — on a v-tagged repo "compare/1.1.0...1.2.0"
 // is a 404.
 func RenderConventionalWithTagNames(commits []*Commit, version string, prevVersion string, tagName string, prevTagName string, repoInfo *git.RepoInfo) string {
+	return renderConventional(commits, version, prevVersion, tagName, prevTagName, repoInfo, repoInfo)
+}
+
+// renderConventional is the shared renderer. compareRepo drives the heading
+// compare link (nil disables it); commitRepo drives per-commit hash links.
+func renderConventional(commits []*Commit, version string, prevVersion string, tagName string, prevTagName string, compareRepo *git.RepoInfo, commitRepo *git.RepoInfo) string {
 	var sb strings.Builder
 
 	date := time.Now().Format("2006-01-02")
@@ -33,9 +39,9 @@ func RenderConventionalWithTagNames(commits []*Commit, version string, prevVersi
 	}
 
 	// Version header with optional compare URL
-	if repoInfo != nil && prevVersion != "" {
+	if compareRepo != nil && prevVersion != "" {
 		compareURL := fmt.Sprintf("https://%s/%s/%s/compare/%s...%s",
-			repoInfo.Host, repoInfo.Owner, repoInfo.Repository,
+			compareRepo.Host, compareRepo.Owner, compareRepo.Repository,
 			prevTagName, tagName)
 		fmt.Fprintf(&sb, "## [%s](%s) (%s)\n", version, compareURL, date)
 	} else {
@@ -55,7 +61,7 @@ func RenderConventionalWithTagNames(commits []*Commit, version string, prevVersi
 
 		fmt.Fprintf(&sb, "\n### %s\n\n", sectionName)
 		for _, c := range sectionCommits {
-			sb.WriteString(formatConventionalEntry(c, repoInfo))
+			sb.WriteString(formatConventionalEntry(c, commitRepo))
 		}
 	}
 

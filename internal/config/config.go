@@ -46,7 +46,6 @@ type GitConfig struct {
 	RequireCleanWorkingDir     bool     `json:"requireCleanWorkingDir" yaml:"requireCleanWorkingDir" toml:"requireCleanWorkingDir" mapstructure:"requireCleanWorkingDir"`
 	RequireUpstream            bool     `json:"requireUpstream" yaml:"requireUpstream" toml:"requireUpstream" mapstructure:"requireUpstream"`
 	RequireCommits             bool     `json:"requireCommits" yaml:"requireCommits" toml:"requireCommits" mapstructure:"requireCommits"`
-	Changelog                  string   `json:"changelog" yaml:"changelog" toml:"changelog" mapstructure:"changelog"`
 	GetLatestTagFromAllRefs    bool     `json:"getLatestTagFromAllRefs" yaml:"getLatestTagFromAllRefs" toml:"getLatestTagFromAllRefs" mapstructure:"getLatestTagFromAllRefs"`
 	CommitsPath                string   `json:"commitsPath" yaml:"commitsPath" toml:"commitsPath" mapstructure:"commitsPath"`
 	AddUntrackedFiles          bool     `json:"addUntrackedFiles" yaml:"addUntrackedFiles" toml:"addUntrackedFiles" mapstructure:"addUntrackedFiles"`
@@ -55,37 +54,25 @@ type GitConfig struct {
 
 // GitHubConfig holds GitHub release configuration.
 type GitHubConfig struct {
-	Release                bool                 `json:"release" yaml:"release" toml:"release" mapstructure:"release"`
-	ReleaseName            string               `json:"releaseName" yaml:"releaseName" toml:"releaseName" mapstructure:"releaseName"`
-	ReleaseNotes           string               `json:"releaseNotes" yaml:"releaseNotes" toml:"releaseNotes" mapstructure:"releaseNotes"`
-	Draft                  bool                 `json:"draft" yaml:"draft" toml:"draft" mapstructure:"draft"`
-	PreRelease             bool                 `json:"preRelease" yaml:"preRelease" toml:"preRelease" mapstructure:"preRelease"`
-	MakeLatest             bool                 `json:"makeLatest" yaml:"makeLatest" toml:"makeLatest" mapstructure:"makeLatest"`
-	AutoGenerate           bool                 `json:"autoGenerate" yaml:"autoGenerate" toml:"autoGenerate" mapstructure:"autoGenerate"`
-	Assets                 []string             `json:"assets" yaml:"assets" toml:"assets" mapstructure:"assets"`
-	Host                   string               `json:"host" yaml:"host" toml:"host" mapstructure:"host"`
-	TokenRef               string               `json:"tokenRef" yaml:"tokenRef" toml:"tokenRef" mapstructure:"tokenRef"`
-	Timeout                int                  `json:"timeout" yaml:"timeout" toml:"timeout" mapstructure:"timeout"`
-	Proxy                  string               `json:"proxy" yaml:"proxy" toml:"proxy" mapstructure:"proxy"`
-	SkipChecks             bool                 `json:"skipChecks" yaml:"skipChecks" toml:"skipChecks" mapstructure:"skipChecks"`
-	Web                    bool                 `json:"web" yaml:"web" toml:"web" mapstructure:"web"`
-	Comments               GitHubCommentsConfig `json:"comments" yaml:"comments" toml:"comments" mapstructure:"comments"`
-	DiscussionCategoryName string               `json:"discussionCategoryName" yaml:"discussionCategoryName" toml:"discussionCategoryName" mapstructure:"discussionCategoryName"`
-}
-
-// GitHubCommentsConfig holds GitHub comment templates.
-type GitHubCommentsConfig struct {
-	Submit bool   `json:"submit" yaml:"submit" toml:"submit" mapstructure:"submit"`
-	Issue  string `json:"issue" yaml:"issue" toml:"issue" mapstructure:"issue"`
-	PR     string `json:"pr" yaml:"pr" toml:"pr" mapstructure:"pr"`
+	Release                bool     `json:"release" yaml:"release" toml:"release" mapstructure:"release"`
+	ReleaseName            string   `json:"releaseName" yaml:"releaseName" toml:"releaseName" mapstructure:"releaseName"`
+	Draft                  bool     `json:"draft" yaml:"draft" toml:"draft" mapstructure:"draft"`
+	PreRelease             bool     `json:"preRelease" yaml:"preRelease" toml:"preRelease" mapstructure:"preRelease"`
+	MakeLatest             bool     `json:"makeLatest" yaml:"makeLatest" toml:"makeLatest" mapstructure:"makeLatest"`
+	AutoGenerate           bool     `json:"autoGenerate" yaml:"autoGenerate" toml:"autoGenerate" mapstructure:"autoGenerate"`
+	Assets                 []string `json:"assets" yaml:"assets" toml:"assets" mapstructure:"assets"`
+	Host                   string   `json:"host" yaml:"host" toml:"host" mapstructure:"host"`
+	TokenRef               string   `json:"tokenRef" yaml:"tokenRef" toml:"tokenRef" mapstructure:"tokenRef"`
+	Timeout                int      `json:"timeout" yaml:"timeout" toml:"timeout" mapstructure:"timeout"`
+	Proxy                  string   `json:"proxy" yaml:"proxy" toml:"proxy" mapstructure:"proxy"`
+	SkipChecks             bool     `json:"skipChecks" yaml:"skipChecks" toml:"skipChecks" mapstructure:"skipChecks"`
+	DiscussionCategoryName string   `json:"discussionCategoryName" yaml:"discussionCategoryName" toml:"discussionCategoryName" mapstructure:"discussionCategoryName"`
 }
 
 // GitLabConfig holds GitLab release configuration.
 type GitLabConfig struct {
 	Release                              bool     `json:"release" yaml:"release" toml:"release" mapstructure:"release"`
 	ReleaseName                          string   `json:"releaseName" yaml:"releaseName" toml:"releaseName" mapstructure:"releaseName"`
-	ReleaseNotes                         string   `json:"releaseNotes" yaml:"releaseNotes" toml:"releaseNotes" mapstructure:"releaseNotes"`
-	PreRelease                           bool     `json:"preRelease" yaml:"preRelease" toml:"preRelease" mapstructure:"preRelease"`
 	Milestones                           []string `json:"milestones" yaml:"milestones" toml:"milestones" mapstructure:"milestones"`
 	Assets                               []string `json:"assets" yaml:"assets" toml:"assets" mapstructure:"assets"`
 	TokenRef                             string   `json:"tokenRef" yaml:"tokenRef" toml:"tokenRef" mapstructure:"tokenRef"`
@@ -141,8 +128,6 @@ type ChangelogConfig struct {
 	Infile         string `json:"infile" yaml:"infile" toml:"infile" mapstructure:"infile"`
 	Header         string `json:"header" yaml:"header" toml:"header" mapstructure:"header"`
 	KeepAChangelog bool   `json:"keepAChangelog" yaml:"keepAChangelog" toml:"keepAChangelog" mapstructure:"keepAChangelog"`
-	AddUnreleased  bool   `json:"addUnreleased" yaml:"addUnreleased" toml:"addUnreleased" mapstructure:"addUnreleased"`
-	KeepUnreleased bool   `json:"keepUnreleased" yaml:"keepUnreleased" toml:"keepUnreleased" mapstructure:"keepUnreleased"`
 	AddVersionUrl  bool   `json:"addVersionUrl" yaml:"addVersionUrl" toml:"addVersionUrl" mapstructure:"addVersionUrl"`
 }
 
@@ -159,16 +144,13 @@ type BumperFile struct {
 	Path             string `json:"path" yaml:"path" toml:"path" mapstructure:"path"`
 	Type             string `json:"type" yaml:"type" toml:"type" mapstructure:"type"`
 	Prefix           string `json:"prefix" yaml:"prefix" toml:"prefix" mapstructure:"prefix"`
-	VersionPrefix    string `json:"versionPrefix" yaml:"versionPrefix" toml:"versionPrefix" mapstructure:"versionPrefix"`
 	ConsumeWholeFile bool   `json:"consumeWholeFile" yaml:"consumeWholeFile" toml:"consumeWholeFile" mapstructure:"consumeWholeFile"`
 }
 
 // CalVerConfig holds calendar versioning configuration.
 type CalVerConfig struct {
-	Enabled           bool   `json:"enabled" yaml:"enabled" toml:"enabled" mapstructure:"enabled"`
-	Format            string `json:"format" yaml:"format" toml:"format" mapstructure:"format"`
-	Increment         string `json:"increment" yaml:"increment" toml:"increment" mapstructure:"increment"`
-	FallbackIncrement string `json:"fallbackIncrement" yaml:"fallbackIncrement" toml:"fallbackIncrement" mapstructure:"fallbackIncrement"`
+	Enabled bool   `json:"enabled" yaml:"enabled" toml:"enabled" mapstructure:"enabled"`
+	Format  string `json:"format" yaml:"format" toml:"format" mapstructure:"format"`
 }
 
 // NotificationConfig holds webhook notification configuration.
