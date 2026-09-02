@@ -44,9 +44,33 @@
 * `hooks install` now prunes managed git hooks that were removed from the config (and resets `core.hooksPath` when none remain), instead of leaving stale hooks active forever.
 * default `git.pushArgs` now includes `--atomic` so branch and tag refs land as a single transaction. Prevents orphan tags on the remote when concurrent CI advances the branch ref and the push is rejected. Users on legacy git servers (pre-2015) without atomic protocol support can revert via `git.pushArgs: ["--follow-tags"]` config override.
 
-## [0.1.3](https://github.com/emrefirat/release-it-GO/compare/0.1.2...0.1.3) (2026-03-30)
+## [0.3.0](https://github.com/emrefirat/release-it-GO/compare/v0.2.0...v0.3.0) (2026-05-19)
 
-## [0.1.2](https://github.com/emrefirat/release-it-GO/compare/0.1.1...0.1.2) (2026-03-30)
+### Features
+
+* support string and stdin input for --check-msg ([80d35d6](https://github.com/emrefirat/release-it-GO/commit/80d35d6))
+
+### Bug Fixes
+
+* **config:** add --atomic to default git.pushArgs ([a0ce868](https://github.com/emrefirat/release-it-GO/commit/a0ce868))
+
+## [0.2.0](https://github.com/emrefirat/release-it-GO/compare/v0.1.3...v0.2.0) (2026-03-31)
+
+### Features
+
+* git hook management — install, remove, check-msg (Phase 20) ([1f40fec](https://github.com/emrefirat/release-it-GO/commit/1f40fec))
+* professional commitlint-style output for --check-msg ([4227782](https://github.com/emrefirat/release-it-GO/commit/4227782))
+* add --check-msg flag for commit-msg hook validation ([a738369](https://github.com/emrefirat/release-it-GO/commit/a738369))
+* use .hooks/ directory with core.hooksPath (husky-style) ([ff1d0c8](https://github.com/emrefirat/release-it-GO/commit/ff1d0c8))
+* add release-it-go install command for git hook management ([094d9fd](https://github.com/emrefirat/release-it-GO/commit/094d9fd))
+
+### Bug Fixes
+
+* standardize --check-msg output to match --check-commits format ([e54808a](https://github.com/emrefirat/release-it-GO/commit/e54808a))
+
+## [0.1.3](https://github.com/emrefirat/release-it-GO/compare/v0.1.2...v0.1.3) (2026-03-30)
+
+## [0.1.2](https://github.com/emrefirat/release-it-GO/compare/0.1.1...v0.1.2) (2026-03-30)
 
 ### Features
 
