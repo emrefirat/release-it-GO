@@ -12,6 +12,7 @@ import (
 
 	"github.com/emrefirat/release-it-GO/internal/config"
 	"github.com/emrefirat/release-it-GO/internal/git"
+	"github.com/emrefirat/release-it-GO/internal/httputil"
 	applog "github.com/emrefirat/release-it-GO/internal/log"
 )
 
@@ -569,6 +570,11 @@ func TestGitHubClient_CreateHTTPClient_InvalidProxy(t *testing.T) {
 }
 
 func TestGitHubClient_ValidateToken_RetriesTransient503(t *testing.T) {
+	orig := retryOptions
+	t.Cleanup(func() { retryOptions = orig })
+	var slept []time.Duration
+	retryOptions = httputil.Options{Sleep: func(d time.Duration) { slept = append(slept, d) }}
+
 	var attempts int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if atomic.AddInt32(&attempts, 1) == 1 {
