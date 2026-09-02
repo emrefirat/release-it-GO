@@ -34,8 +34,12 @@
 | 23 | Critical Correctness & Security Fixes (2026-08 audit P0) | Complete | 100% |
 | 25 | npm Parity Batch | Complete | 100% |
 | 26 | Hardening (audit structural findings) | Complete | 100% |
+| 27 | Stability Fixes (2026-09-02 second audit) | In Progress | 0% |
+| 28 | Parameter Validation & Dead-Field Cleanup | Not Started | 0% |
+| 29 | Test Hygiene & Distribution/CI Trust (absorbs planned Phase 24) | Not Started | 0% |
+| 30 | Documentation Sync | Not Started | 0% |
 
-**Last Updated:** 2026-08-26
+**Last Updated:** 2026-09-02
 **Active Developer:** Claude
 **Current Version:** v0.1.3 (Phase 22 complete — production-ready)
 
@@ -809,6 +813,7 @@
 | 2026-08-26 | Claude | Phase 25 complete (npm parity): positional/explicit versions, no prompt on explicit increment, v-prefix inference (+TagNameExplicit loader flag), --no-increment recovery via TagPointsAtHead, template vars in commit/tag/release names, pre-release prompt menu, independent commit/tag/push confirmations, migration serializes all sections |
 | 2026-08-26 | Claude | Phase 26 complete (hardening): ErrNoCommits sentinel + unified git error wrappers, spinner race fix, Windows hooks + RELEASE_* env vars, real glob + semver tag selection, targeted staging, shared HTTP retry (httputil), format-preserving bumper with proof-based splice, push recovery guidance |
 | 2026-08-26 | Claude | fix: `--check-msg` diagnostic redesigned (scannable message/problem/Expected/Example/Types layout, type suggestions, corrected example); single type registry (`build` restored in help), fixup!/squash!/amend! auto-pass, no-config warning silenced in lint modes, `--check-commits -V` de-duplicated, COMMIT_EDITMSG blank/comment lines skipped |
+| 2026-09-02 | Claude | Second full audit (4 review streams) after Phases 23-26; 15 commits pushed; PRDs for Phases 27-30 created from the findings (5 critical: bumper text overwrite, --no-increment recovery, test foot-gun, no config validation, only-version prerequisite bypass) |
 
 ---
 
