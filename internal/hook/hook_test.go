@@ -304,3 +304,25 @@ func TestShellCommandFor_Platforms(t *testing.T) {
 		t.Errorf("windows COMSPEC: args = %v", c.Args)
 	}
 }
+
+func TestGetHooks_EveryPipelineStepHasAField(t *testing.T) {
+	// The runner fires before:/after: for each of these step names; a config
+	// key for any of them used to be silently dropped.
+	cfg := &config.HooksConfig{
+		BeforePrerequisites: []string{"a"}, AfterPrerequisites: []string{"b"},
+		BeforeCommitlint: []string{"c"}, AfterCommitlint: []string{"d"},
+		BeforeVersion: []string{"e"}, AfterVersion: []string{"f"},
+		BeforeChangelog: []string{"g"}, AfterChangelog: []string{"h"},
+		BeforeNotification: []string{"i"}, AfterNotification: []string{"j"},
+	}
+	h := NewHookRunner(cfg, applog.NewLogger(0, false), true)
+	steps := []string{"prerequisites", "commitlint", "version", "changelog", "notification"}
+	for _, step := range steps {
+		if got := h.getHooks("before:" + step); len(got) != 1 {
+			t.Errorf("before:%s not mapped (got %v)", step, got)
+		}
+		if got := h.getHooks("after:" + step); len(got) != 1 {
+			t.Errorf("after:%s not mapped (got %v)", step, got)
+		}
+	}
+}

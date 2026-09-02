@@ -306,24 +306,3 @@ func TestLoadConfigFromBytes_JSONNormalization_PluginsRemoved(t *testing.T) {
 		t.Errorf("tagName = %q, want 'v${version}'", cfg.Git.TagName)
 	}
 }
-
-func TestApplyPluginCompat_YAMLIgnored(t *testing.T) {
-	dir := t.TempDir()
-	configPath := filepath.Join(dir, ".release-it.yaml")
-	content := `git:
-  tagName: "v${version}"
-`
-	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	cfg, err := LoadConfig(configPath)
-	if err != nil {
-		t.Fatalf("LoadConfig failed: %v", err)
-	}
-
-	// YAML doesn't have plugin compat processing, defaults remain
-	if cfg.Git.TagName != "v${version}" {
-		t.Errorf("tagName = %q", cfg.Git.TagName)
-	}
-}

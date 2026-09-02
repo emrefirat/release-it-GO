@@ -1,168 +1,166 @@
 package config
 
 import (
-	"encoding/json"
+	"fmt"
 	"strings"
 )
 
-// normalizeJSON pre-processes JSON config data to fix type mismatches between
-// the original npm release-it format and the Go struct types.
-// This runs BEFORE Viper unmarshal to prevent type errors.
-func normalizeJSON(data []byte) []byte {
-	var raw map[string]interface{}
-	if err := json.Unmarshal(data, &raw); err != nil {
-		// Return original data; Viper will report the parse error with context
-		return data
-	}
-
-	changed := false
-
-	// Remove unknown top-level keys that don't map to Config struct
-	for _, key := range []string{"npm", "plugins", "versionFile"} {
-		if _, ok := raw[key]; ok {
-			delete(raw, key)
-			changed = true
-		}
-	}
-
-	// Fix git.requireBranch: []string → join to string
-	if gitRaw, ok := raw["git"].(map[string]interface{}); ok {
-		if rb, ok := gitRaw["requireBranch"]; ok {
-			switch v := rb.(type) {
-			case []interface{}:
-				parts := make([]string, 0, len(v))
-				for _, item := range v {
-					if s, ok := item.(string); ok {
-						parts = append(parts, s)
-					}
-				}
-				gitRaw["requireBranch"] = strings.Join(parts, ",")
-				changed = true
-			}
-		}
-		// Remove changelogFile - not in our struct (we use changelog.infile)
-		if _, ok := gitRaw["changelogFile"]; ok {
-			delete(gitRaw, "changelogFile")
-			changed = true
-		}
-	}
-
-	// Fix gitlab.assets: {links:[]} → [] (empty string array)
-	if glRaw, ok := raw["gitlab"].(map[string]interface{}); ok {
-		if assets, ok := glRaw["assets"]; ok {
-			if _, isMap := assets.(map[string]interface{}); isMap {
-				glRaw["assets"] = []string{}
-				changed = true
-			}
-		}
-	}
-
-	// Fix github.assets: same as gitlab
-	if ghRaw, ok := raw["github"].(map[string]interface{}); ok {
-		if assets, ok := ghRaw["assets"]; ok {
-			if _, isMap := assets.(map[string]interface{}); isMap {
-				ghRaw["assets"] = []string{}
-				changed = true
-			}
-		}
-	}
-
-	if !changed {
-		return data
-	}
-
-	normalized, err := json.Marshal(raw)
-	if err != nil {
-		return data
-	}
-	return normalized
+// legacyKey describes a config key that is accepted for backward
+// compatibility but has no effect. It is removed from the raw map with a
+// warning instead of failing the unknown-key check.
+type legacyKey struct {
+	canonical string // original spelling for messages (viper lowercases keys)
+	reason    string
 }
 
-// applyPluginCompat reads the original JSON config to detect release-it npm
-// plugin settings and maps them to the Go built-in equivalents.
-// This provides backward compatibility with existing .release-it.json files
-// that use the @release-it/conventional-changelog or
-// @release-it/keep-a-changelog plugins.
-func applyPluginCompat(cfg *Config, data []byte, format string) {
-	if format != "json" {
-		return
+// legacyTopLevelKeys are npm release-it keys with no Go equivalent.
+var legacyTopLevelKeys = map[string]legacyKey{
+	"npm":         {"npm", "npm publishing is not supported (npm-only)"},
+	"versionfile": {"versionFile", "use bumper.in / bumper.out instead"},
+}
+
+// legacySectionKeys are per-section keys that are npm-only or were removed
+// because they never had an effect.
+var legacySectionKeys = map[string]map[string]legacyKey{
+	"git": {
+		"changelogfile": {"changelogFile", "use changelog.infile instead"},
+		"changelog":     {"changelog", "removed: the conventional-commit renderer generates the changelog"},
+	},
+	"github": {
+		"releasenotes": {"releaseNotes", "removed: release notes come from the generated changelog"},
+		"web":          {"web", "removed: no web-based release flow"},
+	},
+	"gitlab": {
+		"releasenotes": {"releaseNotes", "removed: release notes come from the generated changelog"},
+		"prerelease":   {"preRelease", "removed: GitLab releases have no pre-release flag"},
+	},
+	"changelog": {
+		"addunreleased":  {"addUnreleased", "removed: never implemented"},
+		"keepunreleased": {"keepUnreleased", "removed: never implemented"},
+	},
+	"calver": {
+		"increment":         {"increment", "removed: CalVer increments by calendar change, otherwise minor"},
+		"fallbackincrement": {"fallbackIncrement", "removed: CalVer increments by calendar change, otherwise minor"},
+	},
+}
+
+// normalizeRaw adapts a parsed config map (any format; keys lowercased by
+// viper) to the Go struct shape: npm-only and removed keys are dropped with a
+// warning, npm array/object shapes are converted, and the plugins section is
+// returned for applyPluginCompat. Previously only JSON files got this
+// treatment, so a legacy .release-it.yaml hard-failed on requireBranch arrays
+// and silently ignored plugin settings.
+func normalizeRaw(raw map[string]interface{}, cfg *Config) map[string]interface{} {
+	var plugins map[string]interface{}
+	if p, ok := raw["plugins"].(map[string]interface{}); ok {
+		plugins = p
+	}
+	if _, ok := raw["plugins"]; ok {
+		delete(raw, "plugins")
 	}
 
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return
+	for key, lk := range legacyTopLevelKeys {
+		if _, ok := raw[key]; ok {
+			delete(raw, key)
+			cfg.Warnings = append(cfg.Warnings, fmt.Sprintf("ignored %q: %s", lk.canonical, lk.reason))
+		}
 	}
 
-	pluginsRaw, ok := raw["plugins"]
-	if !ok {
-		return
+	for section, keys := range legacySectionKeys {
+		sec, ok := raw[section].(map[string]interface{})
+		if !ok {
+			continue
+		}
+		for key, lk := range keys {
+			if _, present := sec[key]; present {
+				delete(sec, key)
+				cfg.Warnings = append(cfg.Warnings, fmt.Sprintf("ignored %q: %s", section+"."+lk.canonical, lk.reason))
+			}
+		}
 	}
 
-	var plugins map[string]json.RawMessage
-	if err := json.Unmarshal(pluginsRaw, &plugins); err != nil {
-		return
+	if gitRaw, ok := raw["git"].(map[string]interface{}); ok {
+		// npm: requireBranch may be an array meaning "any of these"
+		if list, isList := gitRaw["requirebranch"].([]interface{}); isList {
+			parts := make([]string, 0, len(list))
+			for _, item := range list {
+				if s, ok := item.(string); ok {
+					parts = append(parts, s)
+				}
+			}
+			gitRaw["requirebranch"] = strings.Join(parts, ",")
+		}
 	}
 
-	// Map @release-it/conventional-changelog plugin settings
+	// npm: assets may be {links: [...]} objects; only glob lists are supported
+	for _, section := range []string{"github", "gitlab"} {
+		sec, ok := raw[section].(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if _, isMap := sec["assets"].(map[string]interface{}); isMap {
+			sec["assets"] = []string{}
+			cfg.Warnings = append(cfg.Warnings, fmt.Sprintf("ignored %s.assets object form: only a list of file globs is supported", section))
+		}
+	}
+
+	// bumper.out[].versionPrefix was never read; prefix is the real field
+	if bumperRaw, ok := raw["bumper"].(map[string]interface{}); ok {
+		if outs, ok := bumperRaw["out"].([]interface{}); ok {
+			for i, o := range outs {
+				if m, ok := o.(map[string]interface{}); ok {
+					if _, present := m["versionprefix"]; present {
+						delete(m, "versionprefix")
+						cfg.Warnings = append(cfg.Warnings, fmt.Sprintf("ignored bumper.out[%d].versionPrefix: use prefix instead", i))
+					}
+				}
+			}
+		}
+	}
+
+	return plugins
+}
+
+// applyPluginCompat maps npm release-it plugin settings
+// (@release-it/conventional-changelog, @release-it/keep-a-changelog) onto the
+// built-in equivalents. Works for every config format.
+func applyPluginCompat(cfg *Config, plugins map[string]interface{}) {
 	for key, val := range plugins {
+		settings, _ := val.(map[string]interface{})
 		if strings.Contains(key, "conventional-changelog") {
-			applyConventionalChangelogPlugin(cfg, val)
+			applyConventionalChangelogPlugin(cfg, settings)
 		}
 		if strings.Contains(key, "keep-a-changelog") {
 			cfg.Changelog.KeepAChangelog = true
-			applyKeepAChangelogPlugin(cfg, val)
+			applyKeepAChangelogPlugin(cfg, settings)
 		}
 	}
 }
 
 // applyConventionalChangelogPlugin maps conventional-changelog plugin settings.
-func applyConventionalChangelogPlugin(cfg *Config, data json.RawMessage) {
-	// Use a raw map to detect which fields are explicitly set in the plugin config.
-	// This prevents bool zero-value (false) from overriding user's explicit config.
-	var rawFields map[string]json.RawMessage
-	if err := json.Unmarshal(data, &rawFields); err != nil {
-		return
+// Only fields present in the plugin config override the user's explicit
+// values (a missing "changelog" bool must not disable the changelog).
+func applyConventionalChangelogPlugin(cfg *Config, settings map[string]interface{}) {
+	if s, ok := settings["preset"].(string); ok && s != "" {
+		cfg.Changelog.Preset = s
 	}
-
-	var pluginCfg struct {
-		Preset    string `json:"preset"`
-		Infile    string `json:"infile"`
-		Header    string `json:"header"`
-		Changelog bool   `json:"changelog"`
+	if s, ok := settings["infile"].(string); ok && s != "" {
+		cfg.Changelog.Infile = s
 	}
-	if err := json.Unmarshal(data, &pluginCfg); err != nil {
-		return
+	if s, ok := settings["header"].(string); ok && s != "" {
+		cfg.Changelog.Header = s
 	}
-
-	if pluginCfg.Preset != "" {
-		cfg.Changelog.Preset = pluginCfg.Preset
-	}
-	if pluginCfg.Infile != "" {
-		cfg.Changelog.Infile = pluginCfg.Infile
-	}
-	if pluginCfg.Header != "" {
-		cfg.Changelog.Header = pluginCfg.Header
-	}
-	// Only override Enabled if the plugin explicitly sets "changelog" field
-	if _, ok := rawFields["changelog"]; ok {
-		cfg.Changelog.Enabled = pluginCfg.Changelog
+	if b, ok := settings["changelog"].(bool); ok {
+		cfg.Changelog.Enabled = b
 	}
 }
 
 // applyKeepAChangelogPlugin maps keep-a-changelog plugin settings.
-func applyKeepAChangelogPlugin(cfg *Config, data json.RawMessage) {
-	var pluginCfg struct {
-		Filename string `json:"filename"`
-		Head     string `json:"head"`
+func applyKeepAChangelogPlugin(cfg *Config, settings map[string]interface{}) {
+	if s, ok := settings["filename"].(string); ok && s != "" {
+		cfg.Changelog.Infile = s
 	}
-	if err := json.Unmarshal(data, &pluginCfg); err != nil {
-		return
-	}
-
-	if pluginCfg.Filename != "" {
-		cfg.Changelog.Infile = pluginCfg.Filename
-	}
-	if pluginCfg.Head != "" {
-		cfg.Changelog.Header = pluginCfg.Head
+	if s, ok := settings["head"].(string); ok && s != "" {
+		cfg.Changelog.Header = s
 	}
 }

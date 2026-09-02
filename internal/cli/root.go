@@ -247,6 +247,10 @@ func runRelease(cmd *cobra.Command, args []string) error {
 		logger.DryRun("running in dry-run mode")
 	}
 
+	for _, w := range cfg.Warnings {
+		logger.Warn("config: %s", w)
+	}
+
 	if cfg.ConfigFile != "" {
 		logger.Debug("config loaded from %s", cfg.ConfigFile)
 	} else if checkMsgFile != "" || checkCommits {

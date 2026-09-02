@@ -87,6 +87,26 @@ func (h *HookRunner) getHooks(lifecycle string) []string {
 		return h.config.BeforeGitLabRelease
 	case "after:gitlab:release":
 		return h.config.AfterGitLabRelease
+	case "before:prerequisites":
+		return h.config.BeforePrerequisites
+	case "after:prerequisites":
+		return h.config.AfterPrerequisites
+	case "before:commitlint":
+		return h.config.BeforeCommitlint
+	case "after:commitlint":
+		return h.config.AfterCommitlint
+	case "before:version":
+		return h.config.BeforeVersion
+	case "after:version":
+		return h.config.AfterVersion
+	case "before:changelog":
+		return h.config.BeforeChangelog
+	case "after:changelog":
+		return h.config.AfterChangelog
+	case "before:notification":
+		return h.config.BeforeNotification
+	case "after:notification":
+		return h.config.AfterNotification
 	default:
 		return nil
 	}

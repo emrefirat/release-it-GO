@@ -1,12 +1,15 @@
 package config
 
 import (
-	"encoding/json"
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
+	"regexp"
 	"strings"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/spf13/viper"
 )
 
@@ -59,64 +62,205 @@ func loadFromFile(cfg *Config, path string) (*Config, error) {
 		return nil, fmt.Errorf("reading config file %s: %w", path, err)
 	}
 
-	ext := strings.ToLower(filepath.Ext(path))
-	format := extToViperType(ext)
-
-	// Keep original data for plugin compat processing
-	originalData := data
-
-	// Pre-process JSON to fix type mismatches from npm release-it format
-	if format == "json" {
-		data = normalizeJSON(data)
+	format := extToViperType(strings.ToLower(filepath.Ext(path)))
+	loaded, err := decodeConfig(cfg, data, format)
+	if err != nil {
+		return nil, fmt.Errorf("config file %s: %w", path, err)
 	}
+	return loaded, nil
+}
 
+// LoadConfigFromBytes parses config from raw bytes with the specified format
+// ("json", "yaml", "toml"). Same pipeline as file loading: npm compat,
+// unknown-key detection, validation.
+func LoadConfigFromBytes(data []byte, format string) (*Config, error) {
+	return decodeConfig(DefaultConfig(), data, format)
+}
+
+// decodeConfig is the single loading pipeline for every format:
+// parse → normalize (npm compat, legacy keys → warnings) → strict decode
+// (unknown keys are errors with suggestions) → plugin compat → validate.
+func decodeConfig(cfg *Config, data []byte, format string) (*Config, error) {
 	v := viper.New()
 	v.SetConfigType(format)
+	if err := v.ReadConfig(bytes.NewReader(data)); err != nil {
+		return nil, fmt.Errorf("parsing %s: %w", format, err)
+	}
+	raw := v.AllSettings()
 
-	if err := v.ReadConfig(strings.NewReader(string(data))); err != nil {
-		return nil, fmt.Errorf("parsing config file %s: %w", path, err)
+	plugins := normalizeRaw(raw, cfg)
+
+	if err := decodeStrict(cfg, raw); err != nil {
+		return nil, err
 	}
 
-	if err := v.Unmarshal(cfg); err != nil {
-		return nil, fmt.Errorf("unmarshaling config file %s: %w", path, err)
-	}
+	applyPluginCompat(cfg, plugins)
 
 	// Record whether tagName was written by the user — the runner's v-prefix
 	// inference only applies to the shipped default template.
-	cfg.Git.TagNameExplicit = v.IsSet("git.tagname")
+	if gitRaw, ok := raw["git"].(map[string]interface{}); ok {
+		_, cfg.Git.TagNameExplicit = gitRaw["tagname"]
+	}
 
-	// Apply backward compatibility for release-it npm plugin settings
-	applyPluginCompat(cfg, originalData, format)
-
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
 	return cfg, nil
 }
 
-// LoadConfigFromBytes parses config from raw bytes with the specified format.
-// Supported formats: "json", "yaml", "toml".
-func LoadConfigFromBytes(data []byte, format string) (*Config, error) {
-	cfg := DefaultConfig()
+// decodeStrict maps the raw config onto the struct. Unknown keys are errors:
+// a misspelled key (github.relase, hooks.preCommit) used to be dropped
+// silently while the user believed the setting was active. A bare string
+// where a list is expected becomes a one-element list — viper's default hook
+// split "echo a, b" into two commands.
+func decodeStrict(cfg *Config, raw map[string]interface{}) error {
+	dc := &mapstructure.DecoderConfig{
+		Result:           cfg,
+		TagName:          "mapstructure",
+		WeaklyTypedInput: true,
+		ErrorUnused:      true,
+		DecodeHook:       stringToSliceHook,
+	}
+	dec, err := mapstructure.NewDecoder(dc)
+	if err != nil {
+		return fmt.Errorf("preparing config decoder: %w", err)
+	}
+	if err := dec.Decode(raw); err != nil {
+		return describeDecodeError(err)
+	}
+	return nil
+}
 
-	if format == "json" {
-		// Apply same normalization as file-based loading for npm compat
-		data = normalizeJSON(data)
-		if err := json.Unmarshal(data, cfg); err != nil {
-			return nil, fmt.Errorf("parsing JSON config: %w", err)
+// stringToSliceHook wraps a single string into []string without splitting.
+func stringToSliceHook(from reflect.Type, to reflect.Type, data interface{}) (interface{}, error) {
+	if from.Kind() == reflect.String && to.Kind() == reflect.Slice && to.Elem().Kind() == reflect.String {
+		return []string{data.(string)}, nil
+	}
+	return data, nil
+}
+
+// invalidKeysPattern matches mapstructure's unused-key diagnostics, e.g.
+// "* 'github' has invalid keys: relase" or "* ” has invalid keys: relase".
+var invalidKeysPattern = regexp.MustCompile(`^\*?\s*'([^']*)' has invalid keys: (.*)$`)
+
+// describeDecodeError turns mapstructure's aggregated diagnostics ("N
+// error(s) decoding:\n\n* ...") into actionable messages with a closest-key
+// suggestion.
+func describeDecodeError(err error) error {
+	var msgs []string
+	for _, line := range strings.Split(err.Error(), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasSuffix(line, "decoding:") {
+			continue
 		}
-		return cfg, nil
+		m := invalidKeysPattern.FindStringSubmatch(line)
+		if m == nil {
+			msgs = append(msgs, strings.TrimPrefix(line, "* "))
+			continue
+		}
+		section := m[1]
+		for _, key := range strings.Split(m[2], ",") {
+			key = strings.TrimSpace(key)
+			full := key
+			if section != "" {
+				full = section + "." + key
+			}
+			msg := fmt.Sprintf("unknown config key %q", full)
+			if suggestion := suggestKey(section, key); suggestion != "" {
+				msg += fmt.Sprintf(" (did you mean %q?)", suggestion)
+			}
+			msgs = append(msgs, msg)
+		}
 	}
+	return fmt.Errorf("%s", strings.Join(msgs, "; "))
+}
 
-	v := viper.New()
-	v.SetConfigType(format)
-
-	if err := v.ReadConfig(strings.NewReader(string(data))); err != nil {
-		return nil, fmt.Errorf("parsing %s config: %w", format, err)
+// knownKeys lists the mapstructure keys of the struct that section refers to
+// ("" = top level, "github", "hooks", ...).
+func knownKeys(section string) []string {
+	t := reflect.TypeOf(Config{})
+	if section != "" {
+		found := false
+		for _, part := range strings.Split(section, ".") {
+			next, ok := fieldByKey(t, part)
+			if !ok {
+				return nil
+			}
+			t = next
+			found = true
+		}
+		if !found {
+			return nil
+		}
 	}
-
-	if err := v.Unmarshal(cfg); err != nil {
-		return nil, fmt.Errorf("unmarshaling %s config: %w", format, err)
+	var keys []string
+	for i := 0; i < t.NumField(); i++ {
+		tag := t.Field(i).Tag.Get("mapstructure")
+		if tag != "" && tag != "-" {
+			keys = append(keys, tag)
+		}
 	}
+	return keys
+}
 
-	return cfg, nil
+// fieldByKey resolves a nested struct type by mapstructure tag (case-insensitive).
+func fieldByKey(t reflect.Type, key string) (reflect.Type, bool) {
+	for i := 0; i < t.NumField(); i++ {
+		f := t.Field(i)
+		if strings.EqualFold(f.Tag.Get("mapstructure"), key) {
+			ft := f.Type
+			for ft.Kind() == reflect.Ptr || ft.Kind() == reflect.Slice {
+				ft = ft.Elem()
+			}
+			if ft.Kind() == reflect.Struct {
+				return ft, true
+			}
+			return nil, false
+		}
+	}
+	return nil, false
+}
+
+// suggestKey returns the closest known key in the section: a case/hyphen
+// variant first (preCommit → pre-commit), then edit distance ≤ 2.
+func suggestKey(section string, unknown string) string {
+	norm := func(s string) string {
+		return strings.ToLower(strings.NewReplacer("-", "", "_", "", ":", "").Replace(s))
+	}
+	best, bestDist := "", 3
+	for _, k := range knownKeys(section) {
+		if norm(k) == norm(unknown) {
+			return k
+		}
+		if d := levenshtein(strings.ToLower(unknown), strings.ToLower(k)); d < bestDist {
+			best, bestDist = k, d
+		}
+	}
+	return best
+}
+
+// levenshtein computes the edit distance between two short strings.
+func levenshtein(a, b string) int {
+	if a == b {
+		return 0
+	}
+	prev := make([]int, len(b)+1)
+	curr := make([]int, len(b)+1)
+	for j := range prev {
+		prev[j] = j
+	}
+	for i := 1; i <= len(a); i++ {
+		curr[0] = i
+		for j := 1; j <= len(b); j++ {
+			cost := 1
+			if a[i-1] == b[j-1] {
+				cost = 0
+			}
+			curr[j] = min(prev[j]+1, curr[j-1]+1, prev[j-1]+cost)
+		}
+		prev, curr = curr, prev
+	}
+	return prev[len(b)]
 }
 
 // extToViperType converts a file extension to a viper config type.

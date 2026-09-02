@@ -19,6 +19,9 @@ type Config struct {
 	Increment    string             `json:"increment" yaml:"increment" toml:"increment" mapstructure:"increment"`
 	PreReleaseID string             `json:"preReleaseId" yaml:"preReleaseId" toml:"preReleaseId" mapstructure:"preReleaseId"`
 	ConfigFile   string             `json:"-" yaml:"-" toml:"-" mapstructure:"-"` // loaded config file path (not serialized)
+	// Warnings collects non-fatal loader findings (ignored legacy keys) for
+	// the CLI to print; never serialized.
+	Warnings []string `json:"-" yaml:"-" toml:"-" mapstructure:"-"`
 }
 
 // GitConfig holds all git-related configuration.
@@ -109,6 +112,18 @@ type HooksConfig struct {
 	AfterGitHubRelease  []string `json:"after:github:release" yaml:"after:github:release" toml:"after:github:release" mapstructure:"after:github:release"`
 	BeforeGitLabRelease []string `json:"before:gitlab:release" yaml:"before:gitlab:release" toml:"before:gitlab:release" mapstructure:"before:gitlab:release"`
 	AfterGitLabRelease  []string `json:"after:gitlab:release" yaml:"after:gitlab:release" toml:"after:gitlab:release" mapstructure:"after:gitlab:release"`
+	// Every pipeline step fires before:/after: events; these complete the set
+	// (a key for a step without a field was silently dropped).
+	BeforePrerequisites []string `json:"before:prerequisites" yaml:"before:prerequisites" toml:"before:prerequisites" mapstructure:"before:prerequisites"`
+	AfterPrerequisites  []string `json:"after:prerequisites" yaml:"after:prerequisites" toml:"after:prerequisites" mapstructure:"after:prerequisites"`
+	BeforeCommitlint    []string `json:"before:commitlint" yaml:"before:commitlint" toml:"before:commitlint" mapstructure:"before:commitlint"`
+	AfterCommitlint     []string `json:"after:commitlint" yaml:"after:commitlint" toml:"after:commitlint" mapstructure:"after:commitlint"`
+	BeforeVersion       []string `json:"before:version" yaml:"before:version" toml:"before:version" mapstructure:"before:version"`
+	AfterVersion        []string `json:"after:version" yaml:"after:version" toml:"after:version" mapstructure:"after:version"`
+	BeforeChangelog     []string `json:"before:changelog" yaml:"before:changelog" toml:"before:changelog" mapstructure:"before:changelog"`
+	AfterChangelog      []string `json:"after:changelog" yaml:"after:changelog" toml:"after:changelog" mapstructure:"after:changelog"`
+	BeforeNotification  []string `json:"before:notification" yaml:"before:notification" toml:"before:notification" mapstructure:"before:notification"`
+	AfterNotification   []string `json:"after:notification" yaml:"after:notification" toml:"after:notification" mapstructure:"after:notification"`
 
 	// Git hooks — installed to .git/hooks/ via `release-it-go install`
 	PreCommit        []string `json:"pre-commit" yaml:"pre-commit" toml:"pre-commit" mapstructure:"pre-commit"`
