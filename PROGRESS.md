@@ -37,11 +37,11 @@
 | 27 | Stability Fixes (2026-09-02 second audit) | Complete | 100% |
 | 28 | Parameter Validation & Dead-Field Cleanup | Complete | 100% |
 | 29 | Test Hygiene & Distribution/CI Trust (absorbs planned Phase 24) | Complete | 100% |
-| 30 | Documentation Sync | Not Started | 0% |
+| 30 | Documentation Sync | Complete | 100% |
 
 **Last Updated:** 2026-09-02
 **Active Developer:** Claude
-**Current Version:** v0.1.3 (Phase 22 complete — production-ready)
+**Current Version:** v0.3.0 released; Phases 23–30 (two audit cycles) complete on `main`, unreleased
 
 ---
 
@@ -780,6 +780,27 @@
 
 ---
 
+## Phase 30: Documentation Sync
+
+**Status:** Complete
+**PRD:** `docs/phase_30.md`
+
+### To Do
+
+- [x] 12 wrong statements fixed (hook install location, `go install` path, CalVer example, nonexistent `${latestTag}`, hook shell, `--check-commits` output, staging semantics, Docker `GIT_AUTHOR_*`, tag-exists / `--no-increment`, Go version + CI claims, ARCHITECTURE retry/hooks/version algorithm, CLAUDE.md phase/steps/seams)
+- [x] README sections added: positional version, `--check-msg` + commit-msg hook, `hooks install|remove`, hook keys for every step, key naming, `RELEASE_*` env, v-prefix inference, `requireBranch` comma patterns, `certificateAuthorityFileRef`, network behavior (retry/proxy/TLS), bumper format preservation, independent confirmations, top-level keys, validation, Docker
+- [x] ARCHITECTURE/CLAUDE.md: `internal/httputil`, `internal/testutil`, shared `runPipeline`/`runSteps`, third exec seam, file-path table
+- [x] DECISIONS: ADR-014 retry policy, ADR-015 bumper splice, ADR-016 TLS default, ADR-017 hook shell + key naming, ADR-018 strict config
+- [x] Help texts in code (`hooks install` Long, full-example comment) no longer claim `.git/hooks/`
+
+### Notes
+
+- Sample outputs in README/TROUBLESHOOTING were captured from the built binary, not written by hand.
+- CalVer: the README example was aligned with the code (`26.9.0`, month not zero-padded) rather than changing the format users already have in their tags.
+- Docker docs now state the real rule from the entrypoint: only `version`, `completion`, `--help` skip the identity check.
+
+---
+
 ## Bugs
 
 - [x] BUG: First-release changelog "exit status 128" error (2026-02-16) → When `LatestVersion=0.0.0`, the `v0.0.0` tag was searched but no such tag exists. The `latestVersionToTag()` helper was added: returns empty for `0.0.0` or empty string, so `GetCommitsSinceTag("")` returns all commits. 3 sites affected: `RunChangelogOnly`, `generateChangelog`, `autoDetectIncrement`.
@@ -840,6 +861,9 @@
 - [x] BUG: release workflow pushed branch and tag in two steps (2026-09-02) → a rejected branch push left an orphan tag on the remote, and the tag was created without running the tests. Fix: `go test` before tagging, single `git push --atomic origin HEAD "$TAG"`.
 - [x] BUG: full-example `commit-msg` hook ran `--check-commits` (2026-09-02) → that lints the existing history, not the message being committed, so a bad message passed. Fix: `release-it-go --check-msg "$1"`; covered end-to-end through the real binary.
 - [x] BUG: real-git tests inherited the developer's git configuration (2026-09-02) → `commit.gpgsign`, `core.hooksPath`, or `init.defaultBranch` could break or skew the suite; 78 `os.Chdir` blocks swallowed errors and one leaked cwd could point a test at the real repo. Fix: `testutil.IsolateGit` in TestMain + `t.Chdir` everywhere.
+
+- [x] BUG: `hooks install` help and the full-example comment said hooks go to `.git/hooks/` (2026-09-02) → the installer has written `.hooks/` + `core.hooksPath` since Phase 20. Fix: texts corrected (docs commit `651b759`).
+- [x] BUG: Docs told Docker users to set `GIT_AUTHOR_*` (2026-09-02) → the entrypoint checks `GIT_USER_NAME`/`GIT_USER_EMAIL` only, so the documented command always failed with the identity error. Fix: TROUBLESHOOTING + README Docker section.
 
 ---
 
@@ -923,6 +947,7 @@
 | 2026-09-02 | Claude | Phase 27 complete: 19 stability items (bumper text in-place, unified runPipeline entry points, --no-increment recovery with defaults, tag templates via VersionFromTag, pre* increments, explicit version ordering, safer retries, proxy env, explicit make_latest, tag-based compare links, git add -u staging, remote/pushRepo checks, auto-detect logging, cli test foot-gun removed) |
 | 2026-09-02 | Claude | Phase 28 complete: strict config loading with unknown-key suggestions, `Validate()` rules, legacy-key normalization for all formats, hook fields for every step, mode-flag conflict errors, `--dry-run` in init/hooks, `commitsPath` / `addVersionUrl` / project-uploads wiring, 11 dead keys removed with load-time warnings, docs aligned |
 | 2026-09-02 | Claude | Phase 29 complete: git-isolated tests + t.Chdir, end-to-end hook/env/bumper/positional/retry coverage, real module path for `go install`, goreleaser v2.6 syntax, gitignore anchor, CI coverage gate + pinned govulncheck + OS matrix + dependabot, atomic release push, CHANGELOG 0.2.0/0.3.0 entries |
+| 2026-09-02 | Claude | Phase 30 complete: 12 wrong doc statements fixed, README sections for every behavior added since Phase 23, ARCHITECTURE/CLAUDE.md synced, ADR-014..018, help texts corrected. Second audit cycle (Phases 27–30) closed |
 
 ---
 
