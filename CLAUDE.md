@@ -22,6 +22,7 @@ A CLI tool that automates the release process as a single static Go binary. Comp
 | Changelog | Conventional commits (Angular preset) + keep-a-changelog | - |
 | Release platform | GitHub + GitLab REST API | - |
 | Notification | Slack + Teams webhook | - |
+| HTTP retry | `internal/httputil` (stdlib only) | - |
 | Plugin | NONE — everything is built-in (DECISIONS.md ADR-006) | - |
 | Distribution | GitHub Releases (GoReleaser), `go install`, Docker | - |
 
@@ -33,7 +34,7 @@ A CLI tool that automates the release process as a single static Go binary. Comp
 init → prerequisites → commitlint → version → bump → changelog → git:release → github:release → gitlab:release → notification
 ```
 
-Every step supports `before:` / `after:` hooks. Dry-run is supported for all steps. The `notification` step is non-fatal (pipeline continues on failure).
+Every step supports `before:` / `after:` hooks; `before:release` / `after:release` wrap the release as a whole. `Run`, `RunOnlyVersion` and `RunNoIncrement` share the step list via `runPipeline`/`runSteps`. Dry-run is supported for all steps. The `notification` step is non-fatal (pipeline continues on failure). Outbound HTTP goes through `internal/httputil.Do` (retry with backoff).
 
 ## Directory Layout
 
@@ -51,11 +52,13 @@ internal/
   bumper/                  # Multi-file version updates (JSON/YAML/TOML/INI/text)
   hook/                    # Lifecycle hook runner (before:/after: events)
   notification/            # Webhook notifications (Slack + Teams MessageCard)
+  httputil/                # Retry/backoff wrapper for every outbound HTTP request
+  testutil/                # Test-only helpers (git config isolation for real-git tests)
   ui/                      # Prompter (interactive/non-interactive), spinner, colors, CI detect
   runner/                  # Pipeline orchestrator + ReleaseContext (shared state)
   log/                     # Structured logger (slog wrapper, verbose levels)
 test/integration/          # Real git repo integration tests
-docs/phase_*.md            # Phase PRD documents (1-20)
+docs/phase_*.md            # Phase PRD documents (1-30)
 ```
 
 ## Code Conventions
@@ -94,7 +97,7 @@ logger.Error("error (always shown)")
 ```
 
 ### Git Command Mocking (Test Pattern)
-Git operations run through a `commandExecutor` function variable. Defined separately in `internal/git/git.go` and `internal/githook/githook.go`. Mock in tests:
+Git operations run through a `commandExecutor` function variable. Defined separately in `internal/git/git.go` and `internal/githook/githook.go`; `internal/hook/hook.go` has the equivalent `execCommand` seam (returns `*exec.Cmd`), and `internal/release` / `internal/notification` expose `retryOptions` for replacing the backoff sleep. Tests that spawn the real git binary (cli, githook, integration) call `testutil.IsolateGit()` from `TestMain`. Mock in tests:
 ```go
 original := commandExecutor
 defer func() { commandExecutor = original }()
@@ -137,11 +140,11 @@ go test ./internal/runner/ -run TestRunner_Run/scenario_name -race -v
 ## Adding New Features
 
 ### Adding a new pipeline step
-1. Add a `{name, fn}` entry to the `pipelineStep` slice in `internal/runner/runner.go`
+1. Add a `{name, fn}` entry to the step list in `runPipeline()` in `internal/runner/runner.go` — every entry point (`Run`, `RunOnlyVersion`, `RunNoIncrement`) shares it through `runSteps`
 2. Write the step function: `func (r *Runner) yourStep() error { ... }`
 3. Use the spinner: `r.ctx.Spinner.Start("...")` → `r.ctx.Spinner.Stop(true|false)`
 4. Dry-run support: check `r.ctx.IsDryRun`, don't perform side effects
-5. Before/after hook support comes for free (the runner handles it)
+5. Before/after hook support comes for free (the runner handles it) — add the two `HooksConfig` fields (`before:<name>` / `after:<name>`) and the `getHooks` cases in `internal/hook/hook.go`
 6. Non-fatal? See `sendNotification` — error log + `return nil`
 7. Add an integration test: `test/integration/release_test.go`
 
@@ -157,8 +160,9 @@ go test ./internal/runner/ -run TestRunner_Run/scenario_name -race -v
 1. `internal/config/config.go` — add the field to the struct, **JSON + YAML + TOML + mapstructure tags are required**
 2. `internal/config/defaults.go` — set the default value
 3. `internal/config/template.go` or `internal/cli/init.go` if the wizard is affected
-4. `internal/config/writer.go` — add commented entry to the `fullExampleYAML` constant
-5. Test: `internal/config/config_test.go`, `defaults_test.go`
+4. `internal/config/writer.go` — add commented entry to the `fullExampleYAML` constant (the round-trip test loads it under strict decoding, so every documented key must exist)
+5. Constrained values → add a rule to `internal/config/validate.go`; legacy/removed keys → `legacySectionKeys` in `compat.go` (warning instead of an unknown-key error)
+6. Test: `internal/config/config_test.go`, `defaults_test.go`, `validate_test.go`
 
 ### Adding a new git command wrapper
 1. Add to the appropriate file under `internal/git/` (commit.go, tag.go, push.go, repo.go)
@@ -267,6 +271,6 @@ Modular rule files. **Read these when the summary above isn't enough**:
 
 ## Document Metadata
 
-- Last updated: 2026-04-16
-- Current phase: Phase 20 complete (git hook installer + commit-msg hook validation)
+- Last updated: 2026-09-02
+- Current phase: Phase 30 complete (two audit cycles: Phases 23–30 — strict config, hardening, test hygiene, distribution/CI, documentation sync)
 - For the next update, check: `docs/phase_*.md` (new phase?), `internal/cli/root.go` (new command/flag?), `go.mod` (version change?), `.github/workflows/` (CI changes?)

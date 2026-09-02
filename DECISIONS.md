@@ -4,7 +4,7 @@
 >
 > Format: ADR-NNN: Decision / Date / Status / Context / Decision / Alternatives / Consequences
 
-Last updated: 2026-04-16 | See also: [ARCHITECTURE.md](ARCHITECTURE.md), [CLAUDE.md](CLAUDE.md)
+Last updated: 2026-09-02 | See also: [ARCHITECTURE.md](ARCHITECTURE.md), [CLAUDE.md](CLAUDE.md)
 
 ---
 
@@ -334,6 +334,115 @@ Distinction: `fileExists(input)` distinguishes file from string.
 ### Consequences
 **Positive**: A single flag, flexible usage. Works for both hooks and manual testing.
 **Negative**: `fileExists()` check fragility — if a file named "test" exists one day, it's read as a file rather than a string. Mitigation: this case is rare, documented.
+
+---
+
+## ADR-014: Method-Aware HTTP Retry Policy (`internal/httputil`)
+
+**Date**: 2026-08-25 (Phase 26), refined 2026-09-02 (Phase 27)
+**Status**: Accepted
+
+### Context
+A single transient `503` from GitHub, GitLab or a webhook endpoint failed the whole release after the commit and tag had already been created locally. Retrying blindly is worse: replaying a `POST /releases` after a gateway `502` can create the release twice, because a `502`/`504` says nothing about whether the upstream processed the request.
+
+### Decision
+One retry wrapper (`httputil.Do`) used by every client: up to 3 attempts on `429`, `502`, `503`, `504`, exponential backoff starting at 1s, `Retry-After` honored. Replay rules depend on the method: idempotent methods are always replayed; non-idempotent ones only after `429`/`503`, which guarantee the request was rejected before processing. Transport errors (no response) are retried only for idempotent methods. Bodies are replayed through `GetBody`.
+
+### Alternatives
+- **Retry everything**: duplicate releases/announcements. **REJECTED**.
+- **No retries, document `--no-increment`**: every flaky proxy becomes a manual recovery. **REJECTED**.
+- **Per-client retry loops**: three copies of the same policy drifting apart. **REJECTED** — that is how the pre-Phase-26 code looked.
+
+### Consequences
+**Positive**: transient failures self-heal, one place to reason about idempotency, `Retry-After` respected. Test seam (`retryOptions.Sleep`) keeps the suite fast.
+**Negative**: a `502` on a release POST still fails the run; the user resolves it with `--no-increment` once the remote is healthy.
+
+---
+
+## ADR-015: Proof-Based Targeted Splice in the Bumper
+
+**Date**: 2026-08-25 (Phase 26), text targets 2026-09-02 (Phase 27)
+**Status**: Accepted
+
+### Context
+The bumper parsed JSON/YAML/TOML, set the version and re-serialized the whole file, destroying key order, indentation and comments; plain-text targets were overwritten with the bare version, which turned a README into a single line. Users diff release commits, and a release commit that reformats `package.json` is unacceptable.
+
+### Decision
+Locate the exact byte range of the version *value* at the configured path, prove that replacing just that range yields a document whose parsed value at the path is the new version (and nothing else changed), then write the spliced bytes. If the proof fails, fall back to the full rewrite and log it. Text targets replace the current version in place (with the optional prefix) and fail *before any commit* when it cannot be found; `consumeWholeFile: true` stays the explicit whole-file opt-in.
+
+### Alternatives
+- **Format-preserving serializers per format**: none exist for all of JSON/YAML/TOML in Go without heavy dependencies. **REJECTED**.
+- **Regex replace without verification**: silently corrupts files when a dependency carries the same version string. **REJECTED**.
+
+### Consequences
+**Positive**: byte-identical files apart from the version (verified end-to-end in `test/integration`), same-looking dependency versions untouched.
+**Negative**: two code paths (splice + fallback) to keep correct; the fallback is the old behavior, so it is at worst as bad as before.
+
+---
+
+## ADR-016: TLS Verification On by Default for GitLab
+
+**Date**: 2026-08-25 (Phase 23)
+**Status**: Accepted
+
+### Context
+`gitlab.secure` was a plain `bool` whose zero value (`false`) mapped to `InsecureSkipVerify: true`. Every default-config GitLab release therefore sent the `Private-Token` over unverified TLS, and a unit test even asserted that as expected behavior.
+
+### Decision
+`Secure: true` in `DefaultConfig()`; `secure: false` remains an explicit opt-out for self-signed instances that cannot ship a CA file. An invalid `certificateAuthorityFile` no longer installs an empty root pool (which broke every connection with an opaque x509 error) — it warns and falls back to the system roots. `certificateAuthorityFileRef` reads the path from an environment variable, matching the `tokenRef` pattern.
+
+### Alternatives
+- **Keep the npm default (`secure: false` allowed implicitly)**: npm's `secure` is opt-in too, but npm's zero value is `undefined`, not "insecure". **REJECTED** — parity with the intent, not with Go's zero value.
+- **Tri-state pointer (`*bool`)**: more code, same outcome. **REJECTED**.
+
+### Consequences
+**Positive**: secure by default; the opt-out is visible in the config file.
+**Negative**: a self-signed instance that relied on the accidental default now fails with a clear x509 error until `secure: false` or a CA file is configured (documented in TROUBLESHOOTING).
+
+---
+
+## ADR-017: Hook Shell Selection and Hook Key Naming
+
+**Date**: 2026-08-25 (Phase 26), git-hook naming 2026-04 (Phase 20)
+**Status**: Accepted
+
+### Context
+Lifecycle hooks were always run through `sh -c`, so on stock Windows every configured hook failed. Separately, three families of keys live in the `hooks` section: lifecycle events, git hooks, and npm-style names users bring from `.release-it.json`.
+
+### Decision
+- Unix: `sh -c <command>`; Windows: `%COMSPEC% /C <command>` (`cmd.exe` when `COMSPEC` is unset). No cross-platform shell emulation.
+- Every template variable is also exported as `RELEASE_<SCREAMING_SNAKE>` (`${repo.owner}` → `RELEASE_REPO_OWNER`) so scripts can avoid `${var}` splicing and its quoting pitfalls.
+- Key naming: lifecycle hooks are `before:<step>` / `after:<step>` for *every* pipeline step plus the aggregate `before:release` / `after:release`; git hooks use git's own kebab-case names (`pre-commit`, `commit-msg`, …). Wrong-case keys (`preCommit`) are rejected by the strict loader with a suggestion rather than silently ignored.
+
+### Alternatives
+- **Require `sh` on Windows (Git Bash)**: silently broke on stock installs. **REJECTED**.
+- **PowerShell on Windows**: different quoting rules from `cmd.exe` and not always present. **REJECTED**; users can call `pwsh -c ...` explicitly.
+- **camelCase git hook keys (`preCommit`)**: would collide with the lifecycle naming and diverge from git. **REJECTED**.
+
+### Consequences
+**Positive**: hooks work on Windows; scripts read `RELEASE_*` safely; one naming rule per family.
+**Negative**: hook commands are still platform-specific shell snippets; a config shared across OSes needs portable commands or a script file.
+
+---
+
+## ADR-018: Strict Configuration Decoding with Validation
+
+**Date**: 2026-09-02 (Phase 28)
+**Status**: Accepted
+
+### Context
+Viper decoded leniently: a typo (`github.relase`), a wrong-case key (`hooks.preCommit`) or a key from another tool loaded as if absent, and users believed a feature was on. Invalid values failed late — a `tagName` without `${version}` created the release commit and then failed at the tag; `-i bogus` failed after the prerequisites; negative timeouts waited forever.
+
+### Decision
+Parse with Viper, then decode the raw map with mapstructure `ErrorUnused` into the typed config; unknown keys are errors with `did you mean` suggestions derived from the struct tags. npm-compat keys are normalized first (all formats, not only JSON), and keys this tool once accepted but never read are stripped with a warning instead of failing. `config.Validate()` runs after loading and again after CLI overrides, reporting every problem at once.
+
+### Alternatives
+- **Warn on unknown keys**: warnings scroll past in CI; the original bug reports were about silently ignored settings. **REJECTED**.
+- **JSON Schema**: a second source of truth next to the structs. **REJECTED** — the struct tags already are the schema.
+
+### Consequences
+**Positive**: configuration mistakes surface before anything is committed; removed keys keep old files loading.
+**Negative**: a key must be registered in the struct (with all four tags) before it can appear in any config — which is the point.
 
 ---
 

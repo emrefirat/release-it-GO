@@ -2,7 +2,7 @@
 
 > Explains how the system works. For a new developer: "which package do I start with, how does the flow work?"
 
-Last updated: 2026-04-16 | See also: [DECISIONS.md](DECISIONS.md) (why), [CLAUDE.md](CLAUDE.md) (rules)
+Last updated: 2026-09-02 | See also: [DECISIONS.md](DECISIONS.md) (why), [CLAUDE.md](CLAUDE.md) (rules)
 
 ---
 
@@ -46,15 +46,17 @@ config  git  version changelog bumper hook  release notification
 | Package | Responsibility | Public Types |
 |---------|----------------|--------------|
 | `cli` | Cobra command tree, flag parsing, runner invocation | `Execute()`, `NewRootCommand()` |
-| `config` | Config loading (JSON/YAML/TOML), defaults, merge, write, npm compat, migration | `Config`, `LoadConfig`, `DefaultConfig`, `WriteConfigYAML` |
+| `config` | Strict config loading (JSON/YAML/TOML, unknown keys are errors), validation, defaults, write, npm compat, migration | `Config`, `LoadConfig`, `Validate`, `DefaultConfig`, `WriteConfigYAML` |
 | `runner` | Pipeline orchestration, ReleaseContext (shared state), hook integration | `Runner`, `ReleaseContext`, `NewRunner` |
-| `git` | Git CLI wrapper (commit, tag, push, log, repo info), prerequisite checks | `Git`, `RepoInfo`, `GetRepoInfo`, `commandExecutor` (var) |
+| `git` | Git CLI wrapper (commit, tag, push, log, repo info), template-aware tag lookup, prerequisite checks | `Git`, `RepoInfo`, `GetRepoInfo`, `VersionFromTag`, `GetFullCommitsSinceTag`, `commandExecutor` (var) |
 | `githook` | Git hook installer (`.hooks/` + core.hooksPath, managed header) | `Installer`, `HooksFromConfig` |
 | `version` | Semver parse/increment, CalVer, branch-aware pre-release | `ParseVersion`, `IncrementVersion`, `CalVer` |
-| `changelog` | Conventional commit parser, lint, bump analyzer, renderer (conventional + keep-a-changelog) | `Commit`, `ParseCommits`, `LintCommits`, `AnalyzeBump`, `GenerateChangelog` |
+| `changelog` | Conventional commit parser (full message, multiline footers), lint with type suggestions, bump analyzer, renderers (conventional with compare/commit links + keep-a-changelog) | `Commit`, `ParseCommits`, `LintCommits`, `SuggestType`, `AnalyzeBump`, `GenerateChangelog` |
 | `release` | GitHub + GitLab REST client, asset upload, PR/MR/issue comment | `ReleaseProvider`, `GitHubClient`, `GitLabClient`, `ReleaseOptions` |
 | `bumper` | Multi-file version writing (JSON/YAML/TOML/INI/text), reading from input file | `Bumper`, `BumperFile`, `ReadVersionFromFile`, `WriteVersionToFile` |
-| `hook` | Lifecycle hook runner (before:/after: shell commands, template variable substitution) | `HookRunner`, `RunHooks`, `SetVars` |
+| `hook` | Lifecycle hook runner (before:/after: shell commands via `sh -c` / `%COMSPEC% /C`, `${var}` substitution + `RELEASE_*` env) | `HookRunner`, `RunHooks`, `SetVars`, `execCommand` (var) |
+| `httputil` | Retry wrapper for outbound HTTP (429/502/503/504, backoff, Retry-After, method-aware replay) | `Do`, `Options` |
+| `testutil` | Test-only helpers shared by packages that spawn a real git binary | `IsolateGit` |
 | `notification` | Webhook notifications (Slack JSON, Teams MessageCard) | `Client`, `RichNotificationContext`, `SendAll` |
 | `ui` | Prompter (interactive Bubbletea / non-interactive CI), spinner, colors, CI detect | `Prompter`, `InteractivePrompter`, `NonInteractivePrompter`, `Spinner`, `IsCI` |
 | `log` | slog wrapper (4 verbose levels + dry-run formatting) | `Logger`, `NewLogger` |
@@ -64,9 +66,10 @@ config  git  version changelog bumper hook  release notification
 ```
 cli ─→ config, runner, ui, changelog, log, githook
 runner ─→ config, git, version, changelog, bumper, hook, notification, release, ui, log
-release ─→ config, git, log
-notification ─→ config, log
+release ─→ config, git, log, httputil
+notification ─→ config, log, httputil
 git ─→ config, log
+httputil (leaf — net/http only)
 hook ─→ config, log
 bumper ─→ config, log
 config (leaf)
@@ -83,22 +86,25 @@ githook ─→ config
 
 ## 3. Pipeline Flow
 
-### 3.1 Full Pipeline (`r.Run()`)
+### 3.1 Full Pipeline (`r.Run()` → `runPipeline(versionStep)` → `runSteps`)
+
+`Run()`, `RunOnlyVersion()` and `RunNoIncrement()` all call `runPipeline` with a different version step, so every entry point runs the same prerequisites, commit lint and token checks:
 
 ```
-1. init                  → fetch repoInfo + branchName
-2. prerequisites         → git installed?, in repo?, clean working dir?, upstream?, commits?, token validation
+1. init                  → fetch repoInfo (from git.pushRepo) + branchName; infer v-prefix for the default tagName
+2. prerequisites         → in repo?, branch?, clean working dir?, upstream?, commits (commitsPath-aware)?, identity?,
+                           token validation, repo info present when a platform release is enabled
 3. commitlint            → conventional commit format validation (if RequireConventionalCommits)
-4. version               → latestTag → IncrementVersion (auto-detected bump type or CLI flag)
-5. bump                  → write the new version into BumperConfig.Out files
-6. changelog             → update CHANGELOG.md, store content in ReleaseContext.Changelog
-7. git:release           → stage → commit → tag → push (each prompts separately, can be skipped with --no-X)
+4. version               → latest tag (semver order, template-aware) → explicit version | increment keyword | auto-detect
+5. bump                  → write the new version into BumperConfig.Out files (targeted splice, formatting preserved)
+6. changelog             → prepend the new section to CHANGELOG.md (skipped when empty), store it in ReleaseContext.Changelog
+7. git:release           → stage (git add . --update | git add .) → commit → tag → push (independent prompts, --no-X to skip)
 8. github:release        → GitHub REST: create release, upload assets
-9. gitlab:release        → GitLab REST: create release, upload assets
+9. gitlab:release        → GitLab REST: create release, upload assets (Generic Package Registry or project uploads)
 10. notification         → Slack + Teams webhook (non-fatal: error → log + continue)
 ```
 
-Before each step, a `before:STEP` hook runs; after each step, an `after:STEP` hook runs.
+`runSteps` fires `before:STEP` / `after:STEP` around every step. Two aggregate events mirror npm release-it: `before:release` fires once ahead of `git:release` (before its own `before:git:release`), `after:release` once after the last step. When the prerequisites stop the run because there are no new commits, the remaining hooks — including `after:release` — are skipped on purpose: the release did not happen.
 
 ### 3.2 Alternate Modes
 
@@ -106,7 +112,7 @@ Before each step, a `before:STEP` hook runs; after each step, an `after:STEP` ho
 - `RunChangelogOnly()` — only compute the changelog, print to stdout
 - `RunReleaseVersionOnly()` — only compute the next version, print to stdout
 - `RunOnlyVersion()` — interactive version prompt, then run rest in CI mode
-- `RunNoIncrement()` — release without incrementing the version (on existing tag)
+- `RunNoIncrement()` — release the current version again: reuses the tag when it already points at `HEAD` (recovery after a failed push), does not regenerate the changelog or create an empty commit
 - `RunCheckCommits()` — only commit lint, no release
 
 CLI flags (`--changelog`, `--release-version`, `--only-version`, `--no-increment`, `--check-commits`, `--check-msg`) select these modes.
@@ -176,7 +182,7 @@ type ReleaseProvider interface {
 To add a new platform, implement this interface + add a new step in `runner.go`.
 
 ### `commandExecutor` (Function Variable Pattern)
-For test mocking. Defined separately in `internal/git/git.go` and `internal/githook/githook.go` (because they are different packages):
+For test mocking. Defined separately in `internal/git/git.go` and `internal/githook/githook.go` (because they are different packages). `internal/hook/hook.go` has the same seam under the name `execCommand` (it returns the `*exec.Cmd` because the runner streams output), and `internal/release` / `internal/notification` expose `retryOptions` so tests can replace the backoff sleep:
 
 ```go
 var commandExecutor = func(name string, args ...string) (string, error) {
@@ -193,10 +199,12 @@ var commandExecutor = func(name string, args ...string) (string, error) {
 | System | Protocol | Auth | Timeout | Failure Behavior |
 |--------|----------|------|---------|------------------|
 | Git CLI | exec.Command | Local git config | OS default | Pipeline stops |
-| GitHub API | HTTPS REST | `GITHUB_TOKEN` env | 30s (default) | Pipeline stops |
-| GitLab API | HTTPS REST | `GITLAB_TOKEN` env (`Private-Token` header) | 30s (default) | Pipeline stops |
-| Slack Webhook | HTTPS POST | Webhook URL (from env, `urlRef`) | 30s | Non-fatal: log + continue |
-| Teams Webhook | HTTPS POST (MessageCard JSON) | Webhook URL (from env, `urlRef`) | 30s | Non-fatal: log + continue |
+| GitHub API | HTTPS REST | `GITHUB_TOKEN` env | 30s (default) | 429/5xx retried (see below), then pipeline stops |
+| GitLab API | HTTPS REST | `GITLAB_TOKEN` env (`Private-Token` header) | 30s (default) | 429/5xx retried, then pipeline stops |
+| Slack Webhook | HTTPS POST | Webhook URL (from env, `urlRef`) | 30s | Retried; then non-fatal: log + continue |
+| Teams Webhook | HTTPS POST (MessageCard JSON) | Webhook URL (from env, `urlRef`) | 30s | Retried; then non-fatal: log + continue |
+
+All three clients send through `httputil.Do`: up to 3 attempts on `429`, `502`, `503`, `504` with exponential backoff (1s, 2s) or the server's `Retry-After`; non-idempotent requests (POST/PUT/PATCH) are replayed only after `429`/`503`, which guarantee the server did not process them, never after a gateway `502`/`504`. Transport errors (no response) are retried only for GET/HEAD/OPTIONS. Transports are cloned from `http.DefaultTransport`, so `HTTPS_PROXY`/`NO_PROXY` apply. See DECISIONS.md ADR-014.
 
 ### Token / Secret Management
 **No token is stored in the config file.** Pattern:
@@ -244,16 +252,21 @@ The `init` command, on detecting a legacy `.release-it.json`, offers migration. 
 
 ```
 1. Find latest tag (from Git):
-   - Default: GetLatestTag() (most recent tag)
-   - If tagName template changed: filter via matchesTagNameFormat()
+   - Default: GetLatestTag() — tags merged into HEAD, filtered by tagMatch/tagExclude (path.Match globs),
+     parsed through the tagName template (git.VersionFromTag) and ordered by semver, not by date
+   - Explicit tagMatch that matches nothing → first release (never another template's tags)
+   - Default template + v-prefixed history → the prefix is inferred and kept (inferTagNameFormat)
+   - getLatestTagFromAllRefs: every ref; falls back to the highest raw tag when the template matches none
    - If PreReleaseID is set: GetLatestPreReleaseTagMerged() + GetLatestStableTagMerged() (branch-aware)
 
-2. Determine bump type:
-   - If --increment flag is set, use it
-   - Otherwise autoDetectIncrement(): compute from conventional commits
+2. Determine the next version (precedence):
+   - Explicit version (positional `2.0.0` / `-i 2.0.0`): used as-is, must be greater than the latest
+   - Increment keyword (positional, --increment, or config `increment`)
+   - Otherwise autoDetectIncrement() from the full commit messages (subject + body + footers):
      - feat → minor
-     - fix → patch
-     - feat! or BREAKING CHANGE → major
+     - fix / perf / revert → patch
+     - feat! or BREAKING CHANGE: footer → major
+   - `pre*` keywords combined with --preRelease keep the keyword (no "preprerelease")
 
 3. Increment the version:
    - SemVer: IncrementVersion(current, type, preReleaseID)
@@ -293,7 +306,9 @@ Solution: Use `git tag -l --merged HEAD --sort=-v:refname` — only look at tags
 |----------|----------|
 | Git command fails | Pipeline stops, error wrap with detailed message |
 | GitHub/GitLab token missing | Pipeline stops, "set X env var" message |
-| GitHub/GitLab API 4xx/5xx | Pipeline stops, parse error from response body |
+| GitHub/GitLab API 4xx | Pipeline stops, parsed message from the response body |
+| GitHub/GitLab API 429/502/503/504 | Retried with backoff (`internal/httputil`, POST only on 429/503); pipeline stops after the last attempt |
+| Missing/unparseable remote with a platform release enabled | Prerequisite error (was a silent skip) |
 | Webhook send fails | **Non-fatal**: warn log + pipeline continues |
 | "no commits since latest tag" | Graceful exit (info message, not error) |
 | Conventional commit lint fails | Pipeline stops; bypass with `--ignore-commit-lint` |
@@ -302,7 +317,7 @@ Solution: Use `git tag -l --merged HEAD --sort=-v:refname` — only look at tags
 | `requireCleanWorkingDir` violation | Pipeline stops, "uncommitted changes" |
 
 ### Idempotency
-- If tag already exists → "tag already exists" error (manual intervention required)
+- If the tag already exists at `HEAD` → skipped (`--no-increment` recovery flow); on a different commit → error (manual intervention required)
 - If release already exists → GitHub/GitLab API error (manual intervention)
 - If CHANGELOG.md already has content → preserves header and prepends new section (`UpdateChangelogFile`)
 
@@ -386,7 +401,8 @@ In CI mode, `Start()` is a no-op; `Stop()` writes the result line (to prevent th
 Placeholders like `${version}`, `${tagName}`, `${repo.host}`:
 - Config fields: `tagName: "v${version}"`, `commitMessage: "release v${version}"`
 - Hook commands: `"echo bumped to v${version}"`
-- `renderTagName()` and `hook.renderTemplate()` perform the substitution.
+- `renderTagName()` (only `${version}` — the tag template must stay reversible) and `renderReleaseTemplate()` / `hook.renderTemplate()` (all variables) perform the substitution.
+- Hooks also receive every variable as `RELEASE_<SCREAMING_SNAKE>` environment variables (`hook.envVars`).
 
 ### Error Wrap Convention
 ```go
@@ -412,7 +428,7 @@ On the git side, the `isWriteOperation()` map knows which git commands are write
 - **Single-goroutine pipeline** — no parallel platform release (GitHub + GitLab are sequential)
 - **No `context.Context`** — relies on OS Ctrl+C; no programmatic cancellation
 - **No plugin system** (intentional, see DECISIONS.md ADR-006) — extensions are done via config + hooks
-- **No rate limiting** — GitHub/GitLab API rate limits are the user's responsibility
+- **No proactive rate limiting** — a `429` is retried with `Retry-After`, but requests are not throttled ahead of time
 - **Single-threaded asset upload** — large binaries can be slow to upload
 - **Single-threaded notifications** — multiple webhooks are sent sequentially
 - **Git CLI dependency** — `go-git` is not used (intentional, see DECISIONS.md ADR-002)
@@ -425,7 +441,11 @@ On the git side, the `isWriteOperation()` map knows which git commands are write
 |------|-------------|
 | `cmd/release-it-go/main.go` | Entry point; ldflags inject version |
 | `internal/cli/root.go` | Cobra root, flags, runRelease() |
-| `internal/runner/runner.go` | Pipeline definition (`pipelineStep` slice) |
+| `internal/runner/runner.go` | Pipeline definition (`runPipeline` step list + `runSteps` hook dispatch) |
+| `internal/config/loader.go` | Strict decode (mapstructure `ErrorUnused`), unknown-key suggestions |
+| `internal/config/validate.go` | `Validate()` rules (tagName, increment, formats, hosts, timeouts, types) |
+| `internal/httputil/retry.go` | `Do` — retry/backoff policy for every outbound HTTP request |
+| `internal/testutil/gitenv.go` | `IsolateGit` — git config isolation for real-git tests |
 | `internal/runner/context.go` | ReleaseContext + UpdateVars |
 | `internal/config/config.go` | All config structs |
 | `internal/config/defaults.go` | Default values — touch when adding a new field |
