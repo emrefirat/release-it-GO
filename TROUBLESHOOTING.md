@@ -6,9 +6,9 @@ Common errors and how to fix them. Split by audience: **users** (running release
 
 ## User Issues
 
-### `tag already exists`
+### `tag vX.Y.Z already exists on a different commit`
 
-**Cause**: A tag with the target name is already in the repo (local or remote).
+**Cause**: The target tag exists locally and points at a commit other than `HEAD`. (A tag that already points at `HEAD` is *not* an error: `release-it-go --no-increment` reuses it — that is the recovery path after a failed push, see below.)
 
 **Fix**:
 ```bash
@@ -23,6 +23,12 @@ git push origin --delete v1.2.3
 ```
 
 If the tag was pushed and downloaded, deleting it may break consumers. Prefer bumping to the next version instead.
+
+**Recovering after a failed push** (commit and tag exist locally, remote rejected the push):
+```bash
+git pull --rebase            # or fix whatever the remote complained about
+release-it-go --no-increment # reuses the tag at HEAD, no new commit, no changelog rewrite
+```
 
 ---
 
@@ -106,7 +112,7 @@ For GitLab: `GITLAB_TOKEN` with `api` scope.
 
 **Cause**: There are no commits between the latest tag and `HEAD`. This is informational, not an error.
 
-**Fix**: Make a commit, then re-run. Or use `--no-increment` to re-release the current version (rarely needed).
+**Fix**: Make a commit, then re-run. Or use `--no-increment` to re-run the release for the current version — the recovery flow after a failed push: the release commit and the tag at `HEAD` are reused, the changelog is not regenerated, and the remaining steps (push, GitHub/GitLab release, notifications) run normally.
 
 ---
 
@@ -118,6 +124,14 @@ For GitLab: `GITLAB_TOKEN` with `api` scope.
 ```bash
 # See which commits failed
 release-it-go --check-commits -V
+
+# Check a single message before committing (also what the commit-msg hook runs)
+release-it-go --check-msg "fic: typo in type"
+#   ✗ Invalid commit message
+#     message:   fic: typo in type
+#     problem:   unknown type "fic" — did you mean "fix"?
+#     Expected:  <type>(<scope>): <description>   scope is optional
+#     Example:   fix: typo in type
 
 # Rewrite the commit message
 git commit --amend -m "fix: correct the previous message"
@@ -136,6 +150,28 @@ Or set in config:
 git:
   requireConventionalCommits: false
 ```
+
+`fixup!`, `squash!`, `amend!`, merge and revert commits are always accepted, so `git commit --fixup` works under the hook.
+
+---
+
+### `unknown config key "github.relase" (did you mean "release"?)`
+
+**Cause**: Config files are decoded strictly. A key the tool does not know — a typo, a wrong-case key (`hooks.preCommit` instead of `hooks.pre-commit`), or a key from another tool — is an error rather than a silently ignored setting.
+
+**Fix**: Rename the key as suggested. `release-it-go init --full-example` writes a reference file with every supported key.
+
+### `config: ignored "github.web": removed: ...` (warning)
+
+**Cause**: A key that older versions accepted but never acted on (`github.web`, `github.comments`, `gitlab.preRelease`, `changelog.addUnreleased`, `calver.fallbackIncrement`, …). The file still loads; the key has no effect.
+
+**Fix**: Delete the key to silence the warning.
+
+### `invalid configuration:` followed by a list
+
+**Cause**: Values are validated before anything runs: `git.tagName` must contain `${version}`, `increment` must be a keyword or a semver version, `calver.format` must be a supported format, `github.host` takes no scheme while `gitlab.origin` requires one, timeouts must not be negative, webhook and bumper types must be known.
+
+**Fix**: Each line names the field and the expected form.
 
 ---
 
@@ -236,15 +272,13 @@ If the log warns `no valid certificates found in CA file`, the configured file e
 
 ### Docker: `Author identity unknown`
 
-**Cause**: Git needs a user identity to create commits. The Docker image checks for this and exits early with a clear message (Phase 12).
+**Cause**: Git needs a user identity to create commits. The image's entrypoint requires `GIT_USER_NAME` and `GIT_USER_EMAIL` (it writes them to the container's git config) and exits early with a clear message when they are missing. `GIT_AUTHOR_*` / `GIT_COMMITTER_*` are not checked.
 
 **Fix**:
 ```bash
 docker run \
-  -e GIT_AUTHOR_NAME="Your Name" \
-  -e GIT_AUTHOR_EMAIL="you@example.com" \
-  -e GIT_COMMITTER_NAME="Your Name" \
-  -e GIT_COMMITTER_EMAIL="you@example.com" \
+  -e GIT_USER_NAME="Your Name" \
+  -e GIT_USER_EMAIL="you@example.com" \
   -e GITHUB_TOKEN \
   -v $(pwd):/workspace \
   release-it-go:latest --ci

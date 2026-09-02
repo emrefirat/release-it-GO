@@ -264,7 +264,7 @@ hooks:
   "after:github:release": []
   "before:gitlab:release": []
   "after:gitlab:release": []
-  # Git hooks — installed to .git/hooks/ via "release-it-go install"
+  # Git hooks — installed to .hooks/ (core.hooksPath) via "release-it-go hooks install"
   "pre-commit": ["go fmt ./...", "go vet ./..."]
   "commit-msg": ['release-it-go --check-msg "$1"']
   "pre-push": ["go test ./..."]

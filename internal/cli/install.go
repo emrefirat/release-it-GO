@@ -29,7 +29,9 @@ func newHooksInstallCommand() *cobra.Command {
 		Use:   "install",
 		Short: "Install git hooks from configuration",
 		Long: `Install git hooks defined in the hooks section of your
-release-it-go config file into .git/hooks/.
+release-it-go config file into .hooks/ and point git's core.hooksPath at it,
+so the hooks can be committed and shared. Hooks removed from the config are
+pruned on the next install; user-created hooks are never touched.
 
 Supported git hooks: pre-commit, commit-msg, pre-push,
 post-commit, post-merge, prepare-commit-msg.

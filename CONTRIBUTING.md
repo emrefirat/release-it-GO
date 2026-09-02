@@ -12,11 +12,11 @@ You need these installed locally:
 
 | Tool | Version | Why |
 |------|---------|-----|
-| Go | 1.26.3+ | Build the binary |
+| Go | 1.26.7+ | Build the binary (older toolchains carry known stdlib advisories that fail `make vuln`) |
 | Git | 2.x+ | Required at runtime (release-it-go wraps the git CLI) |
 | Make | any | Run `make check`, `make build`, etc. |
 | golangci-lint | latest | `make lint` and `make check` |
-| govulncheck | latest | `make vuln` and `make check` |
+| govulncheck | v1.7.0 (CI pin) | `make vuln` and `make check` |
 | Docker | 20+ (optional) | Only if you change Docker-related code |
 | GoReleaser | v2+ (optional) | Only if you change `.goreleaser.yaml` |
 
@@ -24,7 +24,7 @@ You need these installed locally:
 
 ```bash
 # Verify Go version
-go version  # must be 1.26.3 or newer
+go version  # must be 1.26.7 or newer
 
 # golangci-lint (required for `make check`)
 brew install golangci-lint                    # macOS
@@ -32,7 +32,7 @@ brew install golangci-lint                    # macOS
 curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
 
 # govulncheck (required for `make check`)
-go install golang.org/x/vuln/cmd/govulncheck@latest
+go install golang.org/x/vuln/cmd/govulncheck@v1.7.0  # same pin as CI
 
 # gosec (optional, used for ad-hoc security audits)
 go install github.com/securego/gosec/v2/cmd/gosec@latest
@@ -110,10 +110,10 @@ make coverage   # opens coverage.html
 ### 6. Validate
 
 ```bash
-make check   # fmt + vet + lint + vuln + test + build
+make check   # fmt + vet + lint + test + build + vuln
 ```
 
-This **must pass** before you commit. The CI runs the same checks.
+This **must pass** before you commit. CI runs the same checks (`build + vet + test + race + coverage gate (70%) + lint + govulncheck`) plus a macOS/Windows build-and-unit matrix (Windows is advisory). `test/integration` builds the binary and drives real git repositories, so `git` must be on `PATH`.
 
 ### 7. Commit
 
@@ -157,7 +157,7 @@ This is a **project rule** (see `.claude/rules/progress-tracking.md`):
 - Title: same conventional commit format as your main commit
 - Description: what changed, why, and how you tested it
 - Link the issue if there is one
-- Check the CI passes (it runs `build + vet + test + race + lint`)
+- Check the CI passes (it runs `build + vet + test + race + coverage gate + lint + govulncheck`, plus the macOS/Windows matrix)
 
 ---
 
@@ -245,11 +245,14 @@ These are real things that have bitten contributors. Read these before they bite
 
 ## Release Process (Maintainers Only)
 
-This project releases itself with itself (self-hosting). See `.github/workflows/release.yml`:
+This project is meant to release itself with itself (self-hosting). `.github/workflows/release.yml` is started by hand (`workflow_dispatch`, optional increment):
 
-1. release-it-go creates the tag (`chore(release): release v0.1.x`)
-2. GoReleaser is triggered by the tag and builds multi-platform binaries
-3. GitHub Release is published with assets
+1. The full test suite runs; nothing is tagged if it fails
+2. release-it-go creates the release commit (`chore(release): release v0.x.y`) and the tag
+3. Commit and tag are pushed in one `git push --atomic` (no orphan tag on a rejected push)
+4. GoReleaser is triggered by the tag, builds multi-platform binaries and publishes the GitHub Release
+
+Note: `v0.2.0` and `v0.3.0` were tagged manually (no release commit exists for them). The workflow is the intended path from here on.
 
 To cut a release locally:
 
