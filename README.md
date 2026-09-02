@@ -8,7 +8,7 @@ Automate versioning and release workflows — **without npm or Node.js**.
 
 - **Zero dependencies** — single Go binary, no npm/Node.js required
 - **Git automation** — commit, tag, push with configurable templates
-- **GitHub & GitLab releases** — create releases, upload assets, post comments
+- **GitHub & GitLab releases** — create releases, upload assets
 - **Conventional Commits** — parse, validate, and generate changelogs from commit history
 - **Keep a Changelog** — alternative changelog format support
 - **Multi-file version bumping** — update version in JSON, YAML, TOML, INI, or plain text files
@@ -177,6 +177,7 @@ git:
   requireCleanWorkingDir: true          # Abort if working directory is dirty
   requireUpstream: true                 # Require upstream tracking branch
   requireCommits: true                  # Require new commits since last tag
+  commitsPath: ""                       # Only count commits touching this path (monorepo)
   requireConventionalCommits: true      # Require conventional commit format
   getLatestTagFromAllRefs: false        # Search all refs for latest tag
   addUntrackedFiles: false              # Stage untracked files before commit
@@ -186,13 +187,12 @@ git:
 
 ### GitHub
 
-Create GitHub releases, upload assets, and comment on issues/PRs.
+Create GitHub releases and upload assets.
 
 ```yaml
 github:
   release: false                        # Create a GitHub release
   releaseName: "Release ${version}"     # Release title
-  releaseNotes: ""                      # Custom release notes template
   draft: false                          # Create as draft
   preRelease: false                     # Mark as pre-release
   makeLatest: true                      # Mark as latest release (default: true)
@@ -203,11 +203,6 @@ github:
   timeout: 0                            # API timeout in seconds (0 = default)
   proxy: ""                             # HTTP proxy URL
   skipChecks: false                     # Skip API pre-flight checks
-  web: false                            # Open release URL in browser
-  comments:
-    submit: false                       # Post comments on resolved issues/PRs
-    issue: ":rocket: _This issue has been resolved in v${version}._"
-    pr: ":rocket: _This pull request is included in v${version}._"
   discussionCategoryName: ""            # GitHub Discussions category
 ```
 
@@ -221,10 +216,9 @@ Create GitLab releases with milestone and asset support.
 gitlab:
   release: false                        # Create a GitLab release
   releaseName: "Release ${version}"     # Release title
-  releaseNotes: ""                      # Custom release notes template
-  preRelease: false                     # Mark as upcoming release
   milestones: []                        # Associated milestone titles
   assets: []                            # Release asset links
+  useGenericPackageRepositoryForAssets: true  # false = project uploads API (no Package Registry)
   tokenRef: "GITLAB_TOKEN"             # Env var with GitLab token
   tokenHeader: "Private-Token"          # Auth header name
   origin: ""                            # GitLab URL (for self-hosted)
@@ -246,9 +240,7 @@ changelog:
   infile: "CHANGELOG.md"               # Output file (empty string = don't write file)
   header: "# Changelog"                # File header
   keepAChangelog: false                 # Use Keep a Changelog format
-  addUnreleased: false                  # Add [Unreleased] section
-  keepUnreleased: false                 # Keep [Unreleased] after release
-  addVersionUrl: false                  # Add compare URLs for versions
+  addVersionUrl: true                   # Compare links on version headings
 ```
 
 **Conventional Changelog** groups commits by type:
@@ -334,7 +326,6 @@ bumper:
 | `path` | Dot-separated path for JSON/YAML/TOML files (e.g. `package.version`) |
 | `type` | File format: `json`, `yaml`, `toml`, `ini`, `text` (auto-detected from extension) |
 | `prefix` | Text prefix before version string |
-| `versionPrefix` | Version prefix (e.g. `v`) |
 | `consumeWholeFile` | Treat entire file content as the version string |
 
 ### CalVer
@@ -345,8 +336,6 @@ Use Calendar Versioning instead of Semantic Versioning.
 calver:
   enabled: false                        # Enable CalVer (disables SemVer)
   format: "yy.mm.minor"               # Version format
-  increment: "calendar"                 # Increment strategy
-  fallbackIncrement: "minor"            # Fallback when calendar hasn't changed
 ```
 
 When enabled, versions follow the calendar format (e.g. `26.02.0`, `26.02.1`). The minor component resets when the year or month changes.

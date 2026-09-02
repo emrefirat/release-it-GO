@@ -4,6 +4,9 @@
 
 ### Features
 
+* strict configuration loading: unknown keys are rejected at startup with a `did you mean` suggestion (all formats), and values are validated before anything runs — `git.tagName` must contain `${version}`, `increment`/`-i` must be a keyword or a semver version, `preReleaseId`, `calver.format`, `github.host`/`gitlab.origin` schemes, timeouts, webhook/bumper types and `changelog.preset` are checked. Legacy npm keys are normalized for YAML and TOML files too, not only JSON.
+* `git.commitsPath` limits `requireCommits`, commit lint, the changelog and notifications to commits touching a path (monorepos); `changelog.addVersionUrl` switches the compare link on version headings; `gitlab.useGenericPackageRepositoryForAssets: false` uploads assets through the project uploads API. All three were documented but ignored.
+* `before:`/`after:` lifecycle hooks for every pipeline step: `prerequisites`, `commitlint`, `version`, `changelog`, `notification`.
 * positional increment and explicit target versions, npm style: `release-it-go minor`, `release-it-go 1.5.0`, `-i 1.5.0` (previously positional args were silently ignored). Invalid arguments are rejected with a clear error.
 * v-prefix tag inference: with the default `tagName`, a repo whose latest tag is v-prefixed keeps the prefix for new tags (and conventional-commit auto-increment now works there). Writing `tagName` in the config file disables the inference.
 * template variables beyond `${version}` (`${branchName}`, `${latestVersion}`, `${repo.*}`, …) now render in `git.commitMessage`, `git.tagAnnotation`, and GitHub/GitLab `releaseName`.
@@ -11,6 +14,8 @@
 
 ### Bug Fixes
 
+* conflicting mode flags (`--check-msg` with `--dry-run`, `--changelog` with `--release-version`, `minor --no-increment`, …) are an error instead of a silent priority order; `-i bogus` fails before the pipeline starts; `--dry-run` is honored by `init`, `hooks install` and `hooks remove` (they wrote files and set `core.hooksPath`).
+* removed configuration keys that no code path ever read — `git.changelog`, `github.releaseNotes`, `github.web`, `github.comments`, `gitlab.releaseNotes`, `gitlab.preRelease`, `changelog.addUnreleased`, `changelog.keepUnreleased`, `calver.increment`, `calver.fallbackIncrement`, `bumper.out[].versionPrefix`. Existing config files keep loading; each of these keys now prints a warning instead of being silently ignored.
 * the bumper no longer truncates plain-text targets (README.md, scripts) to the bare version: the current version is replaced in place, and the release fails before any commit when it cannot be found (`consumeWholeFile: true` remains the explicit whole-file opt-in).
 * `--only-version` and `--no-increment` now run the same prerequisites, commit lint and token checks as a normal release, so problems surface before anything is committed; `--no-increment` no longer writes an empty changelog section or creates an extra commit, making it a working recovery flow after a failed push. `before:bump` hooks in `--only-version` now see `${version}`. `--changelog` and `--release-version` never prompt.
 * tag templates with literal text around `${version}` (e.g. `release-${version}`) work across releases; `getLatestTagFromAllRefs: true` on a v-tagged repo no longer restarts at `0.1.0`; an explicit `tagMatch` that matches nothing is a first release rather than another package's tag.

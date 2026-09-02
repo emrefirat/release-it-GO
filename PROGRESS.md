@@ -35,7 +35,7 @@
 | 25 | npm Parity Batch | Complete | 100% |
 | 26 | Hardening (audit structural findings) | Complete | 100% |
 | 27 | Stability Fixes (2026-09-02 second audit) | Complete | 100% |
-| 28 | Parameter Validation & Dead-Field Cleanup | Not Started | 0% |
+| 28 | Parameter Validation & Dead-Field Cleanup | Complete | 100% |
 | 29 | Test Hygiene & Distribution/CI Trust (absorbs planned Phase 24) | Not Started | 0% |
 | 30 | Documentation Sync | Not Started | 0% |
 
@@ -728,6 +728,29 @@
 
 ---
 
+## Phase 28: Parameter Validation & Dead-Field Cleanup
+
+**Status:** Complete
+**PRD:** `docs/phase_28.md`
+
+### To Do
+
+- [x] Strict config decoding: unknown keys are errors with `did you mean` suggestions (JSON/YAML/TOML)
+- [x] `config.Validate()` after load and after flag overrides: tagName `${version}`, increment, preReleaseId, calver.format, github.host / gitlab.origin schemes, timeouts, webhook + bumper types, changelog.preset
+- [x] Legacy npm keys (`npm`, `versionFile`, `changelogFile`, `plugins`, array `requireBranch`, object `assets`) normalized in every format
+- [x] Hook fields for all pipeline steps (`before/after:prerequisites|commitlint|version|changelog|notification`)
+- [x] Mode flag conflicts rejected up front; `-i` validated before the pipeline; `--dry-run` honored by `init` / `hooks install` / `hooks remove`
+- [x] Wired: `git.commitsPath` (pathspec on every history query), `changelog.addVersionUrl` (default true), `gitlab.useGenericPackageRepositoryForAssets` (`false` → project uploads API, link_type `other`)
+- [x] Removed 11 dead keys (loaded with a warning): `git.changelog`, `github.releaseNotes|web|comments`, `gitlab.releaseNotes|preRelease`, `changelog.addUnreleased|keepUnreleased`, `calver.increment|fallbackIncrement`, `bumper.out[].versionPrefix`; `Git.GenerateChangelog` and `NewCalVer` increment parameters deleted with them
+- [x] README / full-example YAML aligned with the real key set (round-trip test loads the example under strict decoding)
+
+### Notes
+
+- `github.comments` is deliberately a warning, not an error: `PostComment` exists, but the `Closes #N` inference needed to drive it is a separate feature; the key is kept out of docs/defaults until then.
+- `useGenericPackageRepositoryForAssets` defaults to **true** (the historical behavior) although npm defaults to false — flipping it would silently change where existing users' assets land.
+
+---
+
 ## Bugs
 
 - [x] BUG: First-release changelog "exit status 128" error (2026-02-16) → When `LatestVersion=0.0.0`, the `v0.0.0` tag was searched but no such tag exists. The `latestVersionToTag()` helper was added: returns empty for `0.0.0` or empty string, so `GetCommitsSinceTag("")` returns all commits. 3 sites affected: `RunChangelogOnly`, `generateChangelog`, `autoDetectIncrement`.
@@ -776,6 +799,12 @@
 - [x] BUG: `hooks install` never pruned hooks removed from config (2026-08-25) → User report: preCommit was deleted from config, `hooks install` re-run, yet the pre-commit hook kept firing. `Install()` was purely additive — it only wrote configured hooks and never looked at previously installed managed scripts, and with an empty hooks section the CLI returned early before the installer ran at all, so `.hooks/<name>` + `core.hooksPath` stayed active forever. Fix: `Install()` now reconciles — managed hooks missing from config are deleted (`✓ Removed <name> (no longer in config)`), user-created hooks are never touched, hooks are written in deterministic `supportedGitHooks` order, `.hooks/` is no longer created when nothing is configured, and when a prune empties `.hooks/` entirely `core.hooksPath` is reset. CLI early-return removed so pruning runs even with an empty hooks section. 6 new unit tests + 2 new CLI tests.
 - [x] BUG: `TestInstall_SkipsEmptyCommands` mutated the developer's repo git config (2026-08-25) → The test ran `Install()` without the `commandExecutor` mock while one hook (`{""}`) was actually written, so a real `git config core.hooksPath .hooks` executed in the test cwd — the release-it-go repo itself — silently disabling all repo git hooks (no `.hooks/` dir exists here). Found while investigating the prune bug: the repo's local config had the stray `core.hooksPath=.hooks` entry. Fix: `mockGitCommands(t)` added to the test; the polluted config entry was manually unset.
 - [x] BUG: With `push: false`, "no upstream configured" error still appeared (2026-02-18) → `checkUpstream()` only looked at the `requireUpstream` flag, not the `push` state. In manually written configs with `push: false` and `requireUpstream` unspecified, the default `true` triggered the upstream check. The init wizard masked this by setting `requireUpstream = false`, but the actual check function had the bug. Fix: `!g.config.Push` check added inside `checkUpstream()`; when push is disabled, the upstream check is skipped. Test added.
+
+- [x] BUG: Unknown config keys were silently ignored (2026-09-02) → viper decoded leniently, so `hooks.preCommit` (wrong case), `github.relase: true` and any typo loaded as if absent; users believed a feature was on. Fix: mapstructure strict decode (`ErrorUnused`) with `did you mean` suggestions; legacy npm keys are stripped first so old configs still load.
+- [x] BUG: Invalid values failed late or never (2026-09-02) → `tagName` without `${version}` created a commit then failed at the tag; `-i bogus` failed after prerequisites; negative timeouts waited forever; unknown `calver.format` silently meant `yy.mm.minor`; `github.host: "https://…"` produced `https://https://`. Fix: `config.Validate()` at load and after CLI overrides, table-driven tests per rule.
+- [x] BUG: Mode flags combined silently by if-order (2026-09-02) → `--check-msg` with `--dry-run`, `--changelog` with `--release-version`, `minor --no-increment` ran whichever branch came first. Fix: `checkModeFlagConflicts` errors with both flag names.
+- [x] BUG: `--dry-run` ignored by `init` and `hooks install` (2026-09-02) → both wrote files and set `core.hooksPath`. Fix: `Installer.DryRun` + dry-run guards in the init writer paths, state-asserting tests (nothing on disk, git config untouched).
+- [x] BUG: `git.commitsPath`, `changelog.addVersionUrl`, `gitlab.useGenericPackageRepositoryForAssets` were documented no-ops (2026-09-02) → history queries never received a pathspec, compare links were always emitted, uploads always used the Generic Package Registry. Fix: wired (see Phase 28); 11 further keys that nothing read were removed and now warn on load.
 
 ---
 
@@ -857,6 +886,7 @@
 | 2026-08-26 | Claude | fix: `--check-msg` diagnostic redesigned (scannable message/problem/Expected/Example/Types layout, type suggestions, corrected example); single type registry (`build` restored in help), fixup!/squash!/amend! auto-pass, no-config warning silenced in lint modes, `--check-commits -V` de-duplicated, COMMIT_EDITMSG blank/comment lines skipped |
 | 2026-09-02 | Claude | Second full audit (4 review streams) after Phases 23-26; 15 commits pushed; PRDs for Phases 27-30 created from the findings (5 critical: bumper text overwrite, --no-increment recovery, test foot-gun, no config validation, only-version prerequisite bypass) |
 | 2026-09-02 | Claude | Phase 27 complete: 19 stability items (bumper text in-place, unified runPipeline entry points, --no-increment recovery with defaults, tag templates via VersionFromTag, pre* increments, explicit version ordering, safer retries, proxy env, explicit make_latest, tag-based compare links, git add -u staging, remote/pushRepo checks, auto-detect logging, cli test foot-gun removed) |
+| 2026-09-02 | Claude | Phase 28 complete: strict config loading with unknown-key suggestions, `Validate()` rules, legacy-key normalization for all formats, hook fields for every step, mode-flag conflict errors, `--dry-run` in init/hooks, `commitsPath` / `addVersionUrl` / project-uploads wiring, 11 dead keys removed with load-time warnings, docs aligned |
 
 ---
 
