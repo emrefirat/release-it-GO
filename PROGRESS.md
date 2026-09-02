@@ -34,7 +34,7 @@
 | 23 | Critical Correctness & Security Fixes (2026-08 audit P0) | Complete | 100% |
 | 25 | npm Parity Batch | Complete | 100% |
 | 26 | Hardening (audit structural findings) | Complete | 100% |
-| 27 | Stability Fixes (2026-09-02 second audit) | In Progress | 0% |
+| 27 | Stability Fixes (2026-09-02 second audit) | Complete | 100% |
 | 28 | Parameter Validation & Dead-Field Cleanup | Not Started | 0% |
 | 29 | Test Hygiene & Distribution/CI Trust (absorbs planned Phase 24) | Not Started | 0% |
 | 30 | Documentation Sync | Not Started | 0% |
@@ -699,6 +699,35 @@
 
 ---
 
+## Phase 27: Stability Fixes (2026-09-02 second audit)
+
+**Status:** Complete
+**PRD:** `docs/phase_27.md`
+
+### To Do
+
+- [x] cli Execute tests moved to temp repos with real assertions (they could release the real repository)
+- [x] Bumper text targets edited in place; unknown/absent current version fails before any commit
+- [x] All entry points (`--only-version`, `--no-increment`) run prerequisites + commit lint + token check via `runPipeline`
+- [x] `--no-increment` recovery works with the shipped defaults (no empty changelog section, no extra commit)
+- [x] `before:bump` hooks in `--only-version` see `${version}` / `RELEASE_VERSION`
+- [x] `--changelog` / `--release-version` never prompt
+- [x] Tag templates beyond `v${version}` (`git.VersionFromTag`); all-refs continuity fallback; explicit `tagMatch` never falls back
+- [x] `-i pre*` + `--preRelease` no longer produces `prepreminor`; explicit version must be greater than latest
+- [x] `bumper.in` + no tags → changelog uses all commits
+- [x] Retry: POST replayed only on 429/503; proxy environment honored; `make_latest` sent explicitly
+- [x] Compare links use tag names
+- [x] Staging back to `git add . --update` (hook-modified tracked files are committed)
+- [x] Missing/unparseable remote with a platform release enabled is a prerequisite error; `pushRepo` drives repo info; trailing-slash remotes parse
+- [x] Auto-detect git failures are logged
+
+### Notes
+
+- Two existing tests encoded bugs as expected behavior (whole-file text overwrite, targeted staging) and were rewritten against the corrected contract.
+- The Phase 26 targeted-staging change is reverted on purpose: with `requireCleanWorkingDir` the tree is clean at start, so every tracked modification made during the release (bumper, changelog, hook output) belongs to the release commit — npm parity.
+
+---
+
 ## Bugs
 
 - [x] BUG: First-release changelog "exit status 128" error (2026-02-16) → When `LatestVersion=0.0.0`, the `v0.0.0` tag was searched but no such tag exists. The `latestVersionToTag()` helper was added: returns empty for `0.0.0` or empty string, so `GetCommitsSinceTag("")` returns all commits. 3 sites affected: `RunChangelogOnly`, `generateChangelog`, `autoDetectIncrement`.
@@ -714,6 +743,19 @@
 - [x] BUG: `latestVersionToTag()` hardcoded a `v` prefix instead of using the `tagName` template from config (2026-03-23) → In environments without a config file (default `tagName: "${version}"`), the tag was created as `0.1.0-main.0` while the changelog searched for `v0.1.0-main.0`. Fix: `latestVersionToTag()` now uses `renderTagName(tagNameTemplate, version)`. The `v` prefix is stripped from the version before applying the template, preventing `vv` duplication.
 - [x] BUG: With changelog disabled, `git commit` produced "nothing to commit" error (2026-03-30) → With changelog and bumper disabled, there are no staged changes, but commit was attempted. Fix: `HasStagedChanges()` check added; if there are no staged changes, the commit is skipped and a verbose log entry is written.
 - [x] BUG: When `tagName` config changed, old-format tags were being found as latest (2026-03-30) → Transitioning from `v${version}` → `${version}`, `GetLatestTag` still found `v1.5.0`, and the changelog searched for the `1.5.0` tag (which doesn't exist). Fix: `matchesTagNameFormat()` added for tag format filtering. A fallback mechanism for version continuity across format transitions, plus a raw tag fallback in changelog.
+- [x] BUG: bumper truncated any non-structured target to the bare version (2026-09-02) → `README.md` in `bumper.out` became `1.1.0` and was committed; `consumeWholeFile: false` was a no-op. Fix: in-place replacement of the current version; refusal (before any commit) when it is unknown or absent, pointing at `consumeWholeFile: true`.
+- [x] BUG: `--no-increment` recovery failed with the shipped defaults (2026-09-02) → an empty duplicate changelog section was written and committed, then the tag failed as "on a different commit". Fix: zero new commits leave the changelog untouched; entry points share `runPipeline`.
+- [x] BUG: `--only-version` / `--no-increment` skipped prerequisites and token checks (2026-09-02) → missing token surfaced after commit/tag/push. Fix: unified pipeline. Also `before:bump` saw an empty `${version}` in `--only-version`.
+- [x] BUG: cli `Execute --ci` tests could release the real repository (2026-09-02) → tests ran from the package dir where the project's `push: false` config is not found; `internal/cli/CHANGELOG.md` was committed that way. Fix: temp repos + assertions.
+- [x] BUG: tag templates other than `${version}`/`v${version}` failed on the second release (2026-09-02) → nothing stripped the template before parsing; the pre-release lookup split on the template's own hyphen. Fix: `git.VersionFromTag` at every parse site.
+- [x] BUG: `getLatestTagFromAllRefs: true` on a v-tagged repo restarted at `0.1.0` (2026-09-02) → the continuity fallback only existed on the describe path. Fix: highest raw tag fallback for derived filters; explicit `tagMatch` never falls back.
+- [x] BUG: `-i preminor` + `--preRelease` → "unsupported increment type: prepreminor" (2026-09-02) → explicit `pre*` keywords are used as-is.
+- [x] BUG: retry replayed POSTs after 502/504 (2026-09-02) → duplicate-release risk behind gateways; non-idempotent methods now retry only 429/503.
+- [x] BUG: GitHub/GitLab clients ignored `HTTPS_PROXY`/`NO_PROXY` (2026-09-02) → transports cloned from `http.DefaultTransport`.
+- [x] BUG: `github.makeLatest: false` was a no-op (2026-09-02) → `make_latest` always sent explicitly.
+- [x] BUG: changelog compare links used bare versions (2026-09-02) → 404 on v-tagged repos; tag names are passed to the renderer.
+- [x] BUG: targeted staging dropped hook-modified files from the release commit (2026-09-02) → back to `git add . --update`.
+- [x] BUG: platform release with an unparseable remote was skipped silently with "Done" (2026-09-02) → prerequisite error; `pushRepo` used for repo info; trailing-slash URLs accepted.
 - [x] BUG: `--check-msg` diagnostic was cramped and misleading (2026-08-26, user feedback) → the block mimicked commitlint's one-liner with `·` separators; users reported it as hard to read. Eight issues fixed together: (1) `-V` type list omitted `build` (accepted by the linter) — lists are now derived from one `validTypes` registry; (2) help claimed "description must start with lowercase", a rule never enforced — replaced by the enforced rule (type must be lowercase); (3) `fixup!`/`squash!`/`amend!` were rejected, breaking `git commit --fixup` under the hook — now auto-pass like merge/revert; (4) the "No config file found" warning fired on every hook run for a mode that never reads config — suppressed in check modes; (5) `--check-commits -V` listed each failure twice — the error now carries only the summary when the list was printed; (6) `%-18s` padding on colored text misaligned columns on real terminals — labels are padded as plain text; (7) COMMIT_EDITMSG leading blank/`#` lines were mistaken for the subject — skipped like git does; (8) unknown types get a `did you mean "fix"?` suggestion (case + edit distance ≤ 2) and the example is the user's own message with the type corrected; the redundant trailing `Error:` line is gone (`ErrCheckFailed` sentinel).
 - [x] BUG: bumper rewrites destroyed file formatting (2026-08-26) → JSON keys were alphabetized with forced 2-space indent and HTML-escaped &, YAML lost every comment, TOML lost layout — each release commit carried a massive unrelated diff on package.json/Chart.yaml/Cargo.toml. Fix: targeted single-value splice, proven by re-parse + whole-tree comparison; unprovable edits fall back to the old full re-marshal.
 - [x] BUG: spinner had a data race and could leak a second animator (2026-08-26) → the goroutine re-read `s.done` unlocked while Start reassigned it; a Stop→Start pair within the 80ms sleep left two animators printing. Fix: channel captured at spawn, previous animator closed by Start, ticker-based select exits immediately.
@@ -814,6 +856,7 @@
 | 2026-08-26 | Claude | Phase 26 complete (hardening): ErrNoCommits sentinel + unified git error wrappers, spinner race fix, Windows hooks + RELEASE_* env vars, real glob + semver tag selection, targeted staging, shared HTTP retry (httputil), format-preserving bumper with proof-based splice, push recovery guidance |
 | 2026-08-26 | Claude | fix: `--check-msg` diagnostic redesigned (scannable message/problem/Expected/Example/Types layout, type suggestions, corrected example); single type registry (`build` restored in help), fixup!/squash!/amend! auto-pass, no-config warning silenced in lint modes, `--check-commits -V` de-duplicated, COMMIT_EDITMSG blank/comment lines skipped |
 | 2026-09-02 | Claude | Second full audit (4 review streams) after Phases 23-26; 15 commits pushed; PRDs for Phases 27-30 created from the findings (5 critical: bumper text overwrite, --no-increment recovery, test foot-gun, no config validation, only-version prerequisite bypass) |
+| 2026-09-02 | Claude | Phase 27 complete: 19 stability items (bumper text in-place, unified runPipeline entry points, --no-increment recovery with defaults, tag templates via VersionFromTag, pre* increments, explicit version ordering, safer retries, proxy env, explicit make_latest, tag-based compare links, git add -u staging, remote/pushRepo checks, auto-detect logging, cli test foot-gun removed) |
 
 ---
 
