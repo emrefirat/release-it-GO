@@ -8,8 +8,12 @@ on:
 permissions:
   contents: read
 
+env:
+  COVERAGE_MIN: 70
+
 jobs:
   verify:
+    name: Build, test, coverage (ubuntu)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -25,6 +29,9 @@ jobs:
       - name: Download dependencies
         run: go mod download
 
+      - name: Verify module checksums
+        run: go mod verify
+
       - name: Build
         run: go build ./...
 
@@ -37,17 +44,45 @@ jobs:
       - name: Race detector
         run: go test ./internal/... -race -count=1 -timeout 300s
 
-      - name: Test coverage
+      - name: Coverage gate (internal packages)
         run: |
           go test ./internal/... -coverprofile=coverage.out -count=1
-          go tool cover -func=coverage.out | tail -1
-          echo "### Coverage by package" >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          go tool cover -func=coverage.out | grep -E "total:|internal/" | tail -20 >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          total=$(go tool cover -func=coverage.out | tail -1 | awk '{sub("%", "", $3); print $3}')
+          echo "total coverage: ${total}% (gate: ${COVERAGE_MIN}%)"
+          {
+            echo "### Coverage by package (total ${total}%, gate ${COVERAGE_MIN}%)"
+            echo '```'
+            go tool cover -func=coverage.out | grep -E "total:|internal/" | tail -20
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if ! awk -v t="$total" -v min="$COVERAGE_MIN" 'BEGIN { exit (t + 0 >= min) ? 0 : 1 }'; then
+            echo "::error::total coverage ${total}% is below the ${COVERAGE_MIN}% gate"
+            exit 1
+          fi
 
       - name: Build binary
         run: go build -ldflags="-s -w" -o bin/release-it-go ./cmd/release-it-go
+
+  cross-platform:
+    name: Build & unit tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    # Windows is advisory until the unit suite has been proven there: the
+    # hook and git-hook code paths were written with Windows in mind but
+    # never executed on it. macOS is blocking.
+    continue-on-error: ${{ matrix.os == 'windows-latest' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build
+        run: go build ./...
+      - name: Unit tests
+        run: go test ./internal/... -count=1 -timeout 300s
 
   lint:
     runs-on: ubuntu-latest
@@ -60,14 +95,15 @@ jobs:
         with:
           version: v2.10.1
 
-  # security:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: actions/setup-go@v5
-  #       with:
-  #         go-version-file: go.mod
-  #     - name: Install govulncheck
-  #       run: go install golang.org/x/vuln/cmd/govulncheck@latest
-  #     - name: Vulnerability scan
-  #       run: govulncheck ./...
+  security:
+    name: Vulnerability scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
+      - name: Vulnerability scan
+        run: govulncheck ./...
