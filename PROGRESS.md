@@ -41,7 +41,7 @@
 
 **Last Updated:** 2026-09-02
 **Active Developer:** Claude
-**Current Version:** v0.4.0 (Phases 23–30, two audit cycles)
+**Current Version:** v0.4.1 (Phases 23–30, two audit cycles)
 
 ---
 

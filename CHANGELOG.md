@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## [0.4.1](https://github.com/emrefirat/release-it-GO/compare/v0.4.0...v0.4.1) (2026-09-03)
 
 ### Bug Fixes
 
