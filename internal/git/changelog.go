@@ -2,6 +2,7 @@ package git
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -117,12 +118,9 @@ func (g *Git) GetCommitCountSinceTag(tag string) (int, error) {
 		return 0, err
 	}
 
-	trimmed := strings.TrimSpace(out)
-	count := 0
-	for _, ch := range trimmed {
-		if ch >= '0' && ch <= '9' {
-			count = count*10 + int(ch-'0')
-		}
+	count, err := strconv.Atoi(strings.TrimSpace(out))
+	if err != nil {
+		return 0, fmt.Errorf("parsing commit count %q: %w", strings.TrimSpace(out), err)
 	}
 	return count, nil
 }

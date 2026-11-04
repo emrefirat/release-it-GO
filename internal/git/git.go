@@ -4,6 +4,7 @@
 package git
 
 import (
+	"bytes"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -12,12 +13,29 @@ import (
 	applog "github.com/emrefirat/release-it-GO/internal/log"
 )
 
-// commandExecutor runs a command and returns its output.
+// commandExecutor runs a command and returns its trimmed stdout. On failure
+// git's stderr is folded into the returned error so callers keep the reason.
 // This is a function variable to allow mocking in tests.
+//
+// stdout and stderr are captured separately on purpose: every parser in this
+// package (branch name, porcelain status, describe, tag lists, rev-list
+// counts) reads the returned string, and with CombinedOutput any stderr
+// chatter — GIT_TRACE=1 lines, "warning: tag 'x' is externally known as",
+// "refname 'HEAD' is ambiguous" — was parsed as if it were data.
 var commandExecutor = func(name string, args ...string) (string, error) {
 	cmd := exec.Command(name, args...)
-	out, err := cmd.CombinedOutput()
-	return strings.TrimSpace(string(out)), err
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	out := strings.TrimSpace(stdout.String())
+	if err != nil {
+		if msg := strings.TrimSpace(stderr.String()); msg != "" {
+			return out, fmt.Errorf("%s: %w", msg, err)
+		}
+		return out, err
+	}
+	return out, nil
 }
 
 // readOnlyCommands lists git subcommands that don't modify state.
