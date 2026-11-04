@@ -2,9 +2,9 @@ package release
 
 import (
 	"net/http"
-	"time"
 	"os"
 	"testing"
+	"time"
 )
 
 func TestGetToken(t *testing.T) {

@@ -23,11 +23,11 @@ import (
 
 // GitLabClient implements ReleaseProvider for GitLab.
 type GitLabClient struct {
-	config    *config.GitLabConfig
-	repoInfo  *git.RepoInfo
-	logger    *applog.Logger
-	dryRun    bool
-	client    *http.Client
+	config   *config.GitLabConfig
+	repoInfo *git.RepoInfo
+	logger   *applog.Logger
+	dryRun   bool
+	client   *http.Client
 	// uploadClient sends asset bodies without the API client's overall
 	// timeout (see newUploadClient). Nil falls back to client.
 	uploadClient *http.Client
