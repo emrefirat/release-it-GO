@@ -11,7 +11,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/emrefirat/release-it-GO/internal/config"
 )
@@ -129,6 +128,11 @@ func (i *Installer) Install(hooks map[string][]string) error {
 		script := generateScript(name, hooks[name])
 		if err := os.WriteFile(hookPath, []byte(script), 0755); err != nil {
 			return fmt.Errorf("writing hook %s: %w", name, err)
+		}
+		// WriteFile keeps an existing file's mode: a managed hook that lost
+		// its executable bit stayed broken across re-installs.
+		if err := os.Chmod(hookPath, 0755); err != nil {
+			return fmt.Errorf("setting permissions on hook %s: %w", name, err)
 		}
 		installed++
 		fmt.Printf("  ✓ Installed %s\n", name)
@@ -295,13 +299,14 @@ func HooksFromConfig(cfg *config.HooksConfig) map[string][]string {
 	return hooks
 }
 
-// generateScript creates a shell script for a git hook.
+// generateScript creates a shell script for a git hook. The output depends
+// only on the configuration — no timestamp — so re-running install never
+// produces a spurious diff in the committed .hooks/ directory.
 func generateScript(hookName string, commands []string) string {
 	var b strings.Builder
 	b.WriteString("#!/bin/sh\n")
 	b.WriteString(managedHeader + "\n")
 	fmt.Fprintf(&b, "# Hook: %s\n", hookName)
-	fmt.Fprintf(&b, "# Generated: %s\n", time.Now().Format("2006-01-02"))
 	b.WriteString("\nset -e\n\n")
 	for _, cmd := range commands {
 		b.WriteString(cmd + "\n")

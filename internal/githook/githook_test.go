@@ -611,3 +611,38 @@ func TestInstall_DryRun_NoWrites(t *testing.T) {
 		t.Errorf("dry-run must not touch git config, got %d calls", gitCalls)
 	}
 }
+
+func TestInstall_IsIdempotentAndRestoresExecutableBit(t *testing.T) {
+	dir := t.TempDir()
+	hooksDir := filepath.Join(dir, hooksDirectory)
+	mockGitCommands(t)
+
+	hooks := map[string][]string{"pre-commit": {"go vet ./..."}}
+	inst := NewInstaller(dir, false)
+	if err := inst.Install(hooks); err != nil {
+		t.Fatal(err)
+	}
+	hookPath := filepath.Join(hooksDir, "pre-commit")
+	first, _ := os.ReadFile(hookPath)
+	if strings.Contains(string(first), "Generated:") {
+		t.Error("script must not embed a timestamp (spurious diffs on every re-install)")
+	}
+
+	// Lose the executable bit, re-install on "another day".
+	if err := os.Chmod(hookPath, 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := inst.Install(hooks); err != nil {
+		t.Fatal(err)
+	}
+	second, _ := os.ReadFile(hookPath)
+	if string(first) != string(second) {
+		t.Errorf("re-install must be byte-identical:\n%s\n---\n%s", first, second)
+	}
+	if runtime.GOOS != "windows" {
+		info, _ := os.Stat(hookPath)
+		if info.Mode().Perm() != 0755 {
+			t.Errorf("permission = %o, want 0755 restored on re-install", info.Mode().Perm())
+		}
+	}
+}
