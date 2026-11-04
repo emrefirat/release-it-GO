@@ -969,3 +969,30 @@ func TestNewGitLabClient_DerivesUploadClient(t *testing.T) {
 		t.Errorf("uploadClient = %+v, want a derived client without overall timeout", c.uploadClient)
 	}
 }
+
+func TestGitLabClient_PostComment_PRTargetMapsToMergeRequests(t *testing.T) {
+	var receivedPath string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedPath = r.URL.Path
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"id":1}`))
+	}))
+	defer server.Close()
+
+	c := &GitLabClient{
+		config:    &config.GitLabConfig{},
+		repoInfo:  testGitLabRepoInfo(),
+		logger:    applog.NewLogger(0, false),
+		client:    server.Client(),
+		baseURL:   server.URL,
+		token:     "test-token",
+		projectID: "testgroup%2Ftestproject",
+	}
+	// "pr" is the target type the GitHub side uses; it must not land on issues.
+	if err := c.PostComment(CommentTarget{Type: "pr", Number: 7}, "x"); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(receivedPath, "/merge_requests/7/notes") {
+		t.Errorf("path = %q, want merge_requests", receivedPath)
+	}
+}

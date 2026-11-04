@@ -104,7 +104,9 @@ func (c *GitHubClient) createHTTPClient() *http.Client {
 	if c.config.Proxy != "" {
 		proxyURL, err := url.Parse(c.config.Proxy)
 		if err != nil {
-			c.logger.Warn("invalid proxy URL %q: %v", c.config.Proxy, err)
+			// Neither the value nor the parse error (which quotes it) may
+			// be logged: a proxy URL commonly carries user:password.
+			c.logger.Warn("invalid github.proxy URL (check the value; it is not shown because it may contain credentials)")
 		} else {
 			transport.Proxy = http.ProxyURL(proxyURL)
 		}

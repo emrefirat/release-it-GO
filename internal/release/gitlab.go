@@ -292,7 +292,8 @@ func (c *GitLabClient) createReleaseLink(tagName string, name string, assetURL s
 func (c *GitLabClient) PostComment(target CommentTarget, message string) error {
 	var resource string
 	switch target.Type {
-	case "mr":
+	case "mr", "pr":
+		// "pr" is what the GitHub side uses for the same target type.
 		resource = "merge_requests"
 	default:
 		resource = "issues"
