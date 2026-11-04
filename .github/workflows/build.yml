@@ -18,8 +18,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Anyone with write access can push a v* tag, and this job holds the
-      # GHCR credentials: refuse to publish a tag that is not on main.
+      # Safety check against accidental releases (a v* tag pushed from a
+      # feature branch): refuse a tag that is not on main. It is NOT an
+      # access control — whoever can push the tag can also edit this file at
+      # that commit. Restrict who may create v* tags with a repository
+      # ruleset and/or publish from a protected GitHub Environment.
       - name: Require the tag to be on main
         run: |
           git fetch --no-tags origin main
