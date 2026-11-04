@@ -599,7 +599,7 @@ release-it-go init
 Migration:
 1. Creates a `.release-it.json.bak` backup
 2. Normalizes npm-specific fields and plugin settings
-3. Maps `@release-it/conventional-changelog` and `@release-it/keep-a-changelog` plugin configs
+3. Maps `@release-it/conventional-changelog`, `@release-it/keep-a-changelog` and `@release-it/bumper` plugin configs; `$schema` is accepted, npm-only keys (`github.update`, `preReleaseBase`, plugin-scoped hooks such as `after:git:bump`) and unknown plugins print a `config: ignored "..."` warning
 4. Writes a clean `.release-it-go.json` or `.release-it-go.yaml`
 
 ## CI/CD Integration

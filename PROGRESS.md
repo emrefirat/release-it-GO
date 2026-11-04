@@ -38,10 +38,11 @@
 | 28 | Parameter Validation & Dead-Field Cleanup | Complete | 100% |
 | 29 | Test Hygiene & Distribution/CI Trust (absorbs planned Phase 24) | Complete | 100% |
 | 30 | Documentation Sync | Complete | 100% |
+| 31 | Third Audit — Critical Fixes | Complete | 100% |
 
-**Last Updated:** 2026-09-02
+**Last Updated:** 2026-11-04
 **Active Developer:** Claude
-**Current Version:** v0.4.1 (Phases 23–30, two audit cycles)
+**Current Version:** v0.4.1 + Phase 31 fixes (unreleased)
 
 ---
 
@@ -801,6 +802,30 @@
 
 ---
 
+## Phase 31: Third Audit — Critical Fixes
+
+**Status:** Complete
+**PRD:** `docs/phase_31.md`
+
+### To Do
+
+- [x] Go toolchain 1.26.7 → 1.26.10 (10 stdlib advisories; `make check` vuln step green again; Dockerfile + docs)
+- [x] `prepatch` on a pre-release moves to the next patch (`1.2.4-beta.0 → 1.2.5-beta.0`); runner continues a pre-release series on the same base for any ID (npm), menu offers it first
+- [x] `BREAKING CHANGE:` paragraphs detected anywhere in the body (GitHub squash-merge `Co-authored-by:` trailer no longer hides them)
+- [x] Text bumper replaces whole-version matches only (`v11.0.0`, `1.0.0.1` untouched)
+- [x] git `commandExecutor` captures stdout/stderr separately; commit count parsed strictly; real-git tests under `GIT_TRACE=1`
+- [x] npm config compat: `$schema` accepted, `github.update` / `preReleaseBase` / plugin-scoped hooks warn instead of failing, `@release-it/bumper` mapped onto `bumper`, unknown plugins reported, top-level typos get a suggestion
+- [x] GitHub asset uploads use the API's `upload_url` (GHES `/api/uploads`), host-aware fallback
+- [x] `resolvePreReleaseBaseTag` strips the tagName template before parsing (custom templates continue the series)
+
+### Notes
+
+- Trigger: the user hit the `prepatch --preRelease` "tag already exists" failure live.
+- The runner's old `"pre"+increment` path for a different pre-release ID only produced the expected `1.6.0-rc.0` because of the IncPatch quirk; the npm rule (pre-release latest → `prerelease`) is now explicit and tested.
+- Remaining medium/low findings from the audit are listed in `docs/phase_31.md` as Phase 32 candidates (untracked-files clean check, identity via env, describe filters, pushRepo URL redaction, Windows hook quoting, webhook URL parse leak, keep-a-changelog Unreleased, GitLab milestone templates/upload timeout, CalVer validation, bumper empty path, Retry-After cap, `%cn` contributors, non-`git@` scp remotes).
+
+---
+
 ## Bugs
 
 - [x] BUG: First-release changelog "exit status 128" error (2026-02-16) → When `LatestVersion=0.0.0`, the `v0.0.0` tag was searched but no such tag exists. The `latestVersionToTag()` helper was added: returns empty for `0.0.0` or empty string, so `GetCommitsSinceTag("")` returns all commits. 3 sites affected: `RunChangelogOnly`, `generateChangelog`, `autoDetectIncrement`.
@@ -859,6 +884,13 @@
 - [x] BUG: `.gitignore` pattern `release-it-go` ignored every path with that name (2026-09-02) → new files under `cmd/release-it-go/` were invisible to `git status`. Fix: anchored to `/release-it-go` (the built binary at the repo root).
 - [x] BUG: documented `go install release-it-go/cmd/release-it-go@latest` could never work (2026-09-02) → the module path was the placeholder `release-it-go`. Fix: module renamed to `github.com/emrefirat/release-it-GO` (82 files), README/Dockerfile aligned.
 - [x] BUG: release workflow pushed branch and tag in two steps (2026-09-02) → a rejected branch push left an orphan tag on the remote, and the tag was created without running the tests. Fix: `go test` before tagging, single `git push --atomic origin HEAD "$TAG"`.
+- [x] BUG: `prepatch` on a pre-release returned the same or a lower version (2026-11-04, user report) → Masterminds `IncPatch` only strips the pre-release, so `release-it-go prepatch --preRelease beta` on `1.2.4-beta.0` produced `1.2.4-beta.0` again ("tag already exists") and `1.2.4-rc.0` with a different ID; the interactive menu offered the same option. Fix: strip the pre-release, then increment patch (npm semver). The runner's auto path now always continues a pre-release latest with `prerelease` like npm (`1.6.0-beta.3 → 1.6.0-rc.0`, never `1.7.0-rc.0`).
+- [x] BUG: `BREAKING CHANGE:` footer missed when another footer paragraph follows it (2026-11-04) → only the last paragraph was the footer block, so GitHub squash-merge messages (`BREAKING CHANGE: …` + blank + `Co-authored-by:`) bumped minor. Fix: breaking-token paragraphs anywhere in the body become footers; other token-like body paragraphs stay body.
+- [x] BUG: text bumper corrupted neighbouring versions (2026-11-04) → `strings.ReplaceAll` with no boundary turned `v11.0.0` into `v12.0.0` and `1.0.0.1` into `2.0.0.1`. Fix: whole-version matches only.
+- [x] BUG: git stderr parsed as command output (2026-11-04) → `CombinedOutput` fed trace lines / warnings into branch name, porcelain status, describe and `rev-list --count` (digit-scraped into a huge number). Fix: separate buffers, stderr only in errors, strict count parsing.
+- [x] BUG: valid npm `.release-it.json` files failed the strict loader (2026-11-04) → `$schema`, `github.update`, `preReleaseBase`, `hooks.after:git:bump` were fatal unknown keys; `@release-it/bumper` was dropped silently; top-level typos reported as `config.Config.incremnt` with no suggestion. Fix: see Phase 31.
+- [x] BUG: GitHub Enterprise asset uploads 404ed (2026-11-04) → upload URL derived by string replace on the REST base (no-op on GHES); the API's `upload_url` was parsed and ignored. Fix: `upload_url` is the upload base, `/api/uploads` fallback.
+- [x] BUG: pre-release series never continued with a custom `tagName` template (2026-11-04) → `resolvePreReleaseBaseTag` parsed raw tags without `VersionFromTag`, always falling back to the stable tag (`beta.0` again). Fix: strip the template first.
 - [x] BUG: full-example `commit-msg` hook ran `--check-commits` (2026-09-02) → that lints the existing history, not the message being committed, so a bad message passed. Fix: `release-it-go --check-msg "$1"`; covered end-to-end through the real binary.
 - [x] BUG: real-git tests inherited the developer's git configuration (2026-09-02) → `commit.gpgsign`, `core.hooksPath`, or `init.defaultBranch` could break or skew the suite; 78 `os.Chdir` blocks swallowed errors and one leaked cwd could point a test at the real repo. Fix: `testutil.IsolateGit` in TestMain + `t.Chdir` everywhere.
 
@@ -951,6 +983,7 @@
 | 2026-09-02 | Claude | Phase 29 complete: git-isolated tests + t.Chdir, end-to-end hook/env/bumper/positional/retry coverage, real module path for `go install`, goreleaser v2.6 syntax, gitignore anchor, CI coverage gate + pinned govulncheck + OS matrix + dependabot, atomic release push, CHANGELOG 0.2.0/0.3.0 entries |
 | 2026-09-02 | Claude | Phase 30 complete: 12 wrong doc statements fixed, README sections for every behavior added since Phase 23, ARCHITECTURE/CLAUDE.md synced, ADR-014..018, help texts corrected. Second audit cycle (Phases 27–30) closed |
 | 2026-09-03 | Claude | v0.4.0 released with the tool itself (13 GoReleaser assets); dependabot enabled and its 5 PRs landed; x/text + x/sys bumped (govulncheck clean); Windows CI job blocking; `version` falls back to ReadBuildInfo for `go install` builds |
+| 2026-11-04 | Claude | Third full audit on v0.4.1 (runner by hand + 4 parallel package reviews); Go 1.26.10; Phase 31 complete: 7 verified critical fixes, each with regression tests (prepatch on pre-release, BREAKING CHANGE paragraph, text bumper boundaries, git stderr separation, npm config compat incl. `@release-it/bumper`, GHES upload_url, pre-release base with custom templates); medium/low backlog recorded in `docs/phase_31.md` |
 
 ---
 
