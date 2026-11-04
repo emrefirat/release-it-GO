@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.4.2](https://github.com/emrefirat/release-it-GO/compare/v0.4.1...v0.4.2) (2026-11-04)
+
+### Bug Fixes
+
+* keep-a-changelog Unreleased block, webhook URL leak, Windows hook quoting ([127b132](https://github.com/emrefirat/release-it-GO/commit/127b132))
+* **bumper:** replace only whole-version matches in text files ([ee69a8b](https://github.com/emrefirat/release-it-GO/commit/ee69a8b))
+* **changelog:** detect BREAKING CHANGE paragraphs that are not the last one ([4edeacb](https://github.com/emrefirat/release-it-GO/commit/4edeacb))
+* **config:** load real npm release-it configs instead of rejecting them ([788fa16](https://github.com/emrefirat/release-it-GO/commit/788fa16))
+* **config,bumper:** reject CalVer + SemVer settings, default bumper path to version ([382d0f1](https://github.com/emrefirat/release-it-GO/commit/382d0f1))
+* **git:** keep git's stderr out of parsed command output ([a615ddb](https://github.com/emrefirat/release-it-GO/commit/a615ddb))
+* **git:** npm-parity prerequisites, describe filters, URL pushRepo, scp users ([b2f22f0](https://github.com/emrefirat/release-it-GO/commit/b2f22f0))
+* **release:** upload GitHub assets to the upload_url the API returns ([d5ec1b2](https://github.com/emrefirat/release-it-GO/commit/d5ec1b2))
+* **release:** upload client without overall timeout, milestone templates, Retry-After cap ([5ab5f84](https://github.com/emrefirat/release-it-GO/commit/5ab5f84))
+* **runner:** continue pre-release series with custom tagName templates ([cca7274](https://github.com/emrefirat/release-it-GO/commit/cca7274))
+* **version:** prepatch on a pre-release moves to the next patch ([d9a735b](https://github.com/emrefirat/release-it-GO/commit/d9a735b))
+
 ## [0.4.1](https://github.com/emrefirat/release-it-GO/compare/v0.4.0...v0.4.1) (2026-09-03)
 
 ### Bug Fixes

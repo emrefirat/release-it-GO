@@ -42,7 +42,7 @@
 
 **Last Updated:** 2026-11-04
 **Active Developer:** Claude
-**Current Version:** v0.4.1 + Phase 31 fixes (unreleased)
+**Current Version:** v0.4.2 (Phase 31: third audit, 7 critical + 13 medium fixes)
 
 ---
 
