@@ -641,3 +641,109 @@ func TestGitHubClient_CreateRelease_SendsMakeLatestFalseExplicitly(t *testing.T)
 		t.Errorf(`make_latest = %v, want the literal "false" on the wire`, body["make_latest"])
 	}
 }
+
+func TestResolveGitHubUploadBaseURL(t *testing.T) {
+	tests := []struct {
+		name string
+		base string
+		want string
+	}{
+		{"github.com", "https://api.github.com", "https://uploads.github.com"},
+		{"enterprise", "https://ghe.corp.com/api/v3", "https://ghe.corp.com/api/uploads"},
+		{"unknown shape is left alone", "http://127.0.0.1:9999", "http://127.0.0.1:9999"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := resolveGitHubUploadBaseURL(tt.base); got != tt.want {
+				t.Errorf("resolveGitHubUploadBaseURL(%q) = %q, want %q", tt.base, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGitHubClient_UploadAssets_UsesUploadURLFromCreateRelease(t *testing.T) {
+	// GitHub Enterprise: the REST base is /api/v3 but uploads go to
+	// /api/uploads — only the create-release response knows the right host.
+	var uploadPath, uploadQuery string
+	uploads := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		uploadPath = r.URL.Path
+		uploadQuery = r.URL.RawQuery
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"id":1,"name":"test.zip"}`))
+	}))
+	defer uploads.Close()
+
+	apiHits := 0
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		apiHits++
+		if r.Method != http.MethodPost || r.URL.Path != "/api/v3/repos/testowner/testrepo/releases" {
+			t.Errorf("unexpected API request %s %s", r.Method, r.URL.Path)
+		}
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(githubCreateReleaseResponse{
+			ID:        42,
+			HTMLURL:   "https://ghe.corp.com/testowner/testrepo/releases/tag/v1.0.0",
+			UploadURL: uploads.URL + "/api/uploads/repos/testowner/testrepo/releases/42/assets{?name,label}",
+		})
+	}))
+	defer api.Close()
+
+	tmpDir := t.TempDir()
+	testFile := tmpDir + "/test.zip"
+	_ = os.WriteFile(testFile, []byte("fake zip content"), 0644)
+
+	c := &GitHubClient{
+		config:   &config.GitHubConfig{},
+		repoInfo: testRepoInfo(),
+		logger:   testLogger(),
+		client:   api.Client(),
+		baseURL:  api.URL + "/api/v3",
+		token:    "test-token",
+	}
+
+	result, err := c.CreateRelease(ReleaseOptions{TagName: "v1.0.0", ReleaseName: "Release 1.0.0"})
+	if err != nil {
+		t.Fatalf("CreateRelease: %v", err)
+	}
+	if err := c.UploadAssets(result.ID, []string{testFile}); err != nil {
+		t.Fatalf("UploadAssets: %v", err)
+	}
+	if apiHits != 1 {
+		t.Errorf("the upload must not go to the REST host, API hits = %d", apiHits)
+	}
+	if uploadPath != "/api/uploads/repos/testowner/testrepo/releases/42/assets" {
+		t.Errorf("upload path = %q, want the upload_url path", uploadPath)
+	}
+	if uploadQuery != "name=test.zip" {
+		t.Errorf("upload query = %q, want name=test.zip", uploadQuery)
+	}
+}
+
+func TestGitHubClient_UploadAssets_EnterpriseFallbackWithoutUploadURL(t *testing.T) {
+	var gotPath string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"id":1}`))
+	}))
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+	testFile := tmpDir + "/a.txt"
+	_ = os.WriteFile(testFile, []byte("x"), 0644)
+
+	c := &GitHubClient{
+		config:   &config.GitHubConfig{},
+		repoInfo: testRepoInfo(),
+		logger:   testLogger(),
+		client:   server.Client(),
+		baseURL:  server.URL + "/api/v3",
+		token:    "test-token",
+	}
+	if err := c.UploadAssets("7", []string{testFile}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotPath != "/api/uploads/repos/testowner/testrepo/releases/7/assets" {
+		t.Errorf("fallback path = %q, want /api/uploads/...", gotPath)
+	}
+}

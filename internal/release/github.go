@@ -28,6 +28,11 @@ type GitHubClient struct {
 	client   *http.Client
 	baseURL  string
 	token    string
+	// uploadURL is the asset upload base returned by the create-release
+	// response (upload_url without its {?name,label} template). GitHub
+	// Enterprise serves uploads from /api/uploads, not /api/v3, so the URL
+	// must come from the API rather than be derived from baseURL.
+	uploadURL string
 }
 
 // githubCreateReleaseRequest is the GitHub API request body for creating a release.
@@ -163,6 +168,7 @@ func (c *GitHubClient) CreateRelease(opts ReleaseOptions) (*ReleaseResult, error
 	if idx := strings.Index(uploadURL, "{"); idx > 0 {
 		uploadURL = uploadURL[:idx]
 	}
+	c.uploadURL = uploadURL
 
 	return &ReleaseResult{
 		ID:        strconv.Itoa(result.ID),
@@ -202,9 +208,7 @@ func (c *GitHubClient) uploadSingleAsset(releaseID string, assetPath string) err
 	}
 
 	filename := filepath.Base(assetPath)
-	uploadURL := fmt.Sprintf("%s/repos/%s/%s/releases/%s/assets?name=%s",
-		strings.Replace(c.baseURL, "api.github.com", "uploads.github.com", 1),
-		c.repoInfo.Owner, c.repoInfo.Repository, releaseID, url.QueryEscape(filename))
+	uploadURL := c.assetUploadURL(releaseID) + "?name=" + url.QueryEscape(filename)
 
 	req, err := http.NewRequest("POST", uploadURL, f)
 	if err != nil {
@@ -227,6 +231,27 @@ func (c *GitHubClient) uploadSingleAsset(releaseID string, assetPath string) err
 
 	c.logger.Info("Uploaded asset: %s", filename)
 	return nil
+}
+
+// assetUploadURL returns the upload endpoint for the release's assets. The
+// upload_url from the create-release response is authoritative; the derived
+// form is a fallback for clients that did not create the release themselves.
+func (c *GitHubClient) assetUploadURL(releaseID string) string {
+	if c.uploadURL != "" {
+		return c.uploadURL
+	}
+	return fmt.Sprintf("%s/repos/%s/%s/releases/%s/assets",
+		resolveGitHubUploadBaseURL(c.baseURL), c.repoInfo.Owner, c.repoInfo.Repository, releaseID)
+}
+
+// resolveGitHubUploadBaseURL derives the uploads host from the API base:
+// github.com uses uploads.github.com, GitHub Enterprise serves uploads from
+// /api/uploads next to its /api/v3 REST root.
+func resolveGitHubUploadBaseURL(baseURL string) string {
+	if strings.HasSuffix(baseURL, "/api/v3") {
+		return strings.TrimSuffix(baseURL, "/api/v3") + "/api/uploads"
+	}
+	return strings.Replace(baseURL, "api.github.com", "uploads.github.com", 1)
 }
 
 // PostComment posts a comment on a GitHub issue or PR.
