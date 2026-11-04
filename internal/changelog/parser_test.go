@@ -314,3 +314,20 @@ func TestAnalyzeBump_BreakingFooterWithTrailingCoAuthor_IsMajor(t *testing.T) {
 		t.Errorf("AnalyzeBump = %v, want BumpMajor", got)
 	}
 }
+
+func TestParseCommit_GitRevertSubject(t *testing.T) {
+	raw := "Revert \"feat(api): add export\"\n\nThis reverts commit abc1234."
+	c := ParseCommit(raw, "def5678")
+	if c == nil {
+		t.Fatal("git's own revert subject must be parsed, not dropped")
+	}
+	if c.Type != "revert" || c.Description != "feat(api): add export" {
+		t.Errorf("got type=%q description=%q", c.Type, c.Description)
+	}
+	if c.Body != "This reverts commit abc1234." {
+		t.Errorf("Body = %q", c.Body)
+	}
+	if got := AnalyzeBump([]*Commit{c}); got != BumpPatch {
+		t.Errorf("a revert must bump patch, got %v", got)
+	}
+}

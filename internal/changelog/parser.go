@@ -11,6 +11,9 @@ var commitPattern = regexp.MustCompile(
 	`^(?P<type>\w+)(?:\((?P<scope>[^)]+)\))?(?P<breaking>!)?:\s+(?P<description>.+)$`,
 )
 
+// gitRevertPattern matches the subject `git revert` generates.
+var gitRevertPattern = regexp.MustCompile(`^Revert "(.+)"$`)
+
 // ParseCommit parses a single commit message into a Commit struct.
 // Returns nil if the message does not match conventional commit format.
 func ParseCommit(raw string, hash string) *Commit {
@@ -21,6 +24,17 @@ func ParseCommit(raw string, hash string) *Commit {
 
 	lines := strings.SplitN(raw, "\n", 2)
 	subject := strings.TrimSpace(lines[0])
+
+	// git's own revert subject: Revert "feat(api): add x". Treated as a
+	// revert-typed commit so the bump analysis and the "Reverts" section see
+	// it; the linter already accepts it.
+	if m := gitRevertPattern.FindStringSubmatch(subject); m != nil {
+		commit := &Commit{Hash: hash, Type: "revert", Description: m[1], Raw: raw}
+		if len(lines) > 1 {
+			commit.Body, commit.Footers = parseBodyAndFooters(strings.TrimSpace(lines[1]))
+		}
+		return commit
+	}
 
 	matches := commitPattern.FindStringSubmatch(subject)
 	if matches == nil {

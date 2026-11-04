@@ -255,8 +255,16 @@ func applyConventionalChangelogPlugin(cfg *Config, settings map[string]interface
 	if s, ok := settings["preset"].(string); ok && s != "" {
 		cfg.Changelog.Preset = s
 	}
-	if s, ok := settings["infile"].(string); ok && s != "" {
-		cfg.Changelog.Infile = s
+	switch v := settings["infile"].(type) {
+	case string:
+		if v != "" {
+			cfg.Changelog.Infile = v
+		}
+	case bool:
+		// npm: infile: false = generate release notes but write no file.
+		if !v {
+			cfg.Changelog.Infile = ""
+		}
 	}
 	if s, ok := settings["header"].(string); ok && s != "" {
 		cfg.Changelog.Header = s

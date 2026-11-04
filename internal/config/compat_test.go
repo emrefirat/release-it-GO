@@ -456,3 +456,18 @@ func TestLoadConfigFromBytes_TopLevelTypo_SuggestsKey(t *testing.T) {
 		t.Errorf("error = %q\nwant  %q", err.Error(), want)
 	}
 }
+
+func TestApplyPluginCompat_ConventionalChangelog_InfileFalse(t *testing.T) {
+	data := []byte(`{"plugins": {"@release-it/conventional-changelog": {"preset": "angular", "infile": false}}}`)
+	cfg, err := LoadConfigFromBytes(data, "json")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// npm: infile: false = release notes only, no CHANGELOG.md written.
+	if cfg.Changelog.Infile != "" {
+		t.Errorf("changelog.infile = %q, want empty (no file)", cfg.Changelog.Infile)
+	}
+	if !cfg.Changelog.Enabled {
+		t.Error("changelog generation itself stays enabled")
+	}
+}
