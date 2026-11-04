@@ -97,8 +97,9 @@ func readINI(data []byte, path string) (string, error) {
 			parts := strings.SplitN(line, "=", 2)
 			if len(parts) == 2 {
 				k := strings.TrimSpace(parts[0])
-				v := strings.TrimSpace(parts[1])
 				if k == key {
+					// Drop an inline comment ("1.0.0 ; current" → "1.0.0").
+					_, v, _ := splitINIValue(parts[1])
 					return v, nil
 				}
 			}

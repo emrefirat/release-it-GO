@@ -261,3 +261,13 @@ func TestReadVersionFromFile_StructuredWithoutPath_DefaultsToVersionKey(t *testi
 		})
 	}
 }
+
+func TestReadINI_StripsInlineComment(t *testing.T) {
+	v, err := readINI([]byte("[metadata]\nversion = 1.0.0 ; current release\n"), "[metadata].version")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if v != "1.0.0" {
+		t.Errorf("version = %q, want 1.0.0 (inline comment stripped)", v)
+	}
+}

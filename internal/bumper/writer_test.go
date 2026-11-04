@@ -448,3 +448,48 @@ func TestWriteVersionToFile_StructuredWithoutPath_WritesVersionKey(t *testing.T)
 		t.Errorf("version key must be updated in place, got:\n%s", got)
 	}
 }
+
+func TestWriteINI_PreservesSpacingCommentsAndCRLF(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"inline comment and spacing", "[metadata]\nversion=1.0.0 ; current\n", "[metadata]\nversion=2.0.0 ; current\n"},
+		{"tab spacing with hash comment", "version\t=\t1.0.0\t# note\n", "version\t=\t2.0.0\t# note\n"},
+		{"crlf", "[metadata]\r\nversion = 1.0.0\r\nname = x\r\n", "[metadata]\r\nversion = 2.0.0\r\nname = x\r\n"},
+		{"value containing hash without space", "version = 1.0.0#build\n", "version = 2.0.0\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path := "[metadata].version"
+			if !strings.Contains(tt.in, "[metadata]") {
+				path = "version"
+			}
+			got, err := writeINI([]byte(tt.in), path, "2.0.0")
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if string(got) != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestWriteJSON_FallbackDoesNotHTMLEscape(t *testing.T) {
+	// A non-string old value defeats the targeted splice, so the fallback
+	// re-marshal runs; it must not turn & < > into \u0026 \u003c \u003e.
+	data := []byte(`{"name": "a & b <c>", "version": 1, "url": "https://x/?a=1&b=2"}`)
+	got, err := writeJSON(data, "version", "2.0.0")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	s := string(got)
+	if strings.Contains(s, "\\u0026") || strings.Contains(s, "\\u003c") {
+		t.Errorf("fallback JSON must not HTML-escape, got:\n%s", s)
+	}
+	if !strings.Contains(s, `"a & b <c>"`) || !strings.Contains(s, `"version": "2.0.0"`) {
+		t.Errorf("unexpected output:\n%s", s)
+	}
+}

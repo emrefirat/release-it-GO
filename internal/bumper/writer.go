@@ -1,6 +1,7 @@
 package bumper
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -146,12 +147,17 @@ func writeJSON(data []byte, path string, version string) ([]byte, error) {
 		return nil, err
 	}
 
-	result, err := json.MarshalIndent(obj, "", "  ")
-	if err != nil {
+	// Fallback re-marshal: no HTML escaping ("&" must stay "&", not
+	// "\u0026" — package.json descriptions and URLs are prose, not HTML).
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(obj); err != nil {
 		return nil, fmt.Errorf("encoding JSON: %w", err)
 	}
 
-	return append(result, '\n'), nil
+	return buf.Bytes(), nil // Encode appends the trailing newline
 }
 
 // writeYAML updates a version in YAML data at the given dot-separated path.
@@ -205,6 +211,10 @@ func yamlParse(data []byte, v interface{}) error { return yaml.Unmarshal(data, v
 func tomlParse(data []byte, v interface{}) error { return toml.Unmarshal(data, v) }
 
 // writeINI updates a version in INI data at the given [section].key path.
+//
+// Only the value span is replaced: the key's spacing, an inline comment
+// (`version = 1.0.0 ; current`) and the line's CR are kept, so setup.cfg-style
+// files do not get rewritten around the version.
 func writeINI(data []byte, path string, version string) ([]byte, error) {
 	section, key := parseINIPath(path)
 	lines := strings.Split(string(data), "\n")
@@ -225,17 +235,24 @@ func writeINI(data []byte, path string, version string) ([]byte, error) {
 			continue
 		}
 
-		if inSection {
-			parts := strings.SplitN(trimmed, "=", 2)
-			if len(parts) == 2 {
-				k := strings.TrimSpace(parts[0])
-				if k == key {
-					lines[i] = fmt.Sprintf("%s = %s", key, version)
-					found = true
-					break
-				}
-			}
+		if !inSection {
+			continue
 		}
+		eq := strings.Index(line, "=")
+		if eq < 0 || strings.TrimSpace(line[:eq]) != key {
+			continue
+		}
+
+		cr := ""
+		body := line
+		if strings.HasSuffix(body, "\r") {
+			cr = "\r"
+			body = body[:len(body)-1]
+		}
+		leading, _, trailing := splitINIValue(body[eq+1:])
+		lines[i] = body[:eq+1] + leading + version + trailing + cr
+		found = true
+		break
 	}
 
 	if !found {
@@ -243,6 +260,27 @@ func writeINI(data []byte, path string, version string) ([]byte, error) {
 	}
 
 	return []byte(strings.Join(lines, "\n")), nil
+}
+
+// splitINIValue splits the text after "=" into the leading whitespace, the
+// value and the trailing part (whitespace + inline comment, if any). An
+// inline comment starts at ";" or "#" preceded by whitespace.
+func splitINIValue(rest string) (leading string, value string, trailing string) {
+	valueStart := len(rest) - len(strings.TrimLeft(rest, " \t"))
+	leading = rest[:valueStart]
+	content := rest[valueStart:]
+
+	commentStart := len(content)
+	for i := 1; i < len(content); i++ {
+		if (content[i] == ';' || content[i] == '#') && (content[i-1] == ' ' || content[i-1] == '\t') {
+			commentStart = i
+			break
+		}
+	}
+	valueWithSpace := content[:commentStart]
+	value = strings.TrimRight(valueWithSpace, " \t")
+	trailing = valueWithSpace[len(value):] + content[commentStart:]
+	return leading, value, trailing
 }
 
 // setNestedValue sets a value in a nested map using a dot-separated path.
