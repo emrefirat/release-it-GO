@@ -2,6 +2,7 @@ package git
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -309,5 +310,69 @@ func TestParseRepoURL_HTTPS_TrailingSlash(t *testing.T) {
 	}
 	if info.Owner != "owner" || info.Repository != "repo" {
 		t.Errorf("got owner=%q repo=%q", info.Owner, info.Repository)
+	}
+}
+
+func TestParseRepoURL_ScpStyleAnyUser(t *testing.T) {
+	tests := []struct {
+		url   string
+		host  string
+		owner string
+		repo  string
+	}{
+		{"org-123456@github.com:owner/repo.git", "github.com", "owner", "repo"},
+		{"gitea@git.example.com:group/sub/repo", "git.example.com", "group/sub", "repo"},
+		{"ubuntu@10.0.0.5:team/project.git", "10.0.0.5", "team", "project"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.url, func(t *testing.T) {
+			info, err := ParseRepoURL(tt.url)
+			if err != nil {
+				t.Fatalf("scp-style remotes with a non-git user must parse: %v", err)
+			}
+			if info.Protocol != "ssh" || info.Host != tt.host || info.Owner != tt.owner || info.Repository != tt.repo {
+				t.Errorf("got %+v", info)
+			}
+		})
+	}
+}
+
+func TestParseRepoURL_CredentialedHTTPSIsNotMistakenForScp(t *testing.T) {
+	info, err := ParseRepoURL("https://user:tok@github.com:443/owner/repo.git")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if info.Protocol != "https" || info.Remote != "https://github.com:443/owner/repo" {
+		t.Errorf("got %+v", info)
+	}
+}
+
+func TestGetRepoInfo_URLValueBypassesRemoteLookup(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+	commandExecutor = func(name string, args ...string) (string, error) {
+		return "", fmt.Errorf("fatal: No such remote '%s'", args[len(args)-1])
+	}
+
+	// npm release-it accepts pushRepo as a URL.
+	info, err := GetRepoInfo("https://ci:s3cret@github.com/owner/repo.git")
+	if err != nil {
+		t.Fatalf("a URL pushRepo must be parsed directly: %v", err)
+	}
+	if info.Owner != "owner" || info.Repository != "repo" || strings.Contains(info.Remote, "s3cret") {
+		t.Errorf("got %+v", info)
+	}
+	if _, err := GetRepoInfo("git@github.com:owner/repo.git"); err != nil {
+		t.Errorf("scp-style URL pushRepo must be parsed directly: %v", err)
+	}
+}
+
+func TestParseRepoURL_UnsupportedError_RedactsCredentials(t *testing.T) {
+	_, err := ParseRepoURL("ftp://user:s3cret@host/x")
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	if strings.Contains(err.Error(), "s3cret") {
+		t.Errorf("error leaks the credential: %v", err)
 	}
 }

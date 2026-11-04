@@ -46,9 +46,15 @@ func (g *Git) GetLatestTag() (string, error) {
 		return g.highestRawTag()
 	}
 
-	out, err := g.runSilent("describe", "--tags", "--abbrev=0")
+	// The filters go to git describe itself (--match/--exclude, like npm
+	// release-it), so the nearest *matching* reachable tag is found. Without
+	// them the nearest tag of any format came back and the fallback listed
+	// all refs regardless of reachability: on a maintenance branch another
+	// package's or another branch's tag became "latest".
+	args := append([]string{"describe", "--tags", "--abbrev=0"}, g.describeFilterArgs()...)
+	out, err := g.runSilent(args...)
 	if err != nil {
-		return "", fmt.Errorf("no git tags found: %w", err)
+		return g.latestTagContinuity(err)
 	}
 
 	tag := strings.TrimSpace(out)
@@ -58,8 +64,8 @@ func (g *Git) GetLatestTag() (string, error) {
 		return tag, nil
 	}
 
-	// Tag doesn't match current format (e.g., found "v1.0.0" but tagName is "${version}").
-	// Search for a matching tag first, then fall back to any tag for version continuity.
+	// git's fnmatch and path.Match disagree on the pattern (rare): search
+	// the matching tags, then fall back to any tag for version continuity.
 	g.logger.Debug("tag %q does not match tagName format, searching for matching tag", tag)
 	matchedTag, matchErr := g.getLatestTagFromAllRefs()
 	if matchErr == nil {
@@ -71,9 +77,44 @@ func (g *Git) GetLatestTag() (string, error) {
 		return "", fmt.Errorf("no git tags match tagMatch %q", g.config.TagMatch)
 	}
 
-	// No matching tag found — this is a format transition scenario.
-	// Return the original tag so version number is preserved.
 	g.logger.Debug("no matching tags found for current format, using %q for version continuity", tag)
+	return tag, nil
+}
+
+// describeFilterArgs translates the effective tag filter into git describe
+// options: an explicit tagMatch wins, otherwise the glob derived from the
+// tagName template ("[0-9]*" for the bare ${version} form).
+func (g *Git) describeFilterArgs() []string {
+	var args []string
+	switch {
+	case g.config.TagMatch != "":
+		args = append(args, "--match="+g.config.TagMatch)
+	case g.config.TagName == "${version}":
+		args = append(args, "--match=[0-9]*")
+	case g.config.TagName != "":
+		args = append(args, "--match="+strings.ReplaceAll(g.config.TagName, "${version}", "*"))
+	}
+	if g.config.TagExclude != "" {
+		args = append(args, "--exclude="+g.config.TagExclude)
+	}
+	return args
+}
+
+// latestTagContinuity handles "no reachable tag matches the filter". With an
+// explicit tagMatch that is a first release for this package. With a derived
+// filter it is a format transition (v-prefixed repo with the default
+// template, tagName change): the nearest raw tag keeps the version number.
+func (g *Git) latestTagContinuity(filterErr error) (string, error) {
+	if g.config.TagMatch != "" {
+		return "", fmt.Errorf("no git tags match tagMatch %q: %w", g.config.TagMatch, filterErr)
+	}
+
+	out, err := g.runSilent("describe", "--tags", "--abbrev=0")
+	if err != nil {
+		return "", fmt.Errorf("no git tags found: %w", err)
+	}
+	tag := strings.TrimSpace(out)
+	g.logger.Debug("no reachable tag matches the tagName format, using %q for version continuity", tag)
 	return tag, nil
 }
 

@@ -1,6 +1,7 @@
 package git
 
 import (
+	"os"
 	"os/exec"
 	"strings"
 	"testing"
@@ -88,5 +89,55 @@ func TestGetCommitCountSinceTag_RejectsNonNumericOutput(t *testing.T) {
 	g := newTestGitWithConfig(&config.GitConfig{}, false)
 	if _, err := g.GetCommitCountSinceTag("v1.0.0"); err == nil {
 		t.Error("garbage output used to be digit-scraped into a huge count; it must be an error now")
+	}
+}
+
+// --- clean-tree and identity checks against a real repository ---
+
+func commitScratchFile(t *testing.T, name string) {
+	t.Helper()
+	if err := os.WriteFile(name, []byte("x\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{{"add", name}, {"-c", "user.name=T", "-c", "user.email=t@example.com", "commit", "-q", "-m", "chore: " + name}} {
+		if out, err := exec.Command("git", args...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+}
+
+func TestCheckCleanWorkingDir_UntrackedFileIsNotDirty(t *testing.T) {
+	initScratchRepo(t)
+	commitScratchFile(t, "tracked.txt")
+	if err := os.WriteFile("scratch.env", []byte("LOCAL=1\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	g := newTestGitWithConfig(&config.GitConfig{RequireCleanWorkingDir: true}, false)
+	// npm release-it (git diff --quiet HEAD) ignores untracked files.
+	if err := g.checkCleanWorkingDir(); err != nil {
+		t.Errorf("an untracked file must not block the release, got: %v", err)
+	}
+
+	if err := os.WriteFile("tracked.txt", []byte("changed\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := g.checkCleanWorkingDir(); err == nil {
+		t.Error("a modified tracked file must still be reported as dirty")
+	}
+}
+
+func TestCheckGitIdentity_EnvironmentIdentityIsAccepted(t *testing.T) {
+	initScratchRepo(t)
+	// Nothing in git config (isolated); identity only through the
+	// environment, as CI containers commonly do.
+	t.Setenv("GIT_AUTHOR_NAME", "CI Bot")
+	t.Setenv("GIT_AUTHOR_EMAIL", "ci@example.com")
+	t.Setenv("GIT_COMMITTER_NAME", "CI Bot")
+	t.Setenv("GIT_COMMITTER_EMAIL", "ci@example.com")
+
+	g := newTestGitWithConfig(&config.GitConfig{Commit: true}, false)
+	if err := g.checkGitIdentity(); err != nil {
+		t.Errorf("env-provided identity must pass (git commit would succeed), got: %v", err)
 	}
 }

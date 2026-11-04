@@ -994,8 +994,8 @@ func TestIntegration_Error_DirtyWorkingDirectory(t *testing.T) {
 	createTag(t, dir, "v1.0.0")
 	createCommits(t, dir, []string{"feat: feature"})
 
-	// Create uncommitted file to make working dir dirty
-	writeFile(t, filepath.Join(dir, "dirty.txt"), "uncommitted content")
+	// Modify a tracked file to make the working dir dirty
+	writeFile(t, filepath.Join(dir, "README.md"), "# Test Project\n\nuncommitted change to a tracked file\n")
 
 	cfg := newTestConfig(dir)
 	cfg.Git.RequireCleanWorkingDir = true
@@ -1008,6 +1008,33 @@ func TestIntegration_Error_DirtyWorkingDirectory(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "not clean") {
 		t.Errorf("expected 'not clean' in error, got: %v", err)
+	}
+}
+
+func TestIntegration_UntrackedFileDoesNotBlockRelease(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	dir := t.TempDir()
+	t.Chdir(dir)
+
+	initGitRepo(t, dir)
+	createTag(t, dir, "v1.0.0")
+	createCommits(t, dir, []string{"feat: feature"})
+
+	// npm release-it checks with `git diff --quiet HEAD`: an untracked local
+	// file (.env, scratch notes) is not an uncommitted change.
+	writeFile(t, filepath.Join(dir, "scratch.env"), "LOCAL=1")
+
+	cfg := newTestConfig(dir)
+	cfg.Git.RequireCleanWorkingDir = true
+	cfg.Increment = "minor"
+	cfg.DryRun = true
+
+	r := runner.NewRunner(cfg)
+	if err := r.Run(); err != nil {
+		t.Fatalf("an untracked file must not fail the clean-tree check, got: %v", err)
 	}
 }
 

@@ -125,13 +125,15 @@ func (g *Git) GetCommitCountSinceTag(tag string) (int, error) {
 	return count, nil
 }
 
-// GetContributorsSinceTag returns unique contributor names since the given tag.
+// GetContributorsSinceTag returns unique contributor (author) names since
+// the given tag. Author, not committer: for PRs squashed or merged through
+// the GitHub UI the committer is "GitHub", which hid the real people.
 func (g *Git) GetContributorsSinceTag(tag string) ([]string, error) {
 	var args []string
 	if tag == "" {
-		args = []string{"log", "--pretty=format:%cn", "HEAD"}
+		args = []string{"log", "--pretty=format:%an", "HEAD"}
 	} else {
-		args = []string{"log", "--pretty=format:%cn", tag + "..HEAD"}
+		args = []string{"log", "--pretty=format:%an", tag + "..HEAD"}
 	}
 	args = append(args, g.pathspec()...)
 

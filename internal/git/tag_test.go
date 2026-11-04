@@ -876,3 +876,103 @@ func TestGetLatestTag_ExplicitTagMatch_NoMatch_IsAnError(t *testing.T) {
 		t.Errorf("expected no-match error with explicit tagMatch, got tag %q", tag)
 	}
 }
+
+// --- describe receives the tag filters (npm --match/--exclude parity) ---
+
+func TestGetLatestTag_DescribeCarriesFilters(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  config.GitConfig
+		want []string
+	}{
+		{"bare version template", config.GitConfig{TagName: "${version}"}, []string{"--match=[0-9]*"}},
+		{"v template", config.GitConfig{TagName: "v${version}"}, []string{"--match=v*"}},
+		{"custom template", config.GitConfig{TagName: "release-${version}"}, []string{"--match=release-*"}},
+		{"explicit tagMatch wins", config.GitConfig{TagName: "v${version}", TagMatch: "app-*"}, []string{"--match=app-*"}},
+		{"tagExclude", config.GitConfig{TagName: "v${version}", TagExclude: "*-beta*"}, []string{"--match=v*", "--exclude=*-beta*"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			original := commandExecutor
+			defer func() { commandExecutor = original }()
+			var describeArgs []string
+			commandExecutor = func(name string, args ...string) (string, error) {
+				if args[0] == "describe" {
+					describeArgs = args
+					return "app-1.0.0", nil
+				}
+				return "", nil
+			}
+			g := newTestGitWithConfig(&tt.cfg, false)
+			_, _ = g.GetLatestTag()
+			joined := strings.Join(describeArgs, " ")
+			if !strings.HasPrefix(joined, "describe --tags --abbrev=0") {
+				t.Fatalf("describe args = %v", describeArgs)
+			}
+			for _, w := range tt.want {
+				if !strings.Contains(joined, w) {
+					t.Errorf("describe args %v should contain %q", describeArgs, w)
+				}
+			}
+		})
+	}
+}
+
+func TestGetLatestTag_ExplicitTagMatch_NoReachableMatch_IsFirstRelease(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	// Monorepo maintenance branch: the nearest reachable tag belongs to
+	// another package and app-2.0.0 exists only on main. The old all-refs
+	// fallback handed app-2.0.0 back regardless of reachability.
+	var listedAllRefs bool
+	commandExecutor = func(name string, args ...string) (string, error) {
+		cmd := strings.Join(args, " ")
+		switch {
+		case strings.HasPrefix(cmd, "describe") && strings.Contains(cmd, "--match=app-*"):
+			return "", fmt.Errorf("fatal: No names found, cannot describe anything")
+		case strings.HasPrefix(cmd, "describe"):
+			return "lib-3.0.0", nil
+		case strings.HasPrefix(cmd, "tag -l"):
+			listedAllRefs = true
+			return "app-2.0.0\nlib-3.0.0", nil
+		}
+		return "", nil
+	}
+
+	g := newTestGitWithConfig(&config.GitConfig{TagName: "${version}", TagMatch: "app-*"}, false)
+	_, err := g.GetLatestTag()
+	if err == nil {
+		t.Fatal("no reachable app-* tag must mean a first release for the package, not another branch's tag")
+	}
+	if listedAllRefs {
+		t.Error("an explicit tagMatch must never fall back to unreachable tags")
+	}
+}
+
+func TestGetLatestTag_DerivedFilter_NoReachableMatch_KeepsContinuity(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	// v-tagged repository with the default ${version} template: the
+	// filtered describe finds nothing, the raw describe keeps the version.
+	commandExecutor = func(name string, args ...string) (string, error) {
+		cmd := strings.Join(args, " ")
+		switch {
+		case strings.HasPrefix(cmd, "describe") && strings.Contains(cmd, "--match="):
+			return "", fmt.Errorf("fatal: No names found, cannot describe anything")
+		case cmd == "describe --tags --abbrev=0":
+			return "v1.4.0", nil
+		}
+		return "", fmt.Errorf("unexpected: %s", cmd)
+	}
+
+	g := newTestGitWithConfig(&config.GitConfig{TagName: "${version}"}, false)
+	tag, err := g.GetLatestTag()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if tag != "v1.4.0" {
+		t.Errorf("tag = %q, want v1.4.0 for version continuity", tag)
+	}
+}

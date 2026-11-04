@@ -88,13 +88,16 @@ func (g *Git) checkCleanWorkingDir() error {
 		return nil
 	}
 
-	out, err := g.runSilent("status", "--porcelain")
+	// Untracked files are not "uncommitted changes": npm release-it checks
+	// with `git diff --quiet HEAD`, which ignores them, and a stray local
+	// file (.env, editor scratch) must not block a release.
+	out, err := g.runSilent("status", "--porcelain", "--untracked-files=no")
 	if err != nil {
 		return fmt.Errorf("failed to check working directory status: %w", err)
 	}
 
 	if strings.TrimSpace(out) != "" {
-		return fmt.Errorf("working directory is not clean (uncommitted changes exist)")
+		return fmt.Errorf("working directory is not clean (uncommitted changes to tracked files exist)")
 	}
 
 	return nil
@@ -123,16 +126,18 @@ func (g *Git) checkGitIdentity() error {
 		return nil
 	}
 
-	name, _ := commandExecutor("git", "config", "user.name")
-	email, _ := commandExecutor("git", "config", "user.email")
-
-	name = strings.TrimSpace(name)
-	email = strings.TrimSpace(email)
-
-	if name == "" || email == "" {
-		return fmt.Errorf("git user identity is not configured (user.name or user.email is missing);\n" +
-			"  run: git config --global user.name \"Your Name\"\n" +
-			"       git config --global user.email \"you@example.com\"")
+	// `git var` resolves the identity exactly the way `git commit` does:
+	// GIT_AUTHOR_*/GIT_COMMITTER_* environment first (CI containers), then
+	// user.name/user.email config, and it fails when neither yields one.
+	// Reading `git config` alone rejected releases that would have worked.
+	for _, ident := range []string{"GIT_AUTHOR_IDENT", "GIT_COMMITTER_IDENT"} {
+		out, err := commandExecutor("git", "var", ident)
+		if err != nil || strings.TrimSpace(out) == "" {
+			return fmt.Errorf("git user identity is not configured (user.name or user.email is missing);\n" +
+				"  run: git config --global user.name \"Your Name\"\n" +
+				"       git config --global user.email \"you@example.com\"\n" +
+				"  or set GIT_AUTHOR_NAME/GIT_AUTHOR_EMAIL and GIT_COMMITTER_NAME/GIT_COMMITTER_EMAIL")
+		}
 	}
 
 	return nil

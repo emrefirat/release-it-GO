@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"fmt"
 	"os/exec"
+	"regexp"
 	"strings"
 
 	"github.com/emrefirat/release-it-GO/internal/config"
@@ -31,11 +32,21 @@ var commandExecutor = func(name string, args ...string) (string, error) {
 	out := strings.TrimSpace(stdout.String())
 	if err != nil {
 		if msg := strings.TrimSpace(stderr.String()); msg != "" {
-			return out, fmt.Errorf("%s: %w", msg, err)
+			return out, fmt.Errorf("%s: %w", redactCredentials(msg), err)
 		}
 		return out, err
 	}
 	return out, nil
+}
+
+// credentialPattern matches the userinfo part of a URL (https://user:token@host).
+var credentialPattern = regexp.MustCompile(`://[^@/\s]+@`)
+
+// redactCredentials hides URL credentials in text that is logged or returned
+// in errors: a pushRepo given as https://user:TOKEN@host/... appears in the
+// push arguments, the dry-run/debug command line and git's own messages.
+func redactCredentials(s string) string {
+	return credentialPattern.ReplaceAllString(s, "://***@")
 }
 
 // readOnlyCommands lists git subcommands that don't modify state.
@@ -69,7 +80,7 @@ func NewGit(cfg *config.GitConfig, logger *applog.Logger, dryRun bool) *Git {
 
 // run executes a git command. Write operations are skipped in dry-run mode.
 func (g *Git) run(args ...string) (string, error) {
-	cmdStr := fmt.Sprintf("git %s", strings.Join(args, " "))
+	cmdStr := redactCredentials(fmt.Sprintf("git %s", strings.Join(args, " ")))
 
 	if g.dryRun && isWriteOperation(args) {
 		g.logger.DryRun(cmdStr)
@@ -82,11 +93,26 @@ func (g *Git) run(args ...string) (string, error) {
 		// Keep both halves: git's stderr for the user, the root cause for
 		// errors.Is/As (project convention).
 		if strings.TrimSpace(out) == "" {
-			return out, fmt.Errorf("%s: %w", cmdStr, err)
+			return out, newGitError(fmt.Sprintf("%s: %v", cmdStr, err), err)
 		}
-		return out, fmt.Errorf("%s: %s: %w", cmdStr, strings.TrimSpace(out), err)
+		return out, newGitError(fmt.Sprintf("%s: %s: %v", cmdStr, strings.TrimSpace(out), err), err)
 	}
 	return out, nil
+}
+
+// gitError carries a user-facing message with URL credentials redacted while
+// still unwrapping to the root cause for errors.Is/As.
+type gitError struct {
+	msg   string
+	cause error
+}
+
+func (e *gitError) Error() string { return e.msg }
+func (e *gitError) Unwrap() error { return e.cause }
+
+// newGitError builds a gitError whose message is credential-redacted.
+func newGitError(msg string, cause error) error {
+	return &gitError{msg: redactCredentials(msg), cause: cause}
 }
 
 // runSilent executes a git command without logging the output.
@@ -96,9 +122,9 @@ func (g *Git) runSilent(args ...string) (string, error) {
 	out, err := commandExecutor("git", args...)
 	if err != nil {
 		if strings.TrimSpace(out) == "" {
-			return out, err
+			return out, newGitError(err.Error(), err)
 		}
-		return out, fmt.Errorf("%s: %w", strings.TrimSpace(out), err)
+		return out, newGitError(fmt.Sprintf("%s: %v", strings.TrimSpace(out), err), err)
 	}
 	return strings.TrimSpace(out), nil
 }

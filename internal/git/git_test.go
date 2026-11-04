@@ -199,3 +199,40 @@ func TestRunSilent_ErrorIncludesStderr(t *testing.T) {
 		t.Errorf("error text lost git stderr: %v", err)
 	}
 }
+
+func TestRedactCredentials(t *testing.T) {
+	tests := []struct{ in, want string }{
+		{"git push --follow-tags https://ci:s3cret@github.com/o/r.git", "git push --follow-tags https://***@github.com/o/r.git"},
+		{"fatal: unable to access 'https://user:tok@host/x/': 403", "fatal: unable to access 'https://***@host/x/': 403"},
+		{"ssh://git@host/o/r.git", "ssh://***@host/o/r.git"},
+		{"https://github.com/o/r.git", "https://github.com/o/r.git"},
+		{"git@github.com:o/r.git", "git@github.com:o/r.git"},
+	}
+	for _, tt := range tests {
+		if got := redactCredentials(tt.in); got != tt.want {
+			t.Errorf("redactCredentials(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
+func TestRun_ErrorAndCommandLineRedactCredentials(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+	commandExecutor = func(name string, args ...string) (string, error) {
+		return "", fmt.Errorf("fatal: unable to access 'https://ci:s3cret@github.com/o/r.git/': exit status 128")
+	}
+
+	cfg := config.DefaultConfig()
+	cfg.Git.PushRepo = "https://ci:s3cret@github.com/o/r.git"
+	g := NewGit(&cfg.Git, applog.NewLogger(0, false), false)
+	err := g.Push()
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if strings.Contains(err.Error(), "s3cret") {
+		t.Errorf("push error leaks the token: %v", err)
+	}
+	if !strings.Contains(err.Error(), "https://***@github.com/o/r.git") {
+		t.Errorf("redacted URL should remain recognizable: %v", err)
+	}
+}

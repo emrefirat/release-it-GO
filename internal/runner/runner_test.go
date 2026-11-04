@@ -728,6 +728,19 @@ func TestRunner_DetermineSemVer_InvalidVersion(t *testing.T) {
 
 // --- Helper to create a runner with mocked git commands ---
 
+// stripDerivedGitOptions removes options the git wrapper derives from config
+// (describe --match/--exclude, status --untracked-files) from a command key.
+func stripDerivedGitOptions(name string, args []string) string {
+	kept := make([]string, 0, len(args))
+	for _, a := range args {
+		if strings.HasPrefix(a, "--match=") || strings.HasPrefix(a, "--exclude=") || strings.HasPrefix(a, "--untracked-files=") {
+			continue
+		}
+		kept = append(kept, a)
+	}
+	return name + " " + strings.Join(kept, " ")
+}
+
 // setupMockedRunner creates a Runner with a mocked commandExecutor.
 // The cmdResponses map keys are full command strings like "git describe --tags --abbrev=0".
 func setupMockedRunner(t *testing.T, cfg *config.Config, cmdResponses map[string]struct {
@@ -739,6 +752,12 @@ func setupMockedRunner(t *testing.T, cfg *config.Config, cmdResponses map[string
 	restore := git.SetCommandExecutorForTest(func(name string, args ...string) (string, error) {
 		key := name + " " + strings.Join(args, " ")
 		if resp, ok := cmdResponses[key]; ok {
+			return resp.output, resp.err
+		}
+		// Filter options are derived from the config under test; mocks are
+		// keyed on the bare command so every test does not have to spell
+		// out the --match/--exclude/--untracked-files it implies.
+		if resp, ok := cmdResponses[stripDerivedGitOptions(name, args)]; ok {
 			return resp.output, resp.err
 		}
 		// Default: return empty for unknown commands to avoid test flakiness
@@ -2673,8 +2692,8 @@ func TestRunner_Run_FullPipeline_DryRun(t *testing.T) {
 		"git rev-parse --abbrev-ref HEAD":                   {output: "main", err: nil},
 		"git rev-parse --is-inside-work-tree":               {output: "true", err: nil},
 		"git status --porcelain":                            {output: "", err: nil},
-		"git config user.name":                              {output: "Test User", err: nil},
-		"git config user.email":                             {output: "test@example.com", err: nil},
+		"git var GIT_AUTHOR_IDENT":                          {output: "Test User <test@example.com> 1 +0000", err: nil},
+		"git var GIT_COMMITTER_IDENT":                       {output: "Test User <test@example.com> 1 +0000", err: nil},
 		"git describe --tags --abbrev=0":                    {output: "v1.0.0", err: nil},
 		"git log v1.0.0..HEAD --pretty=format:%h%x1f%B%x1e": {output: "abc001b\x1ffix: a fix\x1e", err: nil},
 		"git tag -l v1.0.1":                                 {output: "", err: nil},
@@ -3250,8 +3269,8 @@ func TestRunner_CheckPrerequisites_NoCommits(t *testing.T) {
 		"git rev-parse --is-inside-work-tree": {output: "true", err: nil},
 		"git rev-parse --abbrev-ref HEAD":     {output: "main", err: nil},
 		"git status --porcelain":              {output: "", err: nil},
-		"git config user.name":                {output: "Test", err: nil},
-		"git config user.email":               {output: "test@example.com", err: nil},
+		"git var GIT_AUTHOR_IDENT":            {output: "Test <test@example.com> 1 +0000", err: nil},
+		"git var GIT_COMMITTER_IDENT":         {output: "Test <test@example.com> 1 +0000", err: nil},
 		"git describe --tags --abbrev=0":      {output: "v1.0.0", err: nil},
 		// empty log output = no commits; checkCommits returns git.ErrNoCommits
 		"git log v1.0.0..HEAD --oneline": {output: "", err: nil},
@@ -4521,8 +4540,8 @@ func TestRunner_RunNoIncrement_MissingToken_FailsBeforeAnyGitWrite(t *testing.T)
 			return "true", nil
 		case strings.HasPrefix(call, "git describe"):
 			return "v1.0.0", nil
-		case strings.HasPrefix(call, "git config user."):
-			return "Test User", nil // identity check passes; the token check is the one under test
+		case strings.HasPrefix(call, "git var GIT_"):
+			return "Test User <test@example.com> 1 +0000", nil // identity check passes; the token check is the one under test
 		}
 		return "", nil
 	})

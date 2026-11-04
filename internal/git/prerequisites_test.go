@@ -153,17 +153,18 @@ func TestCheckUpstream(t *testing.T) {
 
 func TestCheckGitIdentity(t *testing.T) {
 	tests := []struct {
-		name     string
-		commit   bool
-		gitName  string
-		gitEmail string
-		wantErr  bool
+		name         string
+		commit       bool
+		authorIdent  string
+		authorErr    error
+		committerErr error
+		wantErr      bool
 	}{
-		{"commit disabled, no identity", false, "", "", false},
-		{"commit enabled, both set", true, "Test User", "test@example.com", false},
-		{"commit enabled, name missing", true, "", "test@example.com", true},
-		{"commit enabled, email missing", true, "Test User", "", true},
-		{"commit enabled, both missing", true, "", "", true},
+		{"commit disabled, no identity", false, "", fmt.Errorf("fatal: empty ident name"), fmt.Errorf("fatal: empty ident name"), false},
+		{"commit enabled, both resolved", true, "Test User <test@example.com> 1 +0000", nil, nil, false},
+		{"commit enabled, author unresolved", true, "", fmt.Errorf("fatal: empty ident name"), nil, true},
+		{"commit enabled, committer unresolved", true, "Test User <test@example.com> 1 +0000", nil, fmt.Errorf("fatal: unable to auto-detect email address"), true},
+		{"commit enabled, empty output", true, "", nil, nil, true},
 	}
 
 	for _, tt := range tests {
@@ -173,13 +174,13 @@ func TestCheckGitIdentity(t *testing.T) {
 
 			commandExecutor = func(name string, args ...string) (string, error) {
 				cmd := strings.Join(args, " ")
-				if strings.Contains(cmd, "config user.name") {
-					return tt.gitName, nil
+				switch cmd {
+				case "var GIT_AUTHOR_IDENT":
+					return tt.authorIdent, tt.authorErr
+				case "var GIT_COMMITTER_IDENT":
+					return tt.authorIdent, tt.committerErr
 				}
-				if strings.Contains(cmd, "config user.email") {
-					return tt.gitEmail, nil
-				}
-				return "", nil
+				return "", fmt.Errorf("unexpected command: %s", cmd)
 			}
 
 			cfg := &config.GitConfig{Commit: tt.commit}
@@ -191,8 +192,8 @@ func TestCheckGitIdentity(t *testing.T) {
 			}
 
 			if tt.wantErr && err != nil {
-				if !strings.Contains(err.Error(), "git user identity") {
-					t.Errorf("expected 'git user identity' in error, got: %v", err)
+				if !strings.Contains(err.Error(), "git user identity") || !strings.Contains(err.Error(), "GIT_COMMITTER_NAME") {
+					t.Errorf("error should explain both config and env ways, got: %v", err)
 				}
 			}
 		})

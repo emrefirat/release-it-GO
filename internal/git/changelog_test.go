@@ -372,3 +372,24 @@ func TestGetCommitCountSinceTag_CommitsPath_ScopesRevList(t *testing.T) {
 		t.Errorf("rev-list must be scoped with a pathspec, got: %v", capturedArgs)
 	}
 }
+
+func TestGetContributorsSinceTag_UsesAuthorNotCommitter(t *testing.T) {
+	original := commandExecutor
+	defer func() { commandExecutor = original }()
+
+	var captured []string
+	commandExecutor = func(name string, args ...string) (string, error) {
+		captured = args
+		return "Jane", nil
+	}
+
+	g := newTestGitWithConfig(&config.GitConfig{}, false)
+	if _, err := g.GetContributorsSinceTag("v1.0.0"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	joined := strings.Join(captured, " ")
+	// PRs squashed through the GitHub UI have committer "GitHub".
+	if !strings.Contains(joined, "%an") || strings.Contains(joined, "%cn") {
+		t.Errorf("contributors must come from the author field, got: %s", joined)
+	}
+}
