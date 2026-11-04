@@ -27,8 +27,10 @@ WORKDIR /workspace
 
 USER releaser
 
-# Allow mounted repositories to be used safely
-RUN git config --global --add safe.directory '*'
+# The repository is mounted at /workspace by a host user whose uid differs
+# from `releaser`; git refuses such a tree unless it is listed as safe. Only
+# the documented mount is trusted, not every directory.
+RUN git config --global --add safe.directory /workspace
 
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["--help"]

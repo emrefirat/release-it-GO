@@ -18,6 +18,14 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Anyone with write access can push a v* tag, and this job holds the
+      # GHCR credentials: refuse to publish a tag that is not on main.
+      - name: Require the tag to be on main
+        run: |
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main \
+            || { echo "::error::tag ${GITHUB_REF_NAME} is not reachable from main"; exit 1; }
+
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod

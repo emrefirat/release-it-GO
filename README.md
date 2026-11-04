@@ -462,7 +462,7 @@ Every release publishes a multi-arch image (linux/amd64, linux/arm64) to GitHub 
 docker pull ghcr.io/emrefirat/release-it-go:latest
 ```
 
-The image contains the static binary, git and CA certificates and runs as a non-root user. The entrypoint requires a git identity for commits:
+The image contains the static binary, git and CA certificates and runs as a non-root user; mount the repository at `/workspace` (the only path git is told to trust). The entrypoint requires a git identity for commits:
 
 ```bash
 docker run --rm \
