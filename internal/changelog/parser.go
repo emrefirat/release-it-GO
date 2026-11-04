@@ -102,9 +102,34 @@ func parseBodyAndFooters(text string) (string, []Footer) {
 		break
 	}
 
-	bodyLines := lines[:footerStartIdx]
-	for i := footerStartIdx; i < len(lines); i++ {
-		line := strings.TrimSpace(lines[i])
+	footers = parseFooterLines(lines[footerStartIdx:])
+
+	// BREAKING CHANGE paragraphs are not always the last one: GitHub's
+	// squash-merge appends "Co-authored-by:" as a separate paragraph after
+	// them, and trailing-paragraph-only detection then demoted a major bump
+	// to minor. Like conventional-commits-parser, honor a paragraph that
+	// starts with the breaking token anywhere in the body.
+	var bodyParagraphs []string
+	var breakingFooters []Footer
+	for _, paragraph := range splitParagraphs(lines[:footerStartIdx]) {
+		if breakingTokenPattern.MatchString(strings.TrimSpace(paragraph[0])) {
+			breakingFooters = append(breakingFooters, parseFooterLines(paragraph)...)
+			continue
+		}
+		bodyParagraphs = append(bodyParagraphs, strings.Join(paragraph, "\n"))
+	}
+	footers = append(breakingFooters, footers...)
+
+	body := strings.TrimSpace(strings.Join(bodyParagraphs, "\n\n"))
+	return body, footers
+}
+
+// parseFooterLines turns a block of footer lines into footers. Non-footer
+// lines are folded into the preceding footer's value.
+func parseFooterLines(lines []string) []Footer {
+	var footers []Footer
+	for _, raw := range lines {
+		line := strings.TrimSpace(raw)
 		if line == "" {
 			continue
 		}
@@ -120,10 +145,32 @@ func parseBodyAndFooters(text string) (string, []Footer) {
 			footers[len(footers)-1].Value += "\n" + line
 		}
 	}
-
-	body := strings.TrimSpace(strings.Join(bodyLines, "\n"))
-	return body, footers
+	return footers
 }
+
+// splitParagraphs groups lines into blank-line-separated paragraphs,
+// dropping the blank lines themselves.
+func splitParagraphs(lines []string) [][]string {
+	var paragraphs [][]string
+	var current []string
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			if len(current) > 0 {
+				paragraphs = append(paragraphs, current)
+				current = nil
+			}
+			continue
+		}
+		current = append(current, line)
+	}
+	if len(current) > 0 {
+		paragraphs = append(paragraphs, current)
+	}
+	return paragraphs
+}
+
+// breakingTokenPattern matches the start of a BREAKING CHANGE footer line.
+var breakingTokenPattern = regexp.MustCompile(`^BREAKING[ -]CHANGE\s*[:#]`)
 
 // footerPattern matches git trailer format: "Token: value" or "BREAKING CHANGE: value"
 var footerPattern = regexp.MustCompile(`^([A-Za-z-]+(?:\s+[A-Z]+)?)\s*[:#]\s*(.+)$`)

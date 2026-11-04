@@ -245,3 +245,72 @@ func TestParseCommits_Empty(t *testing.T) {
 		t.Errorf("len(commits) = %d, want 0", len(commits))
 	}
 }
+
+func TestParseCommit_BreakingChangeFollowedByCoAuthorParagraph(t *testing.T) {
+	// GitHub squash-merge appends Co-authored-by as its own paragraph.
+	raw := "feat: x\n\nBREAKING CHANGE: removed foo\n\nCo-authored-by: Jane <j@x.io>"
+	c := ParseCommit(raw, "abc1234")
+	if c == nil {
+		t.Fatal("expected commit")
+	}
+	if !c.BreakingChange {
+		t.Fatal("BreakingChange = false, want true")
+	}
+	if c.BreakingMessage != "removed foo" {
+		t.Errorf("BreakingMessage = %q, want 'removed foo'", c.BreakingMessage)
+	}
+	if len(c.Footers) != 2 || c.Footers[0].Token != "BREAKING CHANGE" || c.Footers[1].Token != "Co-authored-by" {
+		t.Errorf("Footers = %+v, want BREAKING CHANGE then Co-authored-by", c.Footers)
+	}
+	if c.Body != "" {
+		t.Errorf("Body = %q, want empty", c.Body)
+	}
+}
+
+func TestParseCommit_BreakingChangeParagraphBeforeProse(t *testing.T) {
+	raw := "feat: x\n\nBREAKING-CHANGE: dropped v1 API\nuse v2 instead\n\nMore details here.\n\nRefs: #12"
+	c := ParseCommit(raw, "abc1234")
+	if c == nil {
+		t.Fatal("expected commit")
+	}
+	if !c.BreakingChange {
+		t.Fatal("BreakingChange = false, want true")
+	}
+	if c.BreakingMessage != "dropped v1 API\nuse v2 instead" {
+		t.Errorf("BreakingMessage = %q", c.BreakingMessage)
+	}
+	if c.Body != "More details here." {
+		t.Errorf("Body = %q, want the prose paragraph only", c.Body)
+	}
+	if len(c.Footers) != 2 || c.Footers[1].Token != "Refs" {
+		t.Errorf("Footers = %+v", c.Footers)
+	}
+}
+
+func TestParseCommit_TokenLikeBodyParagraphStaysInBody(t *testing.T) {
+	// "Note: ..." looks like a trailer but sits in the body; only the
+	// trailing paragraph (and BREAKING CHANGE paragraphs) are footers.
+	raw := "fix: y\n\nNote: this touches the cache.\n\nCo-authored-by: Jane <j@x.io>"
+	c := ParseCommit(raw, "abc1234")
+	if c == nil {
+		t.Fatal("expected commit")
+	}
+	if c.BreakingChange {
+		t.Error("BreakingChange = true, want false")
+	}
+	if c.Body != "Note: this touches the cache." {
+		t.Errorf("Body = %q", c.Body)
+	}
+	if len(c.Footers) != 1 || c.Footers[0].Token != "Co-authored-by" {
+		t.Errorf("Footers = %+v", c.Footers)
+	}
+}
+
+func TestAnalyzeBump_BreakingFooterWithTrailingCoAuthor_IsMajor(t *testing.T) {
+	commits := ParseCommits([]RawCommit{
+		{Hash: "a", Message: "feat: x\n\nBREAKING CHANGE: removed foo\n\nCo-authored-by: Jane <j@x.io>"},
+	})
+	if got := AnalyzeBump(commits); got != BumpMajor {
+		t.Errorf("AnalyzeBump = %v, want BumpMajor", got)
+	}
+}
