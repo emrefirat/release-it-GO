@@ -50,6 +50,14 @@ func (c *Config) Validate() error {
 	if c.CalVer.Enabled && !calverFormats[c.CalVer.Format] {
 		add("calver.format %q is not supported (yy.mm.minor, yyyy.mm.minor, yyyy.mm.dd)", c.CalVer.Format)
 	}
+	// CalVer derives the version from the calendar; a SemVer increment or
+	// pre-release ID next to it was accepted and then silently ignored.
+	if c.CalVer.Enabled && c.PreReleaseID != "" {
+		add("preReleaseId %q cannot be combined with calver.enabled (CalVer has no pre-release series)", c.PreReleaseID)
+	}
+	if inc := c.Increment; c.CalVer.Enabled && inc != "" && inc != "no-increment" {
+		add("increment %q cannot be combined with calver.enabled (the calendar decides the version)", inc)
+	}
 
 	if strings.Contains(c.GitHub.Host, "://") {
 		add("github.host %q must be a host name without a scheme (e.g. github.mycompany.com)", c.GitHub.Host)
@@ -71,12 +79,20 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	if c.Bumper.In != nil && !bumperTypes[strings.ToLower(c.Bumper.In.Type)] {
-		add("bumper.in.type %q is not supported (json, yaml, toml, ini, text)", c.Bumper.In.Type)
+	if c.Bumper.In != nil {
+		if !bumperTypes[strings.ToLower(c.Bumper.In.Type)] {
+			add("bumper.in.type %q is not supported (json, yaml, toml, ini, text)", c.Bumper.In.Type)
+		}
+		if c.Bumper.In.File == "" {
+			add("bumper.in.file is required")
+		}
 	}
 	for i, out := range c.Bumper.Out {
 		if !bumperTypes[strings.ToLower(out.Type)] {
 			add("bumper.out[%d].type %q is not supported (json, yaml, toml, ini, text)", i, out.Type)
+		}
+		if out.File == "" {
+			add("bumper.out[%d].file is required", i)
 		}
 	}
 

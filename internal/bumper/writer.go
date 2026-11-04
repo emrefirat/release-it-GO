@@ -37,17 +37,18 @@ func WriteVersionToFileFrom(file config.BumperFile, from string, to string) erro
 	}
 
 	format := detectFormat(file)
+	path := effectivePath(file, format)
 
 	var updated []byte
 	switch format {
 	case FormatJSON:
-		updated, err = writeJSON(data, file.Path, finalVersion)
+		updated, err = writeJSON(data, path, finalVersion)
 	case FormatYAML:
-		updated, err = writeYAML(data, file.Path, finalVersion)
+		updated, err = writeYAML(data, path, finalVersion)
 	case FormatTOML:
-		updated, err = writeTOML(data, file.Path, finalVersion)
+		updated, err = writeTOML(data, path, finalVersion)
 	case FormatINI:
-		updated, err = writeINI(data, file.Path, finalVersion)
+		updated, err = writeINI(data, path, finalVersion)
 	case FormatText:
 		updated, err = replaceVersionInText(data, from, to, file.File)
 	default:

@@ -434,3 +434,17 @@ func TestWriteVersionToFileFrom_Text_DoesNotCorruptNeighbouringVersions(t *testi
 		t.Errorf("got:\n%s\nwant:\n%s", got, want)
 	}
 }
+
+func TestWriteVersionToFile_StructuredWithoutPath_WritesVersionKey(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "package.json")
+	if err := os.WriteFile(file, []byte("{\n  \"name\": \"x\",\n  \"version\": \"1.0.0\"\n}\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteVersionToFile(config.BumperFile{File: file}, "2.0.0"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got, _ := os.ReadFile(file)
+	if !strings.Contains(string(got), `"version": "2.0.0"`) || !strings.Contains(string(got), `"name": "x"`) {
+		t.Errorf("version key must be updated in place, got:\n%s", got)
+	}
+}

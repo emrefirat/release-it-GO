@@ -19,17 +19,18 @@ func ReadVersionFromFile(file config.BumperFile) (string, error) {
 	}
 
 	format := detectFormat(file)
+	path := effectivePath(file, format)
 
 	var version string
 	switch format {
 	case FormatJSON:
-		version, err = readJSON(data, file.Path)
+		version, err = readJSON(data, path)
 	case FormatYAML:
-		version, err = readYAML(data, file.Path)
+		version, err = readYAML(data, path)
 	case FormatTOML:
-		version, err = readTOML(data, file.Path)
+		version, err = readTOML(data, path)
 	case FormatINI:
-		version, err = readINI(data, file.Path)
+		version, err = readINI(data, path)
 	case FormatText:
 		version, err = readText(data)
 	default:

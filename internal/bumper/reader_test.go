@@ -232,3 +232,32 @@ func TestReadTOML_KeyNotFound(t *testing.T) {
 		t.Error("expected error for missing key")
 	}
 }
+
+func TestReadVersionFromFile_StructuredWithoutPath_DefaultsToVersionKey(t *testing.T) {
+	tests := []struct {
+		name    string
+		file    string
+		content string
+	}{
+		{"json", "package.json", `{"name": "x", "version": "1.0.0"}`},
+		{"yaml", "chart.yaml", "name: x\nversion: 1.0.0\n"},
+		{"toml", "pyproject.toml", "version = \"1.0.0\"\n[tool]\nname = \"x\"\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			file := filepath.Join(t.TempDir(), tt.file)
+			if err := os.WriteFile(file, []byte(tt.content), 0644); err != nil {
+				t.Fatal(err)
+			}
+			// npm's bumper defaults path to "version"; the whole document
+			// used to be stringified ("map[name:x version:1.0.0]").
+			v, err := ReadVersionFromFile(config.BumperFile{File: file})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if v != "1.0.0" {
+				t.Errorf("version = %q, want 1.0.0", v)
+			}
+		})
+	}
+}
