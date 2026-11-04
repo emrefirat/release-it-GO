@@ -668,6 +668,8 @@ The following variables can be used in `git.commitMessage`, `git.tagAnnotation`,
 
 Variables are filled in as the pipeline progresses: `${version}` and `${tagName}` are known from the version step on, `${changelog}` after the changelog step, `${releaseUrl}` after the GitHub/GitLab step.
 
+`${...}` placeholders are substituted into the shell command line in a single pass (a value is never re-expanded). Because `${changelog}` contains text written by commit authors, read it through `RELEASE_CHANGELOG` in your script rather than splicing it into the command. `RELEASE_*` values are capped at 96 KiB (with a trailing `[truncated ...]` marker) so a very large changelog cannot exceed the operating system's per-variable limit.
+
 ## Shell Completions
 
 ```bash

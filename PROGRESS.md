@@ -39,10 +39,11 @@
 | 29 | Test Hygiene & Distribution/CI Trust (absorbs planned Phase 24) | Complete | 100% |
 | 30 | Documentation Sync | Complete | 100% |
 | 31 | Third Audit — Critical Fixes | Complete | 100% |
+| 32 | Third Audit — Low-Severity Cleanup | Complete | 100% |
 
 **Last Updated:** 2026-11-04
 **Active Developer:** Claude
-**Current Version:** v0.4.2 (Phase 31: third audit, 7 critical + 13 medium fixes)
+**Current Version:** v0.4.2 + Phase 32 fixes (unreleased)
 
 ---
 
@@ -828,6 +829,30 @@
 
 ---
 
+## Phase 32: Third Audit — Low-Severity Cleanup
+
+**Status:** Complete
+**PRD:** `docs/phase_32.md`
+
+### To Do
+
+- [x] INI bumper keeps spacing, inline comments and CRLF; reader strips inline comments
+- [x] JSON fallback re-marshal no longer HTML-escapes
+- [x] `Revert "..."` subjects parsed as revert commits (patch bump, Reverts section)
+- [x] npm `conventional-changelog` `infile: false` honored (no file written)
+- [x] Hook templates rendered in a single pass; `RELEASE_*` values capped at 96 KiB
+- [x] `hooks install` output deterministic (no date) and executable bit restored
+- [x] `version` recognizes untagged pseudo-versions
+- [x] Proxy URL never logged; GitLab `pr` comment target → merge requests
+- [x] Dead `version.go` helpers removed
+
+### Notes
+
+- CalVer still uses local time; left as a product decision.
+- `${changelog}` in hook commands remains a shell-splicing risk by design (same as npm); README now points at `RELEASE_CHANGELOG`.
+
+---
+
 ## Bugs
 
 - [x] BUG: First-release changelog "exit status 128" error (2026-02-16) → When `LatestVersion=0.0.0`, the `v0.0.0` tag was searched but no such tag exists. The `latestVersionToTag()` helper was added: returns empty for `0.0.0` or empty string, so `GetCommitsSinceTag("")` returns all commits. 3 sites affected: `RunChangelogOnly`, `generateChangelog`, `autoDetectIncrement`.
@@ -892,6 +917,16 @@
 - [x] BUG: git stderr parsed as command output (2026-11-04) → `CombinedOutput` fed trace lines / warnings into branch name, porcelain status, describe and `rev-list --count` (digit-scraped into a huge number). Fix: separate buffers, stderr only in errors, strict count parsing.
 - [x] BUG: valid npm `.release-it.json` files failed the strict loader (2026-11-04) → `$schema`, `github.update`, `preReleaseBase`, `hooks.after:git:bump` were fatal unknown keys; `@release-it/bumper` was dropped silently; top-level typos reported as `config.Config.incremnt` with no suggestion. Fix: see Phase 31.
 - [x] BUG: GitHub Enterprise asset uploads 404ed (2026-11-04) → upload URL derived by string replace on the REST base (no-op on GHES); the API's `upload_url` was parsed and ignored. Fix: `upload_url` is the upload base, `/api/uploads` fallback.
+- [x] BUG: INI bumper rewrote the whole line (2026-11-04) → inline comment, spacing and CR lost; reader returned `1.0.0 ; comment`. Fix: value-span replacement, comment stripped on read.
+- [x] BUG: JSON fallback HTML-escaped `&`, `<`, `>` (2026-11-04) → `json.Encoder` with `SetEscapeHTML(false)`.
+- [x] BUG: git revert subjects were dropped from the changelog and bump analysis (2026-11-04) → parsed as `revert`.
+- [x] BUG: npm `infile: false` wrote CHANGELOG.md anyway (2026-11-04) → `Infile` cleared.
+- [x] BUG: hook template rendering depended on map iteration order (2026-11-04) → single-pass regexp.
+- [x] BUG: huge `RELEASE_CHANGELOG` made every hook fail with "argument list too long" (2026-11-04) → 96 KiB cap with marker.
+- [x] BUG: `hooks install` rewrote scripts daily and did not restore 0755 (2026-11-04) → no date, chmod after write.
+- [x] BUG: `version` printed `commit: none` for `v0.0.0-<ts>-<hash>` builds (2026-11-04) → regex accepts the dash form.
+- [x] BUG: unparseable `github.proxy` logged with its credentials (2026-11-04) → value not logged.
+- [x] BUG: GitLab `PostComment` sent `pr` targets to issues (2026-11-04) → merge_requests.
 - [x] BUG: `requireCleanWorkingDir` rejected untracked files (2026-11-04) → `status --porcelain` lists `??`; npm uses `git diff --quiet HEAD`. Fix: `--untracked-files=no`.
 - [x] BUG: git identity from `GIT_COMMITTER_*` env was rejected (2026-11-04) → only `git config` was consulted. Fix: `git var GIT_AUTHOR_IDENT` / `GIT_COMMITTER_IDENT`, exactly what `git commit` resolves.
 - [x] BUG: `git describe` ignored tag filters and the fallback ignored reachability (2026-11-04) → monorepo maintenance branch picked up another branch's `app-*` tag. Fix: `--match`/`--exclude` on describe; explicit `tagMatch` never falls back to all refs.
@@ -1000,6 +1035,7 @@
 | 2026-09-02 | Claude | Phase 29 complete: git-isolated tests + t.Chdir, end-to-end hook/env/bumper/positional/retry coverage, real module path for `go install`, goreleaser v2.6 syntax, gitignore anchor, CI coverage gate + pinned govulncheck + OS matrix + dependabot, atomic release push, CHANGELOG 0.2.0/0.3.0 entries |
 | 2026-09-02 | Claude | Phase 30 complete: 12 wrong doc statements fixed, README sections for every behavior added since Phase 23, ARCHITECTURE/CLAUDE.md synced, ADR-014..018, help texts corrected. Second audit cycle (Phases 27–30) closed |
 | 2026-09-03 | Claude | v0.4.0 released with the tool itself (13 GoReleaser assets); dependabot enabled and its 5 PRs landed; x/text + x/sys bumped (govulncheck clean); Windows CI job blocking; `version` falls back to ReadBuildInfo for `go install` builds |
+| 2026-11-04 | Claude | v0.4.2 released (15 commits, 13 GoReleaser assets, CI green); Phase 32 complete: 10 low-severity findings + npm `infile: false` fixed in 7 commits with tests, dead `version.go` removed |
 | 2026-11-04 | Claude | Phase 31 medium batch: 13 verified findings fixed in 4 package-group commits with tests (git prerequisites/describe/URL redaction/scp users/`%an`, upload client + milestones + Retry-After cap + GitLab fallback link, keep-a-changelog Unreleased/CRLF + webhook URL leak + Windows hook quoting, CalVer validation + bumper default path) |
 | 2026-11-04 | Claude | Third full audit on v0.4.1 (runner by hand + 4 parallel package reviews); Go 1.26.10; Phase 31 complete: 7 verified critical fixes, each with regression tests (prepatch on pre-release, BREAKING CHANGE paragraph, text bumper boundaries, git stderr separation, npm config compat incl. `@release-it/bumper`, GHES upload_url, pre-release base with custom templates); medium/low backlog recorded in `docs/phase_31.md` |
 

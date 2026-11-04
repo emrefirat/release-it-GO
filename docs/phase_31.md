@@ -42,6 +42,6 @@ Kullanıcı onayıyla 13 orta bulgu da düzeltildi; dört paket-grubu commit'i, 
 
 **Davranış değişiklikleri (not):** untracked dosyalar artık release'i engellemez (npm paritesi); env ile verilen identity kabul edilir; explicit `tagMatch` ile erişilebilir eşleşme yoksa paket ilk release'inden başlar (başka daldan tag miras almaz).
 
-## Kalan Bulgular (Faz 32 adayı)
+## Kalan Bulgular
 
-**Düşük:** INI inline comment/CRLF kaybı, `Revert "..."` commit'leri changelog'dan düşüyor, `hooks install` idempotent değil (tarih) + 0755 yeniden uygulanmıyor, `version` fallback `v0.0.0-<ts>-<hash>` formunu kaçırıyor, `RELEASE_CHANGELOG` env limiti, `version.go` ölü kod, proxy URL şifresi log'da, `PostComment` ölü kod, JSON fallback HTML-escape, `${changelog}` hook template'inde shell injection (env var yolu güvenli).
+Düşük seviye liste Faz 32 olarak aynı gün kapatıldı → `docs/phase_32.md`. Açık kalan tek karar: CalVer `time.Now()` yerel saat kullanıyor (ürün kararı, değiştirilmedi).
