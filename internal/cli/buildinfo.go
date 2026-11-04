@@ -30,10 +30,11 @@ var readBuildInfo = func() *debug.BuildInfo {
 	return info
 }
 
-// pseudoVersionHash captures the commit hash of a Go pseudo-version; the
-// timestamp always follows a dot (v0.4.1-0.20260903103000-b2afd41c0ffe,
-// v0.5.0-beta.0.20260903103000-b2afd41c0ffe).
-var pseudoVersionHash = regexp.MustCompile(`\.\d{14}-([0-9a-f]{12})$`)
+// pseudoVersionHash captures the commit hash of a Go pseudo-version. The
+// timestamp follows a dot after a tagged base (v0.4.1-0.20260903103000-…,
+// v0.5.0-beta.0.20260903103000-…) and a dash when no tag is reachable
+// (v0.0.0-20260903103000-…, the `go install …@main` form).
+var pseudoVersionHash = regexp.MustCompile(`[.-]\d{14}-([0-9a-f]{12})$`)
 
 // shortHashLen is the abbreviated commit length used everywhere in the output.
 const shortHashLen = 7

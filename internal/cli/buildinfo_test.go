@@ -113,3 +113,16 @@ func TestVersionCommand_UsesResolvedBuildInfo(t *testing.T) {
 		t.Errorf("version output = %q, want %q", out.String(), want)
 	}
 }
+
+func TestResolveBuildInfo_UntaggedPseudoVersionCommit(t *testing.T) {
+	// `go install …@main` on a repository with no reachable tag: the
+	// timestamp follows a dash, not a dot.
+	info := &debug.BuildInfo{Main: debug.Module{Version: "v0.0.0-20260903103000-b2afd41c0ffe"}}
+	got := resolveBuildInfo(BuildInfo{Version: unsetVersion, Commit: unsetCommit, Date: unsetDate}, info)
+	if got.Commit != "b2afd41" {
+		t.Errorf("Commit = %q, want b2afd41", got.Commit)
+	}
+	if got.Version != "0.0.0-20260903103000-b2afd41c0ffe" {
+		t.Errorf("Version = %q", got.Version)
+	}
+}
