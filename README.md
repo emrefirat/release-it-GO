@@ -456,15 +456,23 @@ Notification failures are non-fatal — they log a warning but don't stop the re
 
 ## Docker
 
-The image is built locally (`make docker-build`); it contains the static binary, git and CA certificates and runs as a non-root user. The entrypoint requires a git identity for commits:
+Every release publishes a multi-arch image (linux/amd64, linux/arm64) to GitHub Container Registry, tagged `<version>`, `<major>.<minor>` and `latest`:
+
+```bash
+docker pull ghcr.io/emrefirat/release-it-go:latest
+```
+
+The image contains the static binary, git and CA certificates and runs as a non-root user. The entrypoint requires a git identity for commits:
 
 ```bash
 docker run --rm \
   -v "$(pwd):/workspace" \
   -e GIT_USER_NAME="Release Bot" -e GIT_USER_EMAIL="bot@example.com" \
   -e GITHUB_TOKEN \
-  release-it-go:latest --ci
+  ghcr.io/emrefirat/release-it-go:latest --ci
 ```
+
+For local development `make docker-build` builds the same image from source (`Dockerfile`), and `make docker-snapshot` builds the published variant through GoReleaser without pushing.
 
 Only `version`, `completion` and `--help` skip the identity check; every other invocation (including `--dry-run` and `--changelog`) needs the two variables.
 

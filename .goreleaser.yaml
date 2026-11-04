@@ -55,6 +55,31 @@ release:
   prerelease: auto
   name_template: "v{{.Version}}"
 
+# Multi-arch image on GHCR, built and pushed by buildx in one step
+# (GoReleaser dockers_v2, v2.12+). Snapshot runs build per-platform images
+# locally instead (`make docker-snapshot`).
+dockers_v2:
+  - id: ghcr
+    images:
+      - ghcr.io/emrefirat/release-it-go
+    tags:
+      - "{{ .Version }}"
+      - "{{ if not .Prerelease }}{{ .Major }}.{{ .Minor }}{{ end }}"
+      - "{{ if not .Prerelease }}latest{{ end }}"
+    dockerfile: Dockerfile.goreleaser
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    extra_files:
+      - docker-entrypoint.sh
+    labels:
+      "org.opencontainers.image.version": "{{ .Version }}"
+      "org.opencontainers.image.revision": "{{ .FullCommit }}"
+      "org.opencontainers.image.created": "{{ .Date }}"
+    annotations:
+      "org.opencontainers.image.description": "Release automation tool for Git projects"
+      "org.opencontainers.image.source": "https://github.com/emrefirat/release-it-GO"
+
 nfpms:
   - package_name: release-it-go
     homepage: "https://github.com/emrefirat/release-it-GO"

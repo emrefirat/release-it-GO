@@ -250,10 +250,11 @@ Modular rule files. **Read these when the summary above isn't enough**:
 |------|-------------|
 | `Makefile` | Build, test, lint, docker — version injection via ldflags |
 | `.goreleaser.yaml` | Multi-platform release (linux/darwin/windows × amd64/arm64), nfpm (deb/rpm/apk) |
-| `Dockerfile` | Multi-stage (golang:1.26.10-alpine builder + alpine:3.21 runtime), non-root user (releaser:1000), static binary |
+| `Dockerfile` | Multi-stage (golang:1.26.10-alpine builder + alpine:3.21 runtime), non-root user (releaser:1000), static binary — local `make docker-build` |
+| `Dockerfile.goreleaser` | Runtime-only image GoReleaser publishes to `ghcr.io/emrefirat/release-it-go` (dockers_v2, linux/amd64 + arm64) |
 | `docker-entrypoint.sh` | Git identity check for Docker, info-only command support |
 | `.github/workflows/ci.yml` | CI: build + vet + test + race + 70% coverage gate + lint + govulncheck (pinned) + macOS/Windows build + unit matrix |
-| `.github/workflows/build.yml` | Multi-platform build via GoReleaser |
+| `.github/workflows/build.yml` | Multi-platform build via GoReleaser + GHCR image push |
 | `.github/workflows/release.yml` | Self-hosting: release-it-go creates the tag, GoReleaser builds the binary release |
 | `.golangci.yml` or golangci-lint config | Not present — uses defaults |
 

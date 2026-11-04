@@ -1,4 +1,4 @@
-.PHONY: build install test test-unit test-integration lint fmt vet tidy vuln coverage check clean all docker-build docker-run
+.PHONY: build install test test-unit test-integration lint fmt vet tidy vuln coverage check clean all docker-build docker-snapshot docker-run
 
 BINARY_NAME=release-it-go
 BUILD_DIR=bin
@@ -57,6 +57,10 @@ docker-build:
 		--build-arg COMMIT=$(COMMIT) \
 		--build-arg BUILD_DATE=$(BUILD_DATE) \
 		-t $(BINARY_NAME):latest .
+
+# Build the GHCR images locally the way GoReleaser does (no push).
+docker-snapshot:
+	goreleaser release --snapshot --clean
 
 docker-run:
 	docker run --rm -v $(PWD):/workspace -e GITHUB_TOKEN -e GIT_USER_NAME -e GIT_USER_EMAIL $(BINARY_NAME):latest --ci

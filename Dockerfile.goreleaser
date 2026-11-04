@@ -1,0 +1,34 @@
+# Runtime image published by GoReleaser (ghcr.io/emrefirat/release-it-go).
+# GoReleaser's build context holds only the pre-built binaries (one directory
+# per platform) plus the extra_files listed in .goreleaser.yaml; the full
+# multi-stage build for local development lives in ./Dockerfile.
+FROM alpine:3.21
+
+ARG TARGETPLATFORM
+ARG USER_UID=1000
+ARG USER_GID=1000
+
+LABEL org.opencontainers.image.title="release-it-go" \
+      org.opencontainers.image.description="Release automation tool for Git projects" \
+      org.opencontainers.image.source="https://github.com/emrefirat/release-it-GO" \
+      org.opencontainers.image.licenses="MIT"
+
+# The binary shells out to git for every operation.
+RUN apk add --no-cache git openssh-client ca-certificates
+
+RUN addgroup -g ${USER_GID} releaser && \
+    adduser -D -u ${USER_UID} -G releaser releaser
+
+COPY ${TARGETPLATFORM}/release-it-go /usr/local/bin/release-it-go
+COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+
+RUN mkdir -p /workspace && chown releaser:releaser /workspace
+WORKDIR /workspace
+
+USER releaser
+
+# Allow mounted repositories to be used safely
+RUN git config --global --add safe.directory '*'
+
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["--help"]

@@ -19,3 +19,6 @@ coverage.html
 
 # Local scratch
 /deneme4/
+
+# GoReleaser output (make docker-snapshot)
+/dist/
