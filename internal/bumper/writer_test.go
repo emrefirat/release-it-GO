@@ -381,3 +381,56 @@ func TestWriteVersionToFile_ConsumeWholeFile_RemainsTheOnlyOverwritePath(t *test
 		t.Errorf("consumeWholeFile must overwrite the whole file, got %q", got)
 	}
 }
+
+func TestReplaceVersionInText_WholeVersionOnly(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"longer major is untouched", "Latest: v11.0.0\n", "Latest: v11.0.0\n"},
+		{"four-part version is untouched", "history 1.0.0.1\n", "history 1.0.0.1\n"},
+		{"version with alpha suffix is untouched", "1.0.0rc1\n", "1.0.0rc1\n"},
+		{"v-prefixed match is replaced", "tag v1.0.0\n", "tag v2.0.0\n"},
+		{"caret-prefixed match is replaced", "lib ^1.0.0\n", "lib ^2.0.0\n"},
+		{"match at end of file", "version: 1.0.0", "version: 2.0.0"},
+		{"match at start of file", "1.0.0 is current", "2.0.0 is current"},
+		{"mixed line", "v11.0.0 and v1.0.0 and 1.0.0.1 and 1.0.0\n", "v11.0.0 and v2.0.0 and 1.0.0.1 and 2.0.0\n"},
+		{"download path", "download/v1.0.0/app_1.0.0_linux.tar.gz\n", "download/v2.0.0/app_2.0.0_linux.tar.gz\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := replaceVersionInText([]byte(tt.in), "1.0.0", "2.0.0", "x")
+			if tt.in == tt.want {
+				if err == nil {
+					t.Fatalf("expected a not-found error when no whole-version match exists, got %q", got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if string(got) != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestWriteVersionToFileFrom_Text_DoesNotCorruptNeighbouringVersions(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "README.md")
+	original := "Current: 1.0.0\nCompat: v11.0.0, 1.0.0.1, 10.0.0\n"
+	if err := os.WriteFile(file, []byte(original), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := WriteVersionToFileFrom(config.BumperFile{File: file}, "1.0.0", "2.0.0"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got, _ := os.ReadFile(file)
+	want := "Current: 2.0.0\nCompat: v11.0.0, 1.0.0.1, 10.0.0\n"
+	if string(got) != want {
+		t.Errorf("got:\n%s\nwant:\n%s", got, want)
+	}
+}

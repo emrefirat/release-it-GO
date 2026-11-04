@@ -287,12 +287,62 @@ func setNestedValue(obj map[string]interface{}, path string, value string) error
 // behavior — silently destroyed documentation. Without a known current
 // version, or when it does not occur in the file, refuse and point at the
 // explicit consumeWholeFile opt-in instead of guessing.
+//
+// Only whole-version occurrences are replaced: "1.0.0" must not turn
+// "v11.0.0" into "v12.0.0" or "1.0.0.1" into "2.0.0.1" (compat matrices and
+// changelogs list other versions). A match may be preceded by anything but a
+// digit or a dot (so "v1.0.0" and "^1.0.0" count) and followed by anything
+// but a digit, letter or dot.
 func replaceVersionInText(data []byte, from string, to string, name string) ([]byte, error) {
 	if from == "" {
 		return nil, fmt.Errorf("%s: current version is unknown, cannot replace it in a text file (set consumeWholeFile: true to overwrite the whole file, or configure bumper.in)", name)
 	}
-	if !strings.Contains(string(data), from) {
+
+	text := string(data)
+	var b strings.Builder
+	b.Grow(len(text))
+	replaced := 0
+	for i := 0; i < len(text); {
+		idx := strings.Index(text[i:], from)
+		if idx < 0 {
+			b.WriteString(text[i:])
+			break
+		}
+		start := i + idx
+		end := start + len(from)
+		b.WriteString(text[i:start])
+		if isWholeVersionMatch(text, start, end) {
+			b.WriteString(to)
+			replaced++
+		} else {
+			b.WriteString(from)
+		}
+		i = end
+	}
+
+	if replaced == 0 {
 		return nil, fmt.Errorf("%s: current version %q not found in file (set consumeWholeFile: true to overwrite the whole file)", name, from)
 	}
-	return []byte(strings.ReplaceAll(string(data), from, to)), nil
+	return []byte(b.String()), nil
 }
+
+// isWholeVersionMatch reports whether text[start:end] is a standalone version
+// token rather than part of a longer version-like string.
+func isWholeVersionMatch(text string, start int, end int) bool {
+	if start > 0 {
+		c := text[start-1]
+		if isDigit(c) || c == '.' {
+			return false
+		}
+	}
+	if end < len(text) {
+		c := text[end]
+		if isDigit(c) || isLetter(c) || c == '.' {
+			return false
+		}
+	}
+	return true
+}
+
+func isDigit(c byte) bool  { return c >= '0' && c <= '9' }
+func isLetter(c byte) bool { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') }
