@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"runtime"
 	"strings"
 	"unicode"
@@ -158,12 +159,25 @@ func windowsCmdLine(shell string, command string) string {
 	return fmt.Sprintf("\"%s\" /S /C \"%s\"", shell, command)
 }
 
+// maxEnvValueLen bounds a single RELEASE_* value. Linux rejects any single
+// environment string over 128 KiB (MAX_ARG_STRLEN) with "argument list too
+// long", which made every hook — even `echo done` — fail on a release with a
+// large changelog.
+const maxEnvValueLen = 96 * 1024
+
+// envTruncatedMarker is appended to a value that was cut to fit.
+const envTruncatedMarker = "\n[truncated by release-it-go: value exceeded 96 KiB]"
+
 // envVars exposes the template variables as RELEASE_* environment variables
 // (version → RELEASE_VERSION, repo.owner → RELEASE_REPO_OWNER, ...) so hook
 // scripts can read values without ${var} splicing and its quoting pitfalls.
 func (h *HookRunner) envVars() []string {
 	env := make([]string, 0, len(h.vars))
 	for key, value := range h.vars {
+		if len(value) > maxEnvValueLen {
+			value = value[:maxEnvValueLen] + envTruncatedMarker
+			h.logger.Verbose("RELEASE_%s truncated to %d bytes for the hook environment", envKey(key), maxEnvValueLen)
+		}
 		env = append(env, "RELEASE_"+envKey(key)+"="+value)
 	}
 	return env
@@ -189,12 +203,22 @@ func envKey(key string) string {
 	return b.String()
 }
 
-// renderTemplate replaces ${var} placeholders in the command string.
+// templateVarPattern matches ${var} placeholders (dotted keys allowed).
+var templateVarPattern = regexp.MustCompile(`\$\{([A-Za-z][A-Za-z0-9.]*)\}`)
+
+// renderTemplate replaces ${var} placeholders in the command string in a
+// single pass: a substituted value (a changelog quoting "${version}" from a
+// commit message) is never expanded again, and the result no longer depends
+// on map iteration order. Unknown placeholders are kept literal.
+//
+// Values are spliced into a shell command line, so ${changelog} — text
+// written by commit authors — should be consumed through the
+// RELEASE_CHANGELOG environment variable instead.
 func renderTemplate(cmd string, vars map[string]string) string {
-	result := cmd
-	for key, value := range vars {
-		placeholder := "${" + key + "}"
-		result = strings.ReplaceAll(result, placeholder, value)
-	}
-	return result
+	return templateVarPattern.ReplaceAllStringFunc(cmd, func(m string) string {
+		if v, ok := vars[m[2:len(m)-1]]; ok {
+			return v
+		}
+		return m
+	})
 }

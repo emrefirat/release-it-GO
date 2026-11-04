@@ -339,3 +339,42 @@ func TestGetHooks_EveryPipelineStepHasAField(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderTemplate_SinglePass_NoReexpansionAndOrderIndependent(t *testing.T) {
+	vars := map[string]string{
+		"version":   "1.2.0",
+		"changelog": "fix: handle ${version} placeholder literally",
+	}
+	got := renderTemplate("notify ${changelog} for ${version}", vars)
+	want := "notify fix: handle ${version} placeholder literally for 1.2.0"
+	if got != want {
+		t.Errorf("got %q\nwant %q", got, want)
+	}
+	// Unknown placeholders stay literal; dotted keys work.
+	vars["repo.owner"] = "acme"
+	if got := renderTemplate("${repo.owner}/${unknown}", vars); got != "acme/${unknown}" {
+		t.Errorf("got %q", got)
+	}
+}
+
+func TestEnvVars_TruncatesOversizedValues(t *testing.T) {
+	h := NewHookRunner(&config.HooksConfig{}, applog.NewLogger(0, false), false)
+	big := strings.Repeat("x", maxEnvValueLen+10)
+	h.SetVars(map[string]string{"changelog": big, "version": "1.0.0"})
+
+	for _, kv := range h.envVars() {
+		switch {
+		case strings.HasPrefix(kv, "RELEASE_CHANGELOG="):
+			if len(kv) > maxEnvValueLen+len("RELEASE_CHANGELOG=")+len(envTruncatedMarker) {
+				t.Errorf("RELEASE_CHANGELOG not capped: %d bytes", len(kv))
+			}
+			if !strings.HasSuffix(kv, envTruncatedMarker) {
+				t.Error("a truncated value must say so")
+			}
+		case strings.HasPrefix(kv, "RELEASE_VERSION="):
+			if kv != "RELEASE_VERSION=1.0.0" {
+				t.Errorf("small values must be untouched, got %q", kv)
+			}
+		}
+	}
+}
