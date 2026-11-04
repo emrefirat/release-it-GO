@@ -20,20 +20,28 @@ v0.4.1 üzerinde üçüncü tam denetim (runner elle; git, release/httputil, con
 | 6 | GHES asset upload `api.github.com→uploads.github.com` replace ile türetiliyor (no-op); API'nin `upload_url`'i kullanılmıyor | `release/github.go` | Enterprise'da her asset 404 (tag push'tan sonra) | ✅ `upload_url` + `/api/uploads` fallback |
 | 7 | `resolvePreReleaseBaseTag` raw tag'i `VersionFromTag` olmadan parse ediyor | `runner.go` | `release-${version}` ile beta serisi hiç devam etmiyor | ✅ |
 
-## Kalan Bulgular (Faz 32 adayı)
+## Orta Seviye Bulgular (aynı gün, ikinci tur)
 
-**Orta:**
-- `requireCleanWorkingDir` untracked dosyaları kirli sayıyor (npm `git diff --quiet HEAD`) — `prerequisites.go`
-- `checkGitIdentity` yalnız `git config` bakıyor; `GIT_COMMITTER_*` env ile çalışan CI'lar reddediliyor (`git var GIT_COMMITTER_IDENT`)
-- `git describe` `tagMatch`/`tagExclude` geçmiyor; fallback `--merged HEAD` yapmıyor (monorepo'da yanlış dal sürümü)
-- `pushRepo` URL verilince token'lı URL log/hata mesajına yazılıyor; npm URL fallback'i yok
-- Windows hook'larında çift tırnak `cmd.exe /C` kaçışında bozuluyor (`SysProcAttr.CmdLine`)
-- Webhook URL'si bozuksa (`\n`) `http.NewRequest` `url.Error`'ı secret'ı sızdırıyor
-- keep-a-changelog `## [Unreleased]` işlenmiyor; CRLF dosyada karışık satır sonu; header eşleşmesi satır başına bağlı değil
-- GitLab `milestones` `${version}` render edilmiyor; project-uploads fallback linki kırık; upload'lara 30s `Client.Timeout`
-- CalVer + `preReleaseId`/`increment` config'ten gelince `Validate()` sessiz
-- Bumper `path` boşsa tüm doküman sürüm olarak okunuyor (npm default `version`)
-- `Retry-After` sınırsız; contributors `%cn` (committer) → squash-merge'de "GitHub"
-- scp-style SSH remote yalnız `git@` kabul ediyor (`org-123@github.com:` reddediliyor)
+Kullanıcı onayıyla 13 orta bulgu da düzeltildi; dört paket-grubu commit'i, her biri regresyon testli.
+
+| # | Bulgu | Yer | Durum |
+|---|-------|-----|-------|
+| 1 | `requireCleanWorkingDir` untracked dosyaları kirli sayıyordu (npm `git diff --quiet HEAD`) | `prerequisites.go` | ✅ `--untracked-files=no`; gerçek git testi |
+| 2 | Identity yalnız `git config`'ten; `GIT_COMMITTER_*` env ile CI reddediliyordu | `prerequisites.go` | ✅ `git var GIT_AUTHOR_IDENT`/`GIT_COMMITTER_IDENT` |
+| 3 | `git describe` filtre geçmiyor; fallback erişilebilirliğe bakmıyordu | `tag.go` | ✅ `--match`/`--exclude`; explicit `tagMatch` eşleşmezse ilk release |
+| 4 | `pushRepo` URL → token log/hata mesajında; npm URL fallback yok | `repo.go`, `git.go` | ✅ URL doğrudan parse; `gitError` ile redaction (errors.Is korunur) |
+| 5 | Windows hook çift tırnak | `hook.go` + `cmdline_windows.go` | ✅ `SysProcAttr.CmdLine` `cmd.exe /S /C "..."` (GOOS=windows vet) |
+| 6 | Bozuk webhook URL'si `http.NewRequest` `url.Error`'ında sızıyordu | `notification.go` | ✅ TrimSpace + `urlErr.Err` |
+| 7 | keep-a-changelog `## [Unreleased]`, CRLF, header satır-başı | `generator.go` | ✅ |
+| 8 | GitLab `milestones` `${version}` render edilmiyordu | `runner.go`, `gitlab.go` | ✅ `ReleaseOptions.Milestones` |
+| 9 | Upload'lara 30s `Client.Timeout` | `release.go` `newUploadClient` | ✅ ayrı client, `ResponseHeaderTimeout` ≥ 1m; GitLab fallback linki de düzeltildi |
+| 10 | CalVer + `preReleaseId`/`increment` config'ten sessiz | `validate.go` | ✅ + `bumper.*.file` zorunlu |
+| 11 | Bumper boş `path` → tüm doküman | `bumper/formats.go` | ✅ JSON/YAML/TOML için `version` default'u |
+| 12 | `Retry-After` sınırsız; contributors `%cn` | `httputil/retry.go`, `git/changelog.go` | ✅ 60s cap; `%an` |
+| 13 | scp-style remote yalnız `git@` | `repo.go` | ✅ herhangi kullanıcı |
+
+**Davranış değişiklikleri (not):** untracked dosyalar artık release'i engellemez (npm paritesi); env ile verilen identity kabul edilir; explicit `tagMatch` ile erişilebilir eşleşme yoksa paket ilk release'inden başlar (başka daldan tag miras almaz).
+
+## Kalan Bulgular (Faz 32 adayı)
 
 **Düşük:** INI inline comment/CRLF kaybı, `Revert "..."` commit'leri changelog'dan düşüyor, `hooks install` idempotent değil (tarih) + 0755 yeniden uygulanmıyor, `version` fallback `v0.0.0-<ts>-<hash>` formunu kaçırıyor, `RELEASE_CHANGELOG` env limiti, `version.go` ölü kod, proxy URL şifresi log'da, `PostComment` ölü kod, JSON fallback HTML-escape, `${changelog}` hook template'inde shell injection (env var yolu güvenli).

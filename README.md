@@ -210,7 +210,7 @@ git:
   pushArgs: ["--follow-tags", "--atomic"]  # Extra push arguments (atomic prevents orphan tags)
   pushRepo: "origin"                    # Remote name (default: "origin")
   requireBranch: ""                     # Required branch: glob or comma list ("main,release/*"); empty = any
-  requireCleanWorkingDir: true          # Abort if working directory is dirty
+  requireCleanWorkingDir: true          # Abort on uncommitted changes to tracked files (untracked files are ignored, like npm)
   requireUpstream: true                 # Require upstream tracking branch
   requireCommits: true                  # Require new commits since last tag
   commitsPath: ""                       # Only count commits touching this path (monorepo)

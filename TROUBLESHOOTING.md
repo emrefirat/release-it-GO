@@ -272,7 +272,7 @@ If the log warns `no valid certificates found in CA file`, the configured file e
 
 ### Docker: `Author identity unknown`
 
-**Cause**: Git needs a user identity to create commits. The image's entrypoint requires `GIT_USER_NAME` and `GIT_USER_EMAIL` (it writes them to the container's git config) and exits early with a clear message when they are missing. `GIT_AUTHOR_*` / `GIT_COMMITTER_*` are not checked.
+**Cause**: Git needs a user identity to create commits. The image's entrypoint requires `GIT_USER_NAME` and `GIT_USER_EMAIL` (it writes them to the container's git config) and exits early with a clear message when they are missing. The entrypoint does not look at `GIT_AUTHOR_*` / `GIT_COMMITTER_*`; outside Docker, release-it-go's own identity check accepts them (it resolves the identity the way `git commit` does).
 
 **Fix**:
 ```bash

@@ -817,12 +817,14 @@
 - [x] npm config compat: `$schema` accepted, `github.update` / `preReleaseBase` / plugin-scoped hooks warn instead of failing, `@release-it/bumper` mapped onto `bumper`, unknown plugins reported, top-level typos get a suggestion
 - [x] GitHub asset uploads use the API's `upload_url` (GHES `/api/uploads`), host-aware fallback
 - [x] `resolvePreReleaseBaseTag` strips the tagName template before parsing (custom templates continue the series)
+- [x] Medium findings (13, same day): untracked files no longer dirty (npm parity), identity via `git var` (env accepted), `git describe --match/--exclude` + reachable-only fallback, URL `pushRepo` + credential redaction in logs/errors (`gitError`), scp remotes with any user, contributors `%an`, upload client without overall timeout (GitHub + GitLab), GitLab milestone templates + fallback link, Retry-After cap 60s, keep-a-changelog `[Unreleased]` + CRLF + header anchoring, webhook URL parse leak + trim, Windows hook verbatim command line, CalVer + SemVer validation, bumper default path `version` + `file` required
 
 ### Notes
 
 - Trigger: the user hit the `prepatch --preRelease` "tag already exists" failure live.
 - The runner's old `"pre"+increment` path for a different pre-release ID only produced the expected `1.6.0-rc.0` because of the IncPatch quirk; the npm rule (pre-release latest → `prerelease`) is now explicit and tested.
-- Remaining medium/low findings from the audit are listed in `docs/phase_31.md` as Phase 32 candidates (untracked-files clean check, identity via env, describe filters, pushRepo URL redaction, Windows hook quoting, webhook URL parse leak, keep-a-changelog Unreleased, GitLab milestone templates/upload timeout, CalVer validation, bumper empty path, Retry-After cap, `%cn` contributors, non-`git@` scp remotes).
+- Behavior changes in the medium batch: untracked files no longer block a release (npm `git diff --quiet HEAD` semantics); an identity provided only through `GIT_AUTHOR_*`/`GIT_COMMITTER_*` passes; with an explicit `tagMatch` and no reachable match the package starts at its first release instead of inheriting another branch's tag.
+- Remaining low findings are listed in `docs/phase_31.md` as Phase 32 candidates.
 
 ---
 
@@ -890,6 +892,21 @@
 - [x] BUG: git stderr parsed as command output (2026-11-04) → `CombinedOutput` fed trace lines / warnings into branch name, porcelain status, describe and `rev-list --count` (digit-scraped into a huge number). Fix: separate buffers, stderr only in errors, strict count parsing.
 - [x] BUG: valid npm `.release-it.json` files failed the strict loader (2026-11-04) → `$schema`, `github.update`, `preReleaseBase`, `hooks.after:git:bump` were fatal unknown keys; `@release-it/bumper` was dropped silently; top-level typos reported as `config.Config.incremnt` with no suggestion. Fix: see Phase 31.
 - [x] BUG: GitHub Enterprise asset uploads 404ed (2026-11-04) → upload URL derived by string replace on the REST base (no-op on GHES); the API's `upload_url` was parsed and ignored. Fix: `upload_url` is the upload base, `/api/uploads` fallback.
+- [x] BUG: `requireCleanWorkingDir` rejected untracked files (2026-11-04) → `status --porcelain` lists `??`; npm uses `git diff --quiet HEAD`. Fix: `--untracked-files=no`.
+- [x] BUG: git identity from `GIT_COMMITTER_*` env was rejected (2026-11-04) → only `git config` was consulted. Fix: `git var GIT_AUTHOR_IDENT` / `GIT_COMMITTER_IDENT`, exactly what `git commit` resolves.
+- [x] BUG: `git describe` ignored tag filters and the fallback ignored reachability (2026-11-04) → monorepo maintenance branch picked up another branch's `app-*` tag. Fix: `--match`/`--exclude` on describe; explicit `tagMatch` never falls back to all refs.
+- [x] BUG: URL `pushRepo` leaked credentials into logs and errors (2026-11-04) → `git remote get-url <url>` failed with the URL in the message; push errors carried the full arg list. Fix: URLs parsed directly, `redactCredentials` in command lines and every git error (`gitError` keeps the root cause).
+- [x] BUG: scp-style remotes with a non-`git` user were "unsupported" (2026-11-04) → `org-123456@github.com:` (GitHub org SSH certs), `gitea@host:`. Fix: any user.
+- [x] BUG: asset uploads shared the 30s API `Client.Timeout` (2026-11-04) → large assets were cut mid-upload after the release existed. Fix: derived upload client without overall timeout, `ResponseHeaderTimeout` ≥ 1m.
+- [x] BUG: `gitlab.milestones: ["${version}"]` sent verbatim (2026-11-04) → "Milestone(s) not found". Fix: rendered in the runner, passed via `ReleaseOptions`.
+- [x] BUG: GitLab project-uploads fallback link lacked the namespace (2026-11-04) → `<instance>/uploads/...` 404. Fix: owner/project prefixed.
+- [x] BUG: unbounded `Retry-After` sleep (2026-11-04) → capped at 60s.
+- [x] BUG: contributors listed committer names (2026-11-04) → "GitHub" for web-merged PRs. Fix: `%an`.
+- [x] BUG: keep-a-changelog `## [Unreleased]` ended up below the new release; CRLF files got mixed endings; `# Changelog` matched inside `## Changelog` (2026-11-04) → line-anchored header, Unreleased block stays first, line endings preserved.
+- [x] BUG: malformed webhook URL leaked the secret via `http.NewRequest`'s `*url.Error` (2026-11-04) → value trimmed, cause reported without the URL.
+- [x] BUG: Windows hooks lost double quotes (2026-11-04) → Go's `EscapeArg` produced `\"` that `cmd.exe /C` keeps. Fix: verbatim `SysProcAttr.CmdLine` with `/S /C "..."`.
+- [x] BUG: CalVer + `preReleaseId`/`increment` from the config file was silently ignored (2026-11-04) → `Validate()` rule; `bumper.*.file` required.
+- [x] BUG: structured bumper target without `path` read the whole document as the version (2026-11-04) → default `version` (npm parity).
 - [x] BUG: pre-release series never continued with a custom `tagName` template (2026-11-04) → `resolvePreReleaseBaseTag` parsed raw tags without `VersionFromTag`, always falling back to the stable tag (`beta.0` again). Fix: strip the template first.
 - [x] BUG: full-example `commit-msg` hook ran `--check-commits` (2026-09-02) → that lints the existing history, not the message being committed, so a bad message passed. Fix: `release-it-go --check-msg "$1"`; covered end-to-end through the real binary.
 - [x] BUG: real-git tests inherited the developer's git configuration (2026-09-02) → `commit.gpgsign`, `core.hooksPath`, or `init.defaultBranch` could break or skew the suite; 78 `os.Chdir` blocks swallowed errors and one leaked cwd could point a test at the real repo. Fix: `testutil.IsolateGit` in TestMain + `t.Chdir` everywhere.
@@ -983,6 +1000,7 @@
 | 2026-09-02 | Claude | Phase 29 complete: git-isolated tests + t.Chdir, end-to-end hook/env/bumper/positional/retry coverage, real module path for `go install`, goreleaser v2.6 syntax, gitignore anchor, CI coverage gate + pinned govulncheck + OS matrix + dependabot, atomic release push, CHANGELOG 0.2.0/0.3.0 entries |
 | 2026-09-02 | Claude | Phase 30 complete: 12 wrong doc statements fixed, README sections for every behavior added since Phase 23, ARCHITECTURE/CLAUDE.md synced, ADR-014..018, help texts corrected. Second audit cycle (Phases 27–30) closed |
 | 2026-09-03 | Claude | v0.4.0 released with the tool itself (13 GoReleaser assets); dependabot enabled and its 5 PRs landed; x/text + x/sys bumped (govulncheck clean); Windows CI job blocking; `version` falls back to ReadBuildInfo for `go install` builds |
+| 2026-11-04 | Claude | Phase 31 medium batch: 13 verified findings fixed in 4 package-group commits with tests (git prerequisites/describe/URL redaction/scp users/`%an`, upload client + milestones + Retry-After cap + GitLab fallback link, keep-a-changelog Unreleased/CRLF + webhook URL leak + Windows hook quoting, CalVer validation + bumper default path) |
 | 2026-11-04 | Claude | Third full audit on v0.4.1 (runner by hand + 4 parallel package reviews); Go 1.26.10; Phase 31 complete: 7 verified critical fixes, each with regression tests (prepatch on pre-release, BREAKING CHANGE paragraph, text bumper boundaries, git stderr separation, npm config compat incl. `@release-it/bumper`, GHES upload_url, pre-release base with custom templates); medium/low backlog recorded in `docs/phase_31.md` |
 
 ---
