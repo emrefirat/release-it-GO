@@ -78,7 +78,11 @@ func IncrementVersion(current *semver.Version, incrementType string, preReleaseI
 		return addPreRelease(next, preReleaseID, 0)
 
 	case "prepatch":
-		next := current.IncPatch()
+		// IncPatch on a pre-release only strips the pre-release part
+		// (1.2.4-beta.0 → 1.2.4), so prepatch handed back the same version —
+		// or a lower one with a different ID. npm semver always moves to the
+		// next patch: 1.2.4-beta.0 → 1.2.5-beta.0.
+		next := stripPreRelease(current).IncPatch()
 		return addPreRelease(next, preReleaseID, 0)
 
 	case "prerelease":
@@ -108,6 +112,20 @@ func CompareVersions(a, b string) (int, error) {
 // FormatVersion returns the version string without the "v" prefix.
 func FormatVersion(v *semver.Version) string {
 	return v.String()
+}
+
+// stripPreRelease returns the version without its pre-release and metadata
+// components (1.2.4-beta.0 → 1.2.4).
+func stripPreRelease(v *semver.Version) semver.Version {
+	base := *v
+	if v.Prerelease() == "" && v.Metadata() == "" {
+		return base
+	}
+	// SetPrerelease/SetMetadata only fail on invalid identifiers; the empty
+	// string is always valid.
+	base, _ = base.SetPrerelease("")
+	base, _ = base.SetMetadata("")
+	return base
 }
 
 // addPreRelease creates a new version with the given pre-release identifier and number.

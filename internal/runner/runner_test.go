@@ -2376,6 +2376,49 @@ func TestRunner_DetermineSemVer_PreReleaseDifferentID(t *testing.T) {
 	}
 }
 
+func TestRunner_DetermineSemVer_PreReleaseDifferentID_MinorKeepsBase(t *testing.T) {
+	cfg := &config.Config{
+		CI:           true,
+		Increment:    "minor",
+		PreReleaseID: "rc",
+		Git: config.GitConfig{
+			TagName: "v${version}",
+		},
+	}
+	runner := NewRunner(cfg)
+
+	// npm release-it: a pre-release latest version continues on the same
+	// base regardless of the detected increment (1.6.0-beta.3 → 1.6.0-rc.0,
+	// not 1.7.0-rc.0).
+	if err := runner.determineSemVer("1.6.0-beta.3"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if runner.ctx.Version != "1.6.0-rc.0" {
+		t.Errorf("expected 1.6.0-rc.0, got %s", runner.ctx.Version)
+	}
+}
+
+func TestRunner_DetermineSemVer_ExplicitPrepatchOnPreRelease(t *testing.T) {
+	cfg := &config.Config{
+		CI:           true,
+		Increment:    "prepatch",
+		PreReleaseID: "beta",
+		Git: config.GitConfig{
+			TagName: "v${version}",
+		},
+	}
+	runner := NewRunner(cfg)
+
+	// Explicit prepatch on a beta tag used to return the identical version
+	// (1.2.4-beta.0) and fail with "tag already exists".
+	if err := runner.determineSemVer("1.2.4-beta.0"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if runner.ctx.Version != "1.2.5-beta.0" {
+		t.Errorf("expected 1.2.5-beta.0, got %s", runner.ctx.Version)
+	}
+}
+
 func TestRunner_DetermineSemVer_PreReleaseSecondIncrement(t *testing.T) {
 	cfg := &config.Config{
 		CI:           true,
@@ -4098,6 +4141,33 @@ func TestRunner_BuildVersionOptions_PreRelease_ContinueSeries(t *testing.T) {
 	}
 	if !options[0].Recommended {
 		t.Error("continue-series option should carry the recommendation")
+	}
+}
+
+func TestRunner_BuildVersionOptions_PreRelease_DifferentIDContinuesSeries(t *testing.T) {
+	cfg := &config.Config{
+		CI:           true,
+		PreReleaseID: "rc",
+		Git:          config.GitConfig{TagName: "v${version}"},
+	}
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{})
+
+	options := runner.buildVersionOptions("1.6.0-beta.3", "prerelease")
+
+	if len(options) != 4 {
+		t.Fatalf("expected 4 options, got %d: %+v", len(options), options)
+	}
+	want := []string{"1.6.0-rc.0", "1.6.1-rc.0", "1.7.0-rc.0", "2.0.0-rc.0"}
+	for i, w := range want {
+		if options[i].Version != w {
+			t.Errorf("options[%d].Version = %q, want %q", i, options[i].Version, w)
+		}
+	}
+	if !options[0].Recommended {
+		t.Error("switching the series on the same base should carry the recommendation")
 	}
 }
 

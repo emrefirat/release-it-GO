@@ -627,11 +627,15 @@ func (r *Runner) determineSemVer(latestVersion string) error {
 			// Explicit pre* keyword — the same words the interactive menu
 			// offers; prefixing again produced "prepreminor".
 			incrementType = increment
-		case parsedCurrent.Prerelease() != "" && strings.HasPrefix(parsedCurrent.Prerelease(), preReleaseID+"."):
-			// Same series: bump the pre-release number (beta.0 → beta.1)
+		case parsedCurrent.Prerelease() != "":
+			// The latest version is already a pre-release: continue it, like
+			// npm release-it. Same ID bumps the number (beta.0 → beta.1), a
+			// different ID restarts the series on the same base version
+			// (1.6.0-beta.3 → 1.6.0-rc.0). "pre"+increment here moved the
+			// base version too (1.6.1-rc.0 / 1.7.0-rc.0).
 			incrementType = "prerelease"
 		default:
-			// Start a new pre-release series
+			// Start a new pre-release series from a stable version
 			incrementType = "pre" + increment
 		}
 	}
@@ -812,8 +816,9 @@ func (r *Runner) buildVersionOptions(current string, recommended string) []ui.Ve
 	increments := []string{"patch", "minor", "major"}
 	if preReleaseID != "" {
 		increments = []string{"prepatch", "preminor", "premajor"}
-		if parsedCurrent.Prerelease() != "" && strings.HasPrefix(parsedCurrent.Prerelease(), preReleaseID+".") {
-			// Continue the current pre-release series (beta.1 → beta.2) first
+		if parsedCurrent.Prerelease() != "" {
+			// Continue the current pre-release series first (beta.1 → beta.2,
+			// or beta.3 → rc.0 when the ID changes)
 			increments = append([]string{"prerelease"}, increments...)
 		}
 	}

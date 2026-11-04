@@ -55,6 +55,13 @@ func TestIncrementVersion(t *testing.T) {
 		{"invalid type", "1.2.3", "invalid", "", "", true},
 		{"major from zero", "0.1.0", "major", "", "1.0.0", false},
 		{"patch from pre-release", "1.2.3-beta.0", "patch", "", "1.2.3", false},
+		// prepatch on an existing pre-release must move to the next patch,
+		// never return the same version (tag already exists) or a lower one.
+		{"prepatch from same pre-release id", "1.2.4-beta.0", "prepatch", "beta", "1.2.5-beta.0", false},
+		{"prepatch from different pre-release id", "1.2.4-beta.1", "prepatch", "rc", "1.2.5-rc.0", false},
+		{"prepatch from pre-release with metadata", "1.2.4-beta.1+build.7", "prepatch", "beta", "1.2.5-beta.0", false},
+		{"preminor from pre-release", "1.2.4-beta.0", "preminor", "beta", "1.3.0-beta.0", false},
+		{"premajor from pre-release", "1.2.4-beta.0", "premajor", "beta", "2.0.0-beta.0", false},
 	}
 
 	for _, tt := range tests {
