@@ -12,7 +12,7 @@ You need these installed locally:
 
 | Tool | Version | Why |
 |------|---------|-----|
-| Go | 1.26.7+ | Build the binary (older toolchains carry known stdlib advisories that fail `make vuln`) |
+| Go | 1.26.10+ | Build the binary (older toolchains carry known stdlib advisories that fail `make vuln`) |
 | Git | 2.x+ | Required at runtime (release-it-go wraps the git CLI) |
 | Make | any | Run `make check`, `make build`, etc. |
 | golangci-lint | latest | `make lint` and `make check` |
@@ -24,7 +24,7 @@ You need these installed locally:
 
 ```bash
 # Verify Go version
-go version  # must be 1.26.7 or newer
+go version  # must be 1.26.10 or newer
 
 # golangci-lint (required for `make check`)
 brew install golangci-lint                    # macOS
