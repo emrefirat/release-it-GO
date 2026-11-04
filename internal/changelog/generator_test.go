@@ -215,3 +215,46 @@ func TestGenerateChangelog_AddVersionURL_GatesCompareLink(t *testing.T) {
 		t.Error("commit hash links must not depend on addVersionUrl")
 	}
 }
+
+func TestInsertAfterHeader_KeepAChangelog_UnreleasedStaysFirst(t *testing.T) {
+	existing := "# Changelog\n\nAll notable changes.\n\n## [Unreleased]\n\n- wip item\n\n## [1.0.0] - 2026-01-01\n\n### Added\n- first\n"
+	result := insertAfterHeader(existing, "# Changelog", "## [1.1.0] - 2026-02-01\n\n### Added\n- second\n")
+
+	order := []string{"# Changelog", "## [Unreleased]", "- wip item", "## [1.1.0]", "## [1.0.0]"}
+	prev := -1
+	for _, want := range order {
+		idx := strings.Index(result, want)
+		if idx == -1 {
+			t.Fatalf("expected %q in result:\n%s", want, result)
+		}
+		if idx <= prev {
+			t.Errorf("%q must come after the previous heading:\n%s", want, result)
+		}
+		prev = idx
+	}
+	if strings.Count(result, "## [Unreleased]") != 1 {
+		t.Errorf("Unreleased heading duplicated:\n%s", result)
+	}
+}
+
+func TestInsertAfterHeader_CRLFFileKeepsLineEndings(t *testing.T) {
+	existing := "# Changelog\r\n\r\n## [1.0.0]\r\n\r\n- old\r\n"
+	result := insertAfterHeader(existing, "# Changelog", "## [1.1.0]\n\n- new\n")
+
+	if strings.Contains(strings.ReplaceAll(result, "\r\n", ""), "\n") {
+		t.Errorf("mixed line endings in result: %q", result)
+	}
+	if !strings.Contains(result, "# Changelog\r\n\r\n## [1.1.0]\r\n\r\n- new\r\n\r\n## [1.0.0]") {
+		t.Errorf("unexpected layout: %q", result)
+	}
+}
+
+func TestInsertAfterHeader_HeaderMatchesWholeLineOnly(t *testing.T) {
+	// "## Changelog" contains "# Changelog" but is not the header.
+	existing := "## Changelog of the old era\n\n## v0.9.0\n"
+	result := insertAfterHeader(existing, "# Changelog", "## v1.0.0\n")
+
+	if !strings.HasPrefix(result, "# Changelog\n\n## v1.0.0\n") {
+		t.Errorf("header must be prepended when only a substring matches:\n%s", result)
+	}
+}

@@ -534,3 +534,35 @@ func TestSendAll_502_IsNotReplayed(t *testing.T) {
 		t.Errorf("webhook calls = %d, want exactly 1 (502 must not be replayed)", got)
 	}
 }
+
+func TestSendAll_MalformedURL_DoesNotLeakWebhookURL(t *testing.T) {
+	// A control character inside the URL makes http.NewRequest fail with a
+	// *url.Error that embeds the full (secret) URL.
+	secretPath := "/services/T0SECRET/B0SECRET/xoxb-super-secret"
+	t.Setenv("TEST_BAD_URL", "http://hooks.example.com"+secretPath+"\x7f")
+
+	client := NewClient([]config.WebhookConfig{{Type: "slack", URLRef: "TEST_BAD_URL", Timeout: 1}}, map[string]string{}, newTestLogger(), false)
+	err := client.SendAll()
+	if err == nil {
+		t.Fatal("expected an error for a malformed webhook URL")
+	}
+	msg := err.Error()
+	if strings.Contains(msg, "SECRET") || strings.Contains(msg, secretPath) {
+		t.Errorf("error message leaks the webhook URL secret:\n%s", msg)
+	}
+	if !strings.Contains(msg, "TEST_BAD_URL") || !strings.Contains(msg, "invalid webhook URL") {
+		t.Errorf("error should name the urlRef and the problem, got:\n%s", msg)
+	}
+}
+
+func TestResolveURL_TrimsWhitespace(t *testing.T) {
+	// Trailing newline from `echo $SECRET > file` style CI secret handling.
+	t.Setenv("TEST_TRIM_URL", "  https://hooks.example.com/services/x \n")
+	got, err := resolveURL("TEST_TRIM_URL")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "https://hooks.example.com/services/x" {
+		t.Errorf("resolveURL = %q, want trimmed", got)
+	}
+}

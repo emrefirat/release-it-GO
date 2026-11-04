@@ -295,13 +295,26 @@ func TestShellCommandFor_Platforms(t *testing.T) {
 	}
 
 	c = shellCommandFor("windows", "", "echo hi")
-	if filepath.Base(c.Args[0]) != "cmd.exe" || c.Args[1] != "/C" || c.Args[2] != "echo hi" {
-		t.Errorf("windows default: args = %v, want cmd.exe /C 'echo hi'", c.Args)
+	if filepath.Base(c.Args[0]) != "cmd.exe" || c.Args[1] != "/S" || c.Args[2] != "/C" || c.Args[3] != "echo hi" {
+		t.Errorf("windows default: args = %v, want cmd.exe /S /C 'echo hi'", c.Args)
 	}
 
 	c = shellCommandFor("windows", `C:\Windows\system32\cmd.exe`, "echo hi")
-	if c.Args[0] != `C:\Windows\system32\cmd.exe` || c.Args[1] != "/C" {
+	if c.Args[0] != `C:\Windows\system32\cmd.exe` || c.Args[1] != "/S" {
 		t.Errorf("windows COMSPEC: args = %v", c.Args)
+	}
+}
+
+func TestWindowsCmdLine_KeepsInnerQuotesVerbatim(t *testing.T) {
+	// Go's EscapeArg would turn the inner quotes into \" which cmd.exe
+	// leaves in place; the raw line must carry them unchanged.
+	got := windowsCmdLine(`C:\Windows\system32\cmd.exe`, `git commit -m "chore: release 1.2.0"`)
+	want := `"C:\Windows\system32\cmd.exe" /S /C "git commit -m "chore: release 1.2.0""`
+	if got != want {
+		t.Errorf("windowsCmdLine = %s, want %s", got, want)
+	}
+	if strings.Contains(got, `\"`) {
+		t.Error("no backslash escaping may be introduced")
 	}
 }
 

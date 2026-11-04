@@ -134,15 +134,28 @@ func (h *HookRunner) runCommand(cmd string) error {
 // Unix uses sh -c; Windows uses %COMSPEC% (cmd.exe) /C — the shipped windows
 // binaries previously hard-required an sh on PATH, so every configured hook
 // failed on stock Windows.
+//
+// On Windows the command line is passed verbatim (see windowsCmdLine):
+// letting Go escape the arguments turned every double quote in a hook into
+// \", which cmd.exe does not unescape — `git commit -m "chore: ${version}"`
+// got the wrong message.
 func shellCommandFor(goos string, comspec string, command string) *exec.Cmd {
 	if goos == "windows" {
 		shell := comspec
 		if shell == "" {
 			shell = "cmd.exe"
 		}
-		return execCommand(shell, "/C", command)
+		c := execCommand(shell, "/S", "/C", command)
+		setVerbatimCmdLine(c, windowsCmdLine(shell, command))
+		return c
 	}
 	return execCommand("sh", "-c", command)
+}
+
+// windowsCmdLine builds the raw command line for cmd.exe: /S strips the
+// outer quotes and leaves everything between them untouched.
+func windowsCmdLine(shell string, command string) string {
+	return fmt.Sprintf("\"%s\" /S /C \"%s\"", shell, command)
 }
 
 // envVars exposes the template variables as RELEASE_* environment variables

@@ -125,6 +125,12 @@ func (c *Client) sendOne(wh config.WebhookConfig) error {
 
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(payload))
 	if err != nil {
+		// Same leak as below: a malformed URL (stray newline or space in
+		// the CI secret) comes back as a *url.Error carrying the full URL.
+		var urlErr *neturl.Error
+		if errors.As(err, &urlErr) {
+			return fmt.Errorf("invalid webhook URL in %s: %w", wh.URLRef, urlErr.Err)
+		}
 		return fmt.Errorf("building request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
@@ -186,7 +192,8 @@ func resolveURL(urlRef string) (string, error) {
 	if urlRef == "" {
 		return "", fmt.Errorf("urlRef is empty")
 	}
-	url := os.Getenv(urlRef)
+	// Trailing newlines/spaces are the most common CI-secret mistake.
+	url := strings.TrimSpace(os.Getenv(urlRef))
 	if url == "" {
 		return "", fmt.Errorf("environment variable %s is not set", urlRef)
 	}
