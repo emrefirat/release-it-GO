@@ -2,6 +2,8 @@ package config
 
 import (
 	"fmt"
+	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -15,9 +17,21 @@ type legacyKey struct {
 
 // legacyTopLevelKeys are npm release-it keys with no Go equivalent.
 var legacyTopLevelKeys = map[string]legacyKey{
-	"npm":         {"npm", "npm publishing is not supported (npm-only)"},
-	"versionfile": {"versionFile", "use bumper.in / bumper.out instead"},
+	"npm":            {"npm", "npm publishing is not supported (npm-only)"},
+	"versionfile":    {"versionFile", "use bumper.in / bumper.out instead"},
+	"prereleasebase": {"preReleaseBase", "not supported: pre-release numbering always starts at 0"},
 }
+
+// schemaKey is the JSON Schema pointer most npm configs carry
+// ("$schema": "https://unpkg.com/release-it/schema/release-it.json"). It is
+// editor metadata, not configuration: accepted silently.
+const schemaKey = "$schema"
+
+// pluginHookPattern matches npm's plugin-scoped lifecycle hooks
+// (before:git:bump, after:npm:release, before:github:init, ...). Only the
+// git/github/gitlab release stages exist here; the rest map onto the
+// unscoped pipeline events.
+var pluginHookPattern = regexp.MustCompile(`^(before|after):(git|npm|github|gitlab):(init|bump|release)$`)
 
 // legacySectionKeys are per-section keys that are npm-only or were removed
 // because they never had an effect.
@@ -30,6 +44,7 @@ var legacySectionKeys = map[string]map[string]legacyKey{
 		"releasenotes": {"releaseNotes", "removed: release notes come from the generated changelog"},
 		"web":          {"web", "removed: no web-based release flow"},
 		"comments":     {"comments", "not implemented yet: issue/PR comments are not posted"},
+		"update":       {"update", "not supported: an existing release for the tag is not updated"},
 	},
 	"gitlab": {
 		"releasenotes": {"releaseNotes", "removed: release notes come from the generated changelog"},
@@ -57,6 +72,7 @@ func normalizeRaw(raw map[string]interface{}, cfg *Config) map[string]interface{
 		plugins = p
 	}
 	delete(raw, "plugins")
+	delete(raw, schemaKey)
 
 	for key, lk := range legacyTopLevelKeys {
 		if _, ok := raw[key]; ok {
@@ -76,6 +92,10 @@ func normalizeRaw(raw map[string]interface{}, cfg *Config) map[string]interface{
 				cfg.Warnings = append(cfg.Warnings, fmt.Sprintf("ignored %q: %s", section+"."+lk.canonical, lk.reason))
 			}
 		}
+	}
+
+	if hooksRaw, ok := raw["hooks"].(map[string]interface{}); ok {
+		dropPluginScopedHooks(hooksRaw, cfg)
 	}
 
 	if gitRaw, ok := raw["git"].(map[string]interface{}); ok {
@@ -120,20 +140,112 @@ func normalizeRaw(raw map[string]interface{}, cfg *Config) map[string]interface{
 	return plugins
 }
 
-// applyPluginCompat maps npm release-it plugin settings
-// (@release-it/conventional-changelog, @release-it/keep-a-changelog) onto the
-// built-in equivalents. Works for every config format.
-func applyPluginCompat(cfg *Config, plugins map[string]interface{}) {
-	for key, val := range plugins {
-		settings, _ := val.(map[string]interface{})
-		if strings.Contains(key, "conventional-changelog") {
-			applyConventionalChangelogPlugin(cfg, settings)
+// dropPluginScopedHooks removes npm's plugin-scoped hook keys that have no
+// struct field (before:git:bump, after:npm:release, ...) with a warning that
+// names the unscoped equivalent. They used to fail the unknown-key check,
+// which made every npm config that had them unloadable.
+func dropPluginScopedHooks(hooksRaw map[string]interface{}, cfg *Config) {
+	known := make(map[string]bool)
+	for _, k := range knownKeys("hooks") {
+		known[strings.ToLower(k)] = true
+	}
+	keys := make([]string, 0, len(hooksRaw))
+	for key := range hooksRaw {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		if known[key] {
+			continue
 		}
-		if strings.Contains(key, "keep-a-changelog") {
+		m := pluginHookPattern.FindStringSubmatch(key)
+		if m == nil {
+			continue
+		}
+		delete(hooksRaw, key)
+		if m[2] == "npm" {
+			cfg.Warnings = append(cfg.Warnings, fmt.Sprintf("ignored \"hooks.%s\": npm publishing is not supported", key))
+			continue
+		}
+		cfg.Warnings = append(cfg.Warnings, fmt.Sprintf("ignored \"hooks.%s\": plugin-scoped hooks are not supported, use \"%s:%s\"", key, m[1], m[3]))
+	}
+}
+
+// applyPluginCompat maps npm release-it plugin settings
+// (@release-it/conventional-changelog, @release-it/keep-a-changelog,
+// @release-it/bumper) onto the built-in equivalents. Any other plugin is
+// dropped with a warning instead of silently. Works for every config format.
+func applyPluginCompat(cfg *Config, plugins map[string]interface{}) {
+	keys := make([]string, 0, len(plugins))
+	for key := range plugins {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		settings, _ := plugins[key].(map[string]interface{})
+		switch {
+		case strings.Contains(key, "conventional-changelog"):
+			applyConventionalChangelogPlugin(cfg, settings)
+		case strings.Contains(key, "keep-a-changelog"):
 			cfg.Changelog.KeepAChangelog = true
 			applyKeepAChangelogPlugin(cfg, settings)
+		case strings.Contains(key, "bumper"):
+			applyBumperPlugin(cfg, settings)
+		default:
+			cfg.Warnings = append(cfg.Warnings, fmt.Sprintf("ignored plugins.%q: not supported (everything is built in; see the hooks and bumper sections)", key))
 		}
 	}
+}
+
+// applyBumperPlugin maps @release-it/bumper settings onto the built-in bumper
+// section. npm accepts a file name, a {file, path, type} object, or (for
+// out) a list of either.
+func applyBumperPlugin(cfg *Config, settings map[string]interface{}) {
+	if in, ok := parseBumperFileSpec(settings["in"]); ok {
+		cfg.Bumper.In = &in
+		cfg.Bumper.Enabled = true
+	}
+	var outs []BumperFile
+	switch v := settings["out"].(type) {
+	case []interface{}:
+		for _, item := range v {
+			if f, ok := parseBumperFileSpec(item); ok {
+				outs = append(outs, f)
+			}
+		}
+	default:
+		if f, ok := parseBumperFileSpec(v); ok {
+			outs = append(outs, f)
+		}
+	}
+	if len(outs) > 0 {
+		cfg.Bumper.Out = append(cfg.Bumper.Out, outs...)
+		cfg.Bumper.Enabled = true
+	}
+}
+
+// parseBumperFileSpec converts an npm bumper file spec ("VERSION" or
+// {file, path, type, prefix, consumeWholeFile}) into a BumperFile.
+func parseBumperFileSpec(spec interface{}) (BumperFile, bool) {
+	switch v := spec.(type) {
+	case string:
+		if v == "" {
+			return BumperFile{}, false
+		}
+		return BumperFile{File: v}, true
+	case map[string]interface{}:
+		f := BumperFile{}
+		f.File, _ = v["file"].(string)
+		if f.File == "" {
+			return BumperFile{}, false
+		}
+		f.Path, _ = v["path"].(string)
+		f.Type, _ = v["type"].(string)
+		f.Prefix, _ = v["prefix"].(string)
+		f.ConsumeWholeFile, _ = v["consumewholefile"].(bool)
+		return f, true
+	}
+	return BumperFile{}, false
 }
 
 // applyConventionalChangelogPlugin maps conventional-changelog plugin settings.

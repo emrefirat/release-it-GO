@@ -161,6 +161,11 @@ func describeDecodeError(err error) error {
 			continue
 		}
 		section := m[1]
+		// mapstructure names the root by its Go type ("config.Config");
+		// our key lookup and messages treat the top level as "".
+		if section == "config.Config" {
+			section = ""
+		}
 		for _, key := range strings.Split(m[2], ",") {
 			key = strings.TrimSpace(key)
 			full := key
