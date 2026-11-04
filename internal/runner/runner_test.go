@@ -3673,6 +3673,62 @@ func TestRunner_RunCheckCommits_NoTags(t *testing.T) {
 
 // --- resolvePreReleaseBaseTag tests ---
 
+func TestRunner_ResolvePreReleaseBaseTag_CustomTemplateContinuesSeries(t *testing.T) {
+	cfg := &config.Config{
+		CI: true,
+		Git: config.GitConfig{
+			TagName: "release-${version}",
+		},
+	}
+
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{
+		"git tag -l --merged HEAD --sort=-v:refname": {
+			output: "release-1.2.3-beta.1\nrelease-1.2.3-beta.0\nrelease-1.2.0",
+			err:    nil,
+		},
+	})
+
+	// With a custom template the raw tags did not parse as versions, so the
+	// stable tag was always returned and beta.0 was produced again.
+	tag, err := runner.resolvePreReleaseBaseTag("beta")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if tag != "release-1.2.3-beta.1" {
+		t.Errorf("expected release-1.2.3-beta.1 (continue series), got %q", tag)
+	}
+}
+
+func TestRunner_ResolvePreReleaseBaseTag_CustomTemplateNewSeriesAfterStable(t *testing.T) {
+	cfg := &config.Config{
+		CI: true,
+		Git: config.GitConfig{
+			TagName: "release-${version}",
+		},
+	}
+
+	runner := setupMockedRunner(t, cfg, map[string]struct {
+		output string
+		err    error
+	}{
+		"git tag -l --merged HEAD --sort=-v:refname": {
+			output: "release-1.3.0\nrelease-1.2.3-beta.1\nrelease-1.2.0",
+			err:    nil,
+		},
+	})
+
+	tag, err := runner.resolvePreReleaseBaseTag("beta")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if tag != "release-1.3.0" {
+		t.Errorf("expected release-1.3.0 (stable is newer than the beta base), got %q", tag)
+	}
+}
+
 func TestRunner_ResolvePreReleaseBaseTag_ContinueSeries(t *testing.T) {
 	cfg := &config.Config{
 		CI: true,

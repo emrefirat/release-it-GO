@@ -699,12 +699,16 @@ func (r *Runner) resolvePreReleaseBaseTag(preReleaseID string) (string, error) {
 		return preTag, nil
 	}
 
-	parsedPre, err := version.ParseVersion(preTag)
+	// Raw tags carry the tagName template's literal prefix/suffix
+	// (release-${version}); parsing them directly failed for anything beyond
+	// ${version}/v${version}, which restarted the series on every run.
+	tagName := r.ctx.Config.Git.TagName
+	parsedPre, err := version.ParseVersion(git.VersionFromTag(preTag, tagName))
 	if err != nil {
 		return stableTag, nil
 	}
 
-	parsedStable, err := version.ParseVersion(stableTag)
+	parsedStable, err := version.ParseVersion(git.VersionFromTag(stableTag, tagName))
 	if err != nil {
 		return preTag, nil
 	}
