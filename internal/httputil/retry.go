@@ -17,6 +17,11 @@ const defaultMaxAttempts = 3
 // defaultBaseDelay is the first backoff delay; it doubles per attempt.
 const defaultBaseDelay = time.Second
 
+// maxRetryAfter caps a server-provided Retry-After: GitHub secondary rate
+// limits and some proxies answer with minutes or hours, and a CLI must not
+// hang silently under its spinner for that long.
+const maxRetryAfter = 60 * time.Second
+
 // retryableStatuses are transient server-side conditions worth retrying.
 var retryableStatuses = map[int]bool{
 	http.StatusTooManyRequests:    true, // 429
@@ -131,5 +136,9 @@ func retryAfter(resp *http.Response) time.Duration {
 	if err != nil || seconds < 0 {
 		return 0
 	}
-	return time.Duration(seconds) * time.Second
+	wait := time.Duration(seconds) * time.Second
+	if wait > maxRetryAfter {
+		return maxRetryAfter
+	}
+	return wait
 }

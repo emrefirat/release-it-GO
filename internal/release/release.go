@@ -4,7 +4,9 @@ package release
 
 import (
 	"fmt"
+	"net/http"
 	"os"
+	"time"
 )
 
 // ReleaseProvider defines the interface for creating releases on remote platforms.
@@ -30,8 +32,33 @@ type ReleaseOptions struct {
 	Draft              bool
 	PreRelease         bool
 	MakeLatest         bool
-	AutoGenerate       bool   // GitHub auto-generate release notes
-	DiscussionCategory string // GitHub discussions category
+	AutoGenerate       bool     // GitHub auto-generate release notes
+	DiscussionCategory string   // GitHub discussions category
+	Milestones         []string // GitLab milestones to associate (templates already rendered)
+}
+
+// minUploadHeaderTimeout bounds how long an upload waits for the server's
+// response after the body has been sent.
+const minUploadHeaderTimeout = time.Minute
+
+// newUploadClient derives a client for asset uploads from an API client: the
+// same transport (proxy, TLS, CA file) but no overall Client.Timeout. That
+// timeout bounds the whole exchange including sending the request body, so a
+// large asset on a slow link was cut off mid-upload — after the release had
+// already been created. The API timeout becomes the response-header timeout
+// instead, which only starts once the body is fully written.
+func newUploadClient(api *http.Client) *http.Client {
+	transport, ok := api.Transport.(*http.Transport)
+	if !ok || transport == nil {
+		return api
+	}
+	headerTimeout := api.Timeout
+	if headerTimeout < minUploadHeaderTimeout {
+		headerTimeout = minUploadHeaderTimeout
+	}
+	t := transport.Clone()
+	t.ResponseHeaderTimeout = headerTimeout
+	return &http.Client{Transport: t}
 }
 
 // ReleaseResult holds the result of a release creation.

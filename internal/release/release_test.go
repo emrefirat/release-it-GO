@@ -1,6 +1,8 @@
 package release
 
 import (
+	"net/http"
+	"time"
 	"os"
 	"testing"
 )
@@ -64,5 +66,31 @@ func TestGetToken(t *testing.T) {
 				t.Errorf("getToken() = %q, want %q", token, tt.wantToken)
 			}
 		})
+	}
+}
+
+func TestNewUploadClient_NoOverallTimeout(t *testing.T) {
+	api := &http.Client{Transport: http.DefaultTransport.(*http.Transport).Clone(), Timeout: 30 * time.Second}
+
+	up := newUploadClient(api)
+	if up.Timeout != 0 {
+		t.Errorf("upload client must not bound the whole exchange, Timeout = %v", up.Timeout)
+	}
+	transport, ok := up.Transport.(*http.Transport)
+	if !ok {
+		t.Fatalf("transport = %T, want *http.Transport clone", up.Transport)
+	}
+	if transport.ResponseHeaderTimeout < time.Minute {
+		t.Errorf("ResponseHeaderTimeout = %v, want at least 1m", transport.ResponseHeaderTimeout)
+	}
+	if transport == api.Transport {
+		t.Error("the API transport must be cloned, not mutated")
+	}
+}
+
+func TestNewUploadClient_CustomTransportKeepsClient(t *testing.T) {
+	api := &http.Client{Transport: http.NewFileTransport(http.Dir(t.TempDir()))}
+	if got := newUploadClient(api); got != api {
+		t.Error("a non-*http.Transport client must be returned unchanged")
 	}
 }

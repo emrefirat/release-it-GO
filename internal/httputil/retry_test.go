@@ -163,3 +163,28 @@ func TestDo_GET_502_Retried(t *testing.T) {
 		t.Errorf("idempotent GET should be retried after 502; attempts = %d", attempts)
 	}
 }
+
+func TestDo_RetryAfterIsCapped(t *testing.T) {
+	var attempts int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if atomic.AddInt32(&attempts, 1) == 1 {
+			w.Header().Set("Retry-After", "3600") // a proxy asking for an hour
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	req, _ := http.NewRequest("GET", server.URL, nil)
+	var delays []time.Duration
+	resp, err := Do(server.Client(), req, Options{Sleep: noSleep(&delays)})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if len(delays) != 1 || delays[0] != maxRetryAfter {
+		t.Errorf("Retry-After must be capped at %v, got %v", maxRetryAfter, delays)
+	}
+}

@@ -26,8 +26,11 @@ type GitHubClient struct {
 	logger   *applog.Logger
 	dryRun   bool
 	client   *http.Client
-	baseURL  string
-	token    string
+	// uploadClient sends asset bodies without the API client's overall
+	// timeout (see newUploadClient). Nil falls back to client.
+	uploadClient *http.Client
+	baseURL      string
+	token        string
 	// uploadURL is the asset upload base returned by the create-release
 	// response (upload_url without its {?name,label} template). GitHub
 	// Enterprise serves uploads from /api/uploads, not /api/v3, so the URL
@@ -77,6 +80,7 @@ func NewGitHubClient(cfg *config.GitHubConfig, repoInfo *git.RepoInfo, logger *a
 	}
 
 	c.client = c.createHTTPClient()
+	c.uploadClient = newUploadClient(c.client)
 	return c, nil
 }
 
@@ -219,7 +223,11 @@ func (c *GitHubClient) uploadSingleAsset(releaseID string, assetPath string) err
 	req.Header.Set("Content-Type", DetectContentType(assetPath))
 	req.ContentLength = stat.Size()
 
-	resp, err := c.client.Do(req)
+	client := c.uploadClient
+	if client == nil {
+		client = c.client
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("uploading asset %s: %w", filename, err)
 	}

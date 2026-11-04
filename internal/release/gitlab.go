@@ -28,9 +28,12 @@ type GitLabClient struct {
 	logger    *applog.Logger
 	dryRun    bool
 	client    *http.Client
-	baseURL   string
-	token     string
-	projectID string // URL-encoded "owner/repo"
+	// uploadClient sends asset bodies without the API client's overall
+	// timeout (see newUploadClient). Nil falls back to client.
+	uploadClient *http.Client
+	baseURL      string
+	token        string
+	projectID    string // URL-encoded "owner/repo"
 }
 
 // gitlabCreateReleaseRequest is the GitLab API request body for creating a release.
@@ -80,6 +83,7 @@ func NewGitLabClient(cfg *config.GitLabConfig, repoInfo *git.RepoInfo, logger *a
 	}
 
 	c.client = c.createHTTPClient()
+	c.uploadClient = newUploadClient(c.client)
 	return c, nil
 }
 
@@ -149,9 +153,14 @@ func (c *GitLabClient) CreateRelease(opts ReleaseOptions) (*ReleaseResult, error
 		Description: opts.ReleaseNotes,
 	}
 
-	// Add milestones from config
-	if len(c.config.Milestones) > 0 {
-		reqBody.Milestones = c.config.Milestones
+	// Milestones: the runner passes them rendered (${version} → 1.2.0, the
+	// npm-documented form); the raw config is the fallback for direct callers.
+	milestones := opts.Milestones
+	if len(milestones) == 0 {
+		milestones = c.config.Milestones
+	}
+	if len(milestones) > 0 {
+		reqBody.Milestones = milestones
 	}
 
 	body, err := json.Marshal(reqBody)
@@ -236,7 +245,7 @@ func (c *GitLabClient) uploadToGenericPackage(tagName string, assetPath string) 
 	c.setAuthHeader(req)
 	req.Header.Set("Content-Type", DetectContentType(assetPath))
 
-	resp, err := c.client.Do(req)
+	resp, err := c.uploadHTTPClient().Do(req)
 	if err != nil {
 		return "", fmt.Errorf("uploading to generic package: %w", err)
 	}
@@ -421,7 +430,7 @@ func (c *GitLabClient) uploadToProject(assetPath string) (string, error) {
 	c.setAuthHeader(req)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
-	resp, err := c.client.Do(req)
+	resp, err := c.uploadHTTPClient().Do(req)
 	if err != nil {
 		return "", fmt.Errorf("uploading to project: %w", err)
 	}
@@ -442,5 +451,16 @@ func (c *GitLabClient) uploadToProject(assetPath string) (string, error) {
 	if result.FullPath != "" {
 		return instance + result.FullPath, nil
 	}
-	return instance + result.URL, nil
+	// Older GitLab without full_path: "url" is project-relative
+	// (/uploads/<secret>/file), so the namespace and project come first.
+	return fmt.Sprintf("%s/%s/%s%s", instance, c.repoInfo.Owner, c.repoInfo.Repository, result.URL), nil
+}
+
+// uploadHTTPClient returns the client for asset bodies (see newUploadClient),
+// falling back to the API client when none was derived.
+func (c *GitLabClient) uploadHTTPClient() *http.Client {
+	if c.uploadClient != nil {
+		return c.uploadClient
+	}
+	return c.client
 }

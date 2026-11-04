@@ -4731,3 +4731,26 @@ func TestRunner_GenerateChangelog_CompareURLUsesTagNames(t *testing.T) {
 		t.Errorf("compare link must use tag names on a v-tagged repo, got:\n%s", runner.ctx.Changelog)
 	}
 }
+
+func TestRunner_RenderMilestones_RendersVersionTemplate(t *testing.T) {
+	cfg := &config.Config{
+		CI:     true,
+		Git:    config.GitConfig{TagName: "v${version}"},
+		GitLab: config.GitLabConfig{Milestones: []string{"${version}", "Q4", "v${version}-${branchName}"}},
+	}
+	runner := NewRunner(cfg)
+	runner.ctx.Version = "1.2.0"
+	runner.ctx.BranchName = "main"
+	runner.ctx.UpdateVars()
+
+	got := runner.renderMilestones()
+	want := []string{"1.2.0", "Q4", "v1.2.0-main"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("renderMilestones() = %v, want %v", got, want)
+	}
+
+	cfg.GitLab.Milestones = nil
+	if runner.renderMilestones() != nil {
+		t.Error("no milestones configured must yield nil, not an empty list")
+	}
+}

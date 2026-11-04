@@ -888,3 +888,84 @@ func TestGitLabClient_CreateRelease_RetriesTransient503(t *testing.T) {
 		t.Errorf("Retry-After: 2 must drive the wait, slept %v", slept)
 	}
 }
+
+func TestGitLabClient_CreateRelease_OptionsMilestonesOverrideConfig(t *testing.T) {
+	var receivedReq gitlabCreateReleaseRequest
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&receivedReq)
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"tag_name":"v1.2.0","_links":{"self":"https://gitlab.com/g/p/-/releases/v1.2.0"}}`))
+	}))
+	defer server.Close()
+
+	c := &GitLabClient{
+		config:    &config.GitLabConfig{Milestones: []string{"${version}"}},
+		repoInfo:  testGitLabRepoInfo(),
+		logger:    applog.NewLogger(0, false),
+		client:    server.Client(),
+		baseURL:   server.URL + "/api/v4",
+		token:     "test-token",
+		projectID: "testgroup%2Ftestproject",
+	}
+	// The runner renders the templates and passes the result.
+	_, err := c.CreateRelease(ReleaseOptions{TagName: "v1.2.0", ReleaseName: "Release 1.2.0", Milestones: []string{"1.2.0"}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(receivedReq.Milestones) != 1 || receivedReq.Milestones[0] != "1.2.0" {
+		t.Errorf("milestones sent = %v, want the rendered [1.2.0]", receivedReq.Milestones)
+	}
+}
+
+func TestGitLabClient_UploadAssets_ProjectUploads_FallbackLinkWithoutFullPath(t *testing.T) {
+	tmp := filepath.Join(t.TempDir(), "app.tar.gz")
+	if err := os.WriteFile(tmp, []byte("binary"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var linkBody gitlabReleaseLinkRequest
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/uploads"):
+			w.WriteHeader(http.StatusCreated)
+			// Older self-managed GitLab: no full_path, url is project-relative.
+			_, _ = w.Write([]byte(`{"url":"/uploads/abc123/app.tar.gz"}`))
+		case r.Method == "POST" && strings.Contains(r.URL.Path, "/assets/links"):
+			_ = json.NewDecoder(r.Body).Decode(&linkBody)
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"id":1}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	c := &GitLabClient{
+		config:    &config.GitLabConfig{UseGenericPackageRepositoryForAssets: false},
+		repoInfo:  testGitLabRepoInfo(),
+		logger:    applog.NewLogger(0, false),
+		client:    server.Client(),
+		baseURL:   server.URL + "/api/v4",
+		token:     "test-token",
+		projectID: "testgroup%2Ftestproject",
+	}
+	if err := c.UploadAssets("v1.0.0", []string{tmp}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	wantURL := server.URL + "/testgroup/testproject/uploads/abc123/app.tar.gz"
+	if linkBody.URL != wantURL {
+		t.Errorf("release link URL = %q, want %q (instance + namespace + project-relative url)", linkBody.URL, wantURL)
+	}
+}
+
+func TestNewGitLabClient_DerivesUploadClient(t *testing.T) {
+	t.Setenv("GITLAB_TOKEN", "x")
+	cfg := config.DefaultConfig().GitLab
+	c, err := NewGitLabClient(&cfg, testGitLabRepoInfo(), applog.NewLogger(0, false), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.uploadClient == nil || c.uploadClient.Timeout != 0 {
+		t.Errorf("uploadClient = %+v, want a derived client without overall timeout", c.uploadClient)
+	}
+}

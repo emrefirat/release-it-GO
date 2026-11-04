@@ -1130,6 +1130,7 @@ func (r *Runner) gitlabRelease() error {
 		TagName:      r.ctx.TagName,
 		ReleaseName:  releaseName,
 		ReleaseNotes: releaseNotes,
+		Milestones:   r.renderMilestones(),
 	})
 	if err != nil {
 		r.ctx.Spinner.Stop(false)
@@ -1155,6 +1156,21 @@ func (r *Runner) gitlabRelease() error {
 
 	r.ctx.Spinner.Stop(true)
 	return nil
+}
+
+// renderMilestones renders ${version} and the other template variables in
+// gitlab.milestones — npm release-it documents milestones: ["${version}"],
+// which was sent verbatim and answered with "Milestone(s) not found".
+func (r *Runner) renderMilestones() []string {
+	raw := r.ctx.Config.GitLab.Milestones
+	if len(raw) == 0 {
+		return nil
+	}
+	rendered := make([]string, 0, len(raw))
+	for _, m := range raw {
+		rendered = append(rendered, r.renderReleaseTemplate(m))
+	}
+	return rendered
 }
 
 // sendNotification sends webhook notifications to configured endpoints.

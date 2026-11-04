@@ -1,6 +1,7 @@
 package release
 
 import (
+	"io"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -745,5 +746,50 @@ func TestGitHubClient_UploadAssets_EnterpriseFallbackWithoutUploadURL(t *testing
 	}
 	if gotPath != "/api/uploads/repos/testowner/testrepo/releases/7/assets" {
 		t.Errorf("fallback path = %q, want /api/uploads/...", gotPath)
+	}
+}
+
+func TestGitHubClient_UploadAssets_SlowUploadOutlivesAPITimeout(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.Copy(io.Discard, r.Body)
+		time.Sleep(300 * time.Millisecond) // longer than the API client's overall timeout
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"id":1}`))
+	}))
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+	testFile := tmpDir + "/big.bin"
+	_ = os.WriteFile(testFile, []byte("payload"), 0644)
+
+	api := &http.Client{Transport: server.Client().Transport, Timeout: 100 * time.Millisecond}
+	c := &GitHubClient{
+		config:       &config.GitHubConfig{},
+		repoInfo:     testRepoInfo(),
+		logger:       testLogger(),
+		client:       api,
+		uploadClient: newUploadClient(api),
+		baseURL:      server.URL,
+		token:        "test-token",
+	}
+	if err := c.UploadAssets("1", []string{testFile}); err != nil {
+		t.Fatalf("an asset upload must not be cut by the API timeout: %v", err)
+	}
+
+	// Control: the API client itself gives up on the same exchange.
+	c.uploadClient = nil
+	if err := c.UploadAssets("1", []string{testFile}); err == nil {
+		t.Error("control: the API client's 100ms timeout should have fired")
+	}
+}
+
+func TestNewGitHubClient_DerivesUploadClient(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "x")
+	c, err := NewGitHubClient(&config.GitHubConfig{TokenRef: "GITHUB_TOKEN", Timeout: 5}, testRepoInfo(), testLogger(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.uploadClient == nil || c.uploadClient.Timeout != 0 {
+		t.Errorf("uploadClient = %+v, want a derived client without overall timeout", c.uploadClient)
 	}
 }
