@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.4.3](https://github.com/emrefirat/release-it-GO/compare/v0.4.2...v0.4.3) (2026-11-04)
+
+### Bug Fixes
+
+* **bumper:** preserve INI layout and comments, no HTML escaping in the JSON fallback ([c63e214](https://github.com/emrefirat/release-it-GO/commit/c63e214))
+* **changelog,config:** parse git revert subjects, honor infile: false ([33a9e53](https://github.com/emrefirat/release-it-GO/commit/33a9e53))
+* **cli:** recognize untagged pseudo-versions in the version output ([7f99736](https://github.com/emrefirat/release-it-GO/commit/7f99736))
+* **githook:** deterministic hook scripts, restore the executable bit ([5b832a7](https://github.com/emrefirat/release-it-GO/commit/5b832a7))
+* **hook:** single-pass template rendering, cap RELEASE_* env values ([6d1d5b0](https://github.com/emrefirat/release-it-GO/commit/6d1d5b0))
+* **release:** hide proxy credentials in warnings, map pr targets to merge requests ([830ce19](https://github.com/emrefirat/release-it-GO/commit/830ce19))
+
 ## [0.4.2](https://github.com/emrefirat/release-it-GO/compare/v0.4.1...v0.4.2) (2026-11-04)
 
 ### Bug Fixes
